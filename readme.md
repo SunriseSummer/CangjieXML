@@ -16,11 +16,11 @@
 |---|---|
 | M0 项目脚手架 | ✅ |
 | M1 DOM 内核  | ✅ |
-| M2 Writer    | ⏳ |
+| M2 Writer    | ✅ |
 | M3 Parser    | ⏳ |
 
-目前已经可以 **手工构造** 完整的 XML DOM 树，并对其进行增删改查；
-**解析** 与 **序列化** 将在后续迭代上线。
+现在已经可以 **手工构造** 完整的 XML DOM 树、对其进行增删改查，并把结果
+**确定性地序列化** 为 XML 字符串。**解析** 将在 M3 落地，届时闭合读写循环。
 
 ---
 
@@ -34,10 +34,11 @@ cjpm build
 cjpm test
 ```
 
-### 示例：手工构造一棵 DOM
+### 示例：手工构造一棵 DOM 并序列化
 
 ```cangjie
 import cangjie_xml.dom.*
+import cangjie_xml.writer.*
 
 main() {
     let doc = XmlDocument()
@@ -51,11 +52,16 @@ main() {
     book.setTextContent("SICP")
     root.appendChild(book)
 
-    // 遍历子元素
-    for (b in root.childElements(name: Some("book"))) {
-        println("${b.attribute(\"id\") ?? \"?\"}: ${b.textContent()}")
-    }
-    // 输出: 1: SICP
+    // 美化输出（默认）
+    println(doc.writeToString())
+    // <?xml version="1.0" encoding="UTF-8"?>
+    // <catalog>
+    //     <book id="1">SICP</book>
+    // </catalog>
+
+    // 紧凑输出
+    println(doc.writeToString(XmlWriteOptions.compactPreset()))
+    // <?xml version="1.0" encoding="UTF-8"?><catalog><book id="1">SICP</book></catalog>
 
     0
 }
@@ -155,6 +161,54 @@ XmlNode (sealed abstract)
 
 轻量数据类，字段均可变。`XmlText` 额外带 `isCdata: Bool` 标志 CDATA 段。
 
+### `cangjie_xml.writer` —— 序列化
+
+#### 公共入口
+
+| API | 说明 |
+|---|---|
+| `XmlDocument.writeToString(options?): String` | 把整个文档序列化为字符串（可选配置） |
+| `XmlElement.writeToString(options?): String` | 把单个元素子树序列化（不含声明 / BOM） |
+| `XmlWriter(sink, options:)` | 底层 API：把 DOM 写入任意 `XmlSink` |
+| `StringXmlSink` | 内存 Sink，暴露 `toString()` 读取结果 |
+| `XmlSink` | 自定义 Sink 扩展点（M6 起可接文件 / 流） |
+
+#### `XmlWriteOptions`
+
+不可变 `struct`，所有字段一次构造一次生效，消除全局静态状态。
+
+| 字段 | 默认 | 说明 |
+|---|---|---|
+| `compact` | `false` | `true` 紧凑单行；`false` 美化缩进 |
+| `indent` | `"    "` | 每层嵌套的缩进串（仅美化模式） |
+| `lineEnd` | `"\n"` | 行结束符（仅美化模式） |
+| `writeDeclaration` | `true` | 是否输出 `<?xml ... ?>`；`true` 时已有声明原样输出，没有则合成默认 |
+| `writeBom` | `false` | 是否在开头写入 UTF-8 BOM；也会因 `document.writeBom=true` 自动启用 |
+| `boolTrueText` / `boolFalseText` | `"true"` / `"false"` | 留给 Query / Builder 层使用 |
+
+便捷工厂：`XmlWriteOptions.default_()`、`XmlWriteOptions.compactPreset()`。
+
+#### 排版规则（一图流）
+
+| 元素内容 | 输出 |
+|---|---|
+| 无子节点 | `<e/>` |
+| 单个文本子节点（常见） | `<e>text</e>` |
+| 含文本的混合内容 | 全内联：`<e>a<b/>c</e>`（保留空白语义） |
+| 仅元素 / 注释 / 未知节点子 | 块级：每个子节点独占一行，按 `indent` 缩进 |
+
+#### 转义
+
+- **文本节点**：`&` / `<` / `>` → 对应实体
+- **属性值**：追加 `"` → `&quot;`
+- **CDATA**：不转义；若内容含 `]]>` 自动按规范拆段
+- **快路径**：输入不含任何需转义字符时直接返回原字符串，零分配
+
+#### 确定性契约
+
+**相同 DOM + 相同 `XmlWriteOptions` → 逐字节相同的输出**。专项测试
+`testDeterminism` 保证；这使 diff、缓存失效、签名校验等外围工程成为可能。
+
 ---
 
 ## 与 tinyxml2 的映射
@@ -175,9 +229,9 @@ XmlNode (sealed abstract)
 ```text
 M0 脚手架  ✅
   ↓
-M1 DOM 内核  ✅  ← 你当前所处的稳定面
+M1 DOM 内核  ✅
   ↓
-M2 Writer
+M2 Writer  ✅  ← 你当前所处的稳定面（DOM + 确定性序列化）
   ↓
 M3 Parser
   ↓

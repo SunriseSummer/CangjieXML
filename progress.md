@@ -8,10 +8,10 @@
 
 | 里程碑 | 名称 | 状态 | 说明 |
 |---|---|---|---|
-| M0 | 项目脚手架 | ✅ 已完成 | 本次迭代落地 |
-| M1 | DOM 内核 | ✅ 已完成 | 本次迭代落地 |
-| M2 | Writer | ⏳ 未开始 | 下一迭代候选 |
-| M3 | Parser | ⏳ 未开始 | |
+| M0 | 项目脚手架 | ✅ 已完成 | 迭代 1 |
+| M1 | DOM 内核 | ✅ 已完成 | 迭代 1 |
+| M2 | Writer | ✅ 已完成 | **迭代 2（本次）** |
+| M3 | Parser | ⏳ 未开始 | 下一迭代候选 |
 | M4 | Query + Builder | ⏳ 未开始 | |
 | M5 | Visit | ⏳ 未开始 | |
 | M6 | IO + Error + Options 收口 | ⏳ 未开始 | 错误枚举骨架已预落位 |
@@ -28,75 +28,96 @@ tinyxml2 v11.0.0 公共 API 能力清单（按 DESIGN.md §3.2 归纳），以�
 |---|---|---|---|
 | 1 | DOM：`XMLDocument` / `XMLElement` / `XMLText` / `XMLComment` / `XMLDeclaration` / `XMLUnknown` / `XMLAttribute` | `dom.XmlDocument` / `XmlElement` / `XmlText` / `XmlComment` / `XmlDeclaration` / `XmlUnknown` / `XmlAttribute` | ✅ 已覆盖（M1） |
 | 2 | 解析：`Parse(const char*)` / `LoadFile` / 流式 / 字节数组 | `XmlDocument.parseString` / `parseBytes` / `loadFile` | ⏳ M3 |
-| 3 | 序列化：`XMLPrinter` / `Print` / 紧凑 vs 格式化 | `writer.XmlWriter` / `XmlDocument.writeToString` / `saveFile` | ⏳ M2 |
+| 3 | 序列化：`XMLPrinter` / `Print` / 紧凑 vs 格式化 | `writer.XmlWriter` + `XmlDocument/XmlElement.writeToString` | ✅ 已覆盖（M2） |
 | 4 | 类型化属性：`IntAttribute` / `BoolAttribute` / `QueryXxx` | `query.*` 扩展 + `XmlValueCodec<T>` | ⏳ M4 |
 | 5 | 访问者：`XMLVisitor` + `Accept` | `visit.XmlVisitor` + `walk()` | ⏳ M5 |
 | 6 | 安全导航：`XMLHandle` / `XMLConstHandle` | 以 `Option<T>` + `?.` / `??` 语言原生替代 | ✅ 已用语言特性替代（M1） |
 | 7 | 错误报告：错误码 + 行号 + 附加文本 | `error.XmlError` 枚举 + `SourcePos` | 🟡 骨架已落位，行列填值待 M3 |
 | 8 | 空白策略：`PRESERVE_WHITESPACE` / `COLLAPSE_WHITESPACE` / `PEDANTIC_WHITESPACE` | `parser.XmlWhitespaceMode` | ⏳ M3 |
 | 9 | 工程性保护：最大嵌套深度 | `XmlParseOptions.maxElementDepth`（默认 500） | ⏳ M3 |
+| 10 | 全局静态写出开关（tinyxml2 有） | **不采用**，统一为 `XmlWriteOptions` 显式配置 | ✅（M2，显式优于隐式） |
 
 图例： ✅ 已完成  🟡 部分完成  ⏳ 未开始
 
 ---
 
-## 3. 本次迭代（M0 + M1）详情
+## 3. 迭代 1（M0 + M1）——见 git 历史
 
-### 3.1 增量
-
-- **M0 项目脚手架**
-  - `cjpm.toml`（`cjc-version = "1.0.5"`，`output-type = "static"`）
-  - `src/lib.cj`、`src/version.cj`、`src/smoke_test.cj`
-  - `.gitignore`
-- **error 模块（最小骨架）**
-  - `SourcePos`：`offset / line / column` 位置结构
-  - `XmlError`：完整 14 个错误构造器（M1 本次仅启用 `DomOperationFailed`，其余
-    M3 / M4 / M6 将按里程碑激活）
-  - `XmlException`：不可预期的 API 误用异常
-- **M1 DOM 内核**
-  - `XmlNodeKind`：文档 / 元素 / 文本 / 注释 / 声明 / 未知六分支枚举
-  - `XmlNode`：`sealed abstract class`，持有 `document` / `parent` / `prev` / `next`
-    导航状态、`kind()`、`removeSelf()`、引用相等 `==`
-  - `XmlDocument`：节点工厂、顶层节点链表、`rootElement` / `declaration` 便捷访问、
-    根元素与声明唯一性约束、文本节点禁止直接置顶层、`clear()` 重置
-  - `XmlElement`：属性顺序保留 + 名称索引、属性的新增 / 覆盖 / 删除 / 枚举；
-    子节点双向链表、`appendChild` / `prependChild` / `insertChildBefore` /
-    `removeChild`；`childNodes()` / `childElements(name:)` /
-    `firstChildElement(name:)` 迭代器；`textContent()` / `setTextContent()`；
-    环路检测、跨文档插入禁止、节点跨父移动的自动解挂
-  - `XmlAttribute` / `XmlText` / `XmlComment` / `XmlDeclaration` / `XmlUnknown`：
-    轻量数据类型
-- **测试**
-  - 20 个 DOM 行为测试 + 1 个根包版本测试 = **21 个 @Test 全绿**
-  - 覆盖：节点工厂文档归属、根元素 / 声明唯一性、兄弟导航、跨父移动、
-    环路与跨文档拒绝、属性顺序与覆盖、`textContent` 递归拼接、
-    `XmlNodeKind` 模式匹配穷举性等
-
-### 3.2 质量门禁
-
-| 门禁 | 状态 |
-|---|---|
-| `cjpm build` | ✅ 成功 |
-| `cjpm test` | ✅ 21/21 通过 |
-| 公共 API 文档注释 | ✅ 覆盖全部公共类型 / 方法 |
-| 非标准库依赖 | ✅ 零 |
-
-### 3.3 设计偏差说明
-
-| DESIGN 原文 | 实际实现 | 原因 |
-|---|---|---|
-| `public sealed interface XmlNode` | `sealed abstract class XmlNode` | 避免在 6 个子类里重复实现链表导航状态；sealed + abstract 的封闭性与接口形态等价，模式匹配仍由 `XmlNodeKind` enum 承载，对用户无差别（DESIGN.md 已附加说明） |
-| `XmlNode.accept(visitor)` | M1 阶段未提供 | `XmlVisitor` 属于 M5；为避免循环依赖，`accept` 将在 M5 通过扩展函数补回 |
+DOM 内核及脚手架。详见上一轮进度记录（commit `8d6cecd`）。
 
 ---
 
-## 4. 下一步候选
+## 4. 迭代 2（M2 Writer）——本次
 
-建议的下一次迭代：**M2 Writer**。理由：
+### 4.1 存量检视结论
 
-1. Writer 不依赖 Parser，可在 DOM 稳定基础上直接落地；
-2. 先建立"DOM → 字符串"的确定性输出，能立即为未来 Parser 的 round-trip
-   测试提供黄金基线；
-3. 代码量与 50 分钟 / 1 万行预算相容。
+复核 M1 DOM，确认 Writer 仅通过 `XmlNode` 公共导航 API（`firstChild` /
+`nextSibling` / `kind()` / `childNodes()` / `attributes()` 等）即可完成全部遍历，
+**无需修改 DOM 内核**。M1 的接口设计经受住了 Writer 的实际使用。
 
-Writer 上线后，即可开始 M3（Parser），完成读写闭环。
+### 4.2 增量
+
+- **`internal` 包**（新建）
+  - `escapeText(s)`：PCDATA 转义（`&` / `<` / `>`），不含特殊字符走零分配快路径
+  - `escapeAttribute(s)`：属性值转义（`&` / `<` / `>` / `"`）
+  - `escapeCdata(s)`：CDATA 段构造，正确处理含 `]]>` 子串的情况（按规范分段）
+  - `UTF8_BOM` / `UTF8_BOM_STRING`：BOM 常量
+
+- **`writer` 包**（新建）
+  - `XmlWriteOptions`：不可变 `struct`，封装 `compact` / `indent` / `lineEnd` /
+    `writeDeclaration` / `writeBom` / `boolTrueText` / `boolFalseText`；
+    提供 `default_()` / `compactPreset()` 工厂
+  - `XmlSink` interface + `StringXmlSink` 默认实现
+  - `XmlWriter`：递归下降写出器，对每种节点单独分派；自动识别自闭合、
+    内联单文本、混合内容、块级嵌套四种排版情形
+  - `extend XmlDocument { writeToString(options?: ...) }` 与
+    `extend XmlElement { writeToString(options?: ...) }`：通过扩展声明把
+    DESIGN §6.2 承诺的公共 API 植回 DOM 类型，同时保留 `dom` 包不依赖 `writer`
+
+### 4.3 排版决策
+
+| 元素内容 | 输出形态 | 示例 |
+|---|---|---|
+| 无子节点 | 自闭合 | `<e/>` |
+| 单个文本子节点 | 内联 | `<e>text</e>` |
+| **任一**子节点为文本 / CDATA（混合内容） | 全内联 | `<e>a<b/>c</e>` |
+| 全部子节点为元素 / 注释 / 未知节点 | 块级缩进 | `<r>\n    <a/>\n    <b/>\n</r>` |
+
+关键取舍：混合内容**不换行**——因为在 XML 中文本节点空白具有语义，
+机械插入 `\n` 或缩进会改变文档意义。这与 tinyxml2 的策略一致，也是
+"先正确、再美化" 的原则。
+
+### 4.4 质量门禁
+
+| 门禁 | 状态 |
+|---|---|
+| `cjpm build` | ✅ 成功（仅两条 `writeToString` unused-warning，因公共 API 在库内未被调用，属预期） |
+| `cjpm test` | ✅ **42/42 通过**（20 DOM + 21 Writer + 1 根包） |
+| 确定性契约 | ✅ 专项测试 `testDeterminism` 验证相同 DOM+options → 相同输出 |
+| 公共 API 文档注释 | ✅ 全覆盖 |
+| 非标准库依赖 | ✅ 零 |
+
+### 4.5 设计偏差说明
+
+| DESIGN 原文 | 实际实现 | 原因 |
+|---|---|---|
+| `XmlDocument.writeToString()` 直接挂在 DOM 类型上 | 通过 `writer` 包内 `extend XmlDocument` 植入 | 保持 DESIGN §4 的分层方向（`writer` → `dom`），避免循环依赖；对用户 API 无差别 |
+| `XmlWriter` 复用 `XmlVisitor` 机制（§9.4） | M2 阶段直接递归下降 | `XmlVisitor` 属 M5；Writer 改写仅为内部重构，不影响外部契约 |
+
+### 4.6 规模
+
+- 本次迭代新增有效代码 ~680 行（生产 ~350 + 测试 ~330），远低于 1 万行预算
+- 累计代码 ~2,250 行
+
+---
+
+## 5. 下一步候选
+
+建议的下一次迭代：**M3 Parser**。理由：
+
+1. Writer 已为 Parser 提供"round-trip"黄金基线——解析完再写出应与规范化输入一致；
+2. Parser 上线后即闭合读写循环，库可独立完成 tinyxml2 的核心使用场景；
+3. `error.XmlError` 的解析类构造器（`MismatchedElement` / `InvalidAttribute` / …）
+   在 M1 已预落位，M3 只需填值，不需重构签名；
+4. 代码量与 50 分钟 / 1 万行预算相容。
+
