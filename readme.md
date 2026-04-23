@@ -18,10 +18,10 @@
 | M1 DOM 内核  | ✅ |
 | M2 Writer    | ✅ |
 | M3 Parser    | ✅ |
+| M4 Query + Builder | ✅ |
 | 质量红线（单文件 ≤ 300 行 / 无下划线前缀 / 常量化 / 低圈复杂度） | ✅ |
 
-现在读写循环已闭合：可以用 `XmlDocument.parseString(xml)` 解析字符串、
-增删改 DOM，再用 `XmlWriter` 确定性写回。测试 **65/65 通过**。
+读写循环已闭合，类型化查询与 Builder DSL 已就绪。测试 **94/94 通过**。
 
 ---
 
@@ -91,6 +91,38 @@ main() {
     } catch (e: XmlParseException) {
         println("parse error: ${e.error}")
     }
+    0
+}
+```
+
+### 示例：Builder DSL + 类型化查询
+
+```cangjie
+import cangjie_xml.dom.*
+import cangjie_xml.build.*
+import cangjie_xml.query.*
+
+main() {
+    // 用 Builder 构造
+    let doc = XmlDocumentBuilder()
+        .declaration()
+        .root("catalog") { r =>
+            r.element("book") { b =>
+                b.attributeAs<Int64>("id", 1, INT64_CODEC)
+                 .attributeAs<Bool>("avail", true, BOOL_CODEC)
+                 .text("SICP")
+            }
+        }
+        .build()
+
+    let root = doc.rootElement.getOrThrow()
+    let book = root.requiredChildElement("book")
+    println(book.intAttribute("id"))       // Some(1)
+    println(book.boolAttribute("avail"))   // Some(true)
+    println(book.textContent())            // "SICP"
+
+    // 缺失/解析失败时的统一处理
+    println(book.attributeOr<Int64>("missing", INT64_CODEC, 0))  // 0
     0
 }
 ```

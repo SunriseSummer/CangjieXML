@@ -12,8 +12,8 @@
 | M1 | DOM 内核 | ✅ 已完成 | 迭代 1 |
 | M2 | Writer | ✅ 已完成 | 迭代 2 |
 | 质量红线 | 单文件≤300行 / 无下划线前缀 / 低圈复杂度 / 无魔鬼数 | ✅ 已落地 | 迭代 3（阶段 A） |
-| M3 | Parser | ✅ 已完成 | **迭代 3（本次，阶段 B）** |
-| M4 | Query + Builder | ⏳ 未开始 | |
+| M3 | Parser | ✅ 已完成 | 迭代 3（阶段 B） |
+| M4 | Query + Builder | ✅ 已完成 | **迭代 4（本次）** |
 | M5 | Visit | ⏳ 未开始 | |
 | M6 | IO + Error + Options 收口 | ⏳ 未开始 | 错误枚举骨架已预落位 |
 | M7 | Batch / Concurrency | ⏳ 未开始 | |
@@ -30,7 +30,7 @@ tinyxml2 v11.0.0 公共 API 能力清单（按 DESIGN.md §3.2 归纳），以�
 | 1 | DOM：`XMLDocument` / `XMLElement` / `XMLText` / `XMLComment` / `XMLDeclaration` / `XMLUnknown` / `XMLAttribute` | `dom.XmlDocument` / `XmlElement` / `XmlText` / `XmlComment` / `XmlDeclaration` / `XmlUnknown` / `XmlAttribute` | ✅ 已覆盖（M1） |
 | 2 | 解析：`Parse(const char*)` / `LoadFile` / 流式 / 字节数组 | `XmlDocument.parseString` / `parseBytes` / `loadFile` | 🟡 `parseString` 已完成（M3）；`parseBytes` / `loadFile` 见 M6 |
 | 3 | 序列化：`XMLPrinter` / `Print` / 紧凑 vs 格式化 | `writer.XmlWriter` + `XmlDocument/XmlElement.writeToString` | ✅ 已覆盖（M2） |
-| 4 | 类型化属性：`IntAttribute` / `BoolAttribute` / `QueryXxx` | `query.*` 扩展 + `XmlValueCodec<T>` | ⏳ M4 |
+| 4 | 类型化属性：`IntAttribute` / `BoolAttribute` / `QueryXxx` | `query.*` 扩展 + `XmlValueCodec<T>` | ✅ 已完成（M4） |
 | 5 | 访问者：`XMLVisitor` + `Accept` | `visit.XmlVisitor` + `walk()` | ⏳ M5 |
 | 6 | 安全导航：`XMLHandle` / `XMLConstHandle` | 以 `Option<T>` + `?.` / `??` 语言原生替代 | ✅ 已用语言特性替代（M1） |
 | 7 | 错误报告：错误码 + 行号 + 附加文本 | `error.XmlError` 枚举 + `SourcePos` + `XmlParseException` | ✅ 已完成（M3） |
@@ -220,10 +220,98 @@ src/error/
 | `XmlParser` 单文件包含所有解析流程 | 拆 `xml_parser.cj` + `xml_parser_toplevel.cj` + `xml_parser_element.cj` 三文件 | 单文件 300 行红线 + 绕开 cjc 1.0.5 下 "主类调用 extend 方法" 的解析限制 |
 | 错误以 `Result<T, XmlError>` 返回 | `XmlParseException(XmlError, SourcePos)` 异常 | 减少每层签名噪声；对外 `parseString` 一处捕获点即可；`error` 字段保留枚举可模式匹配 |
 
-### 5.4 下一步候选
+### 5.4 M4 Query + Builder（迭代 4）
 
-建议的下一次迭代：**M4 Query + Builder**。理由：
-1. 读写闭环已完成，类型化访问（`IntAttribute` / `BoolAttribute` / `QueryXxx`）是 tinyxml2 用户最常触达的第二层 API；
-2. `XmlValueCodec<T>` 在 DESIGN §7 已有详细签名，只需落地；
-3. Builder DSL 是"锦上添花"的体验优化，可与 Query 并行引入。
+#### 5.4.1 新增包结构
+
+```
+src/query/
+  xml_value_codec.cj         (37)  XmlValueCodec<T> 双向编解码接口
+  builtin_codecs.cj         (140)  Int64/Int32/Float64/Bool/String codec + 单例 + trim/lower 工具
+  xml_queryable.cj           (37)  XmlQueryable 接口（契约：cjc 1.0.5 跨包扩展可见性要求）
+  element_query.cj          (118)  extend XmlElement <: XmlQueryable 实现
+  query_test.cj             (186)  19 个 Query 测试用例
+src/build/
+  xml_element_builder.cj     (69)  XmlElementBuilder（立即落回 DOM，不形成平行结构）
+  xml_document_builder.cj    (60)  XmlDocumentBuilder
+  build_test.cj             (165)  10 个 Builder 测试用例（含 end-to-end round-trip）
+src/parser/
+  dom_parse_ext.cj          (46)  （扩展）新增顶层 parseXml() 函数，作为跨包稳定入口
+```
+
+#### 5.4.2 Query：`XmlValueCodec<T>` + extension
+
+```cangjie
+public interface XmlValueCodec<T> {
+    func tryParse(text: String): ?T    // 失败返回 None，不抛异常
+    func format(value: T): String
+}
+```
+
+内置 codec 单例：`INT64_CODEC` / `INT32_CODEC` / `FLOAT64_CODEC` / `BOOL_CODEC` / `STRING_CODEC`。
+
+`XmlQueryable` 接口 + `extend XmlElement <: XmlQueryable` 共 13 个方法：
+
+| 方法 | 语义 |
+|---|---|
+| `attributeAs<T>(name, codec): ?T` | 读属性 + 泛型解析 |
+| `intAttribute` / `int32Attribute` / `doubleAttribute` / `boolAttribute` | 常见标量的便捷短写 |
+| `requiredAttribute(name): String` | 缺失抛 `XmlException` |
+| `requiredAttributeAs<T>(name, codec): T` | 缺失或解析失败均抛 `XmlException` |
+| `attributeOr<T>(name, codec, fallback): T` | 默认值兜底 |
+| `childElement(name): ?XmlElement` | 按名字定位子元素 |
+| `requiredChildElement(name): XmlElement` | 缺失抛 `XmlException` |
+| `childElementText(name): ?String` / `childElementTextAs<T>` / `childElementTexts` | 子元素的文本读取（单值 / 解析 / 多值） |
+
+#### 5.4.3 Builder：立即落回 DOM，不形成平行结构
+
+```cangjie
+let doc = XmlDocumentBuilder()
+    .declaration()
+    .root("catalog") { r =>
+        r.element("book") { b =>
+            b.attributeAs<Int64>("id", 1, INT64_CODEC)
+             .text("SICP")
+        }
+    }
+    .build()   // 返回的就是普通 XmlDocument
+```
+
+- `XmlDocumentBuilder`：`declaration` / `comment` / `root` / `build`；`declaration` 幂等。
+- `XmlElementBuilder`：`attribute` / `attributeAs<T>` / `text(cdata?)` / `comment` / `element(name, configure)` / `build`。
+- 所有写入**立即**落到底层 `XmlDocument`：不持有平行表示、不做事务性提交。用户在 `configure` lambda 里拿到 child builder，也是对同一棵真实 DOM 的引用。
+
+#### 5.4.4 cjc 1.0.5 跨包扩展可见性问题
+
+本次落地过程中发现一个关键规则：
+
+> 跨包使用 `extend T { ... }`（不实现接口）的方法，调用方需要"导入该扩展的某个继承接口"——对纯追加方法的扩展这是**死锁**，因为没有接口可导入。
+>
+> 使用 `extend T <: I { ... }` 时，调用方**只能**看到 `I` 中声明的方法，其余 `public` 方法不可见。
+
+处理方式：
+- `query` 包：定义 `public interface XmlQueryable`，把所有 13 个公共方法签名声明在其中，然后 `extend XmlElement <: XmlQueryable` 实现之。
+- `parser` 包：已有的 `extend XmlDocument.parseString` 跨包不可用；新增 **顶层** `parseXml(xml, options?)` 函数作为稳定跨包入口，`parseString` 保留作为同包/未来兼容入口。
+
+#### 5.4.5 质量门禁
+
+| 门禁 | 状态 |
+|---|---|
+| `cjpm build` | ✅ 成功 |
+| `cjpm test` | ✅ **94/94 通过**（20 DOM + 21 Writer + 23 Parser + 19 Query + 10 Build + 1 根包） |
+| 单文件 ≤ 300 行 | ✅ 最长仍为 298（`xml_writer.cj`） |
+| 无下划线前缀标识符 | ✅ |
+| 无魔鬼字符串 / 数字 | ✅ |
+| 非标准库依赖 | ✅ 零 |
+
+#### 5.4.6 E2E 回归
+
+`testRoundTripBuildWriteParseQuery` 连接四条链路：**Builder → Writer → Parser → Query**，验证类型化属性（`Int64` / `Bool`）与子元素查询能完整穿越读写闭环。
+
+### 5.5 下一步候选
+
+建议：**M5 Visit**（`XmlVisitor` + `walk(node, fn)` 函数式遍历）。理由：
+1. Query/Build 已覆盖"按名字定位 + 构造"的最常见诉求；Visit 则补齐"无特定名字、需要遍历整棵树"的场景。
+2. tinyxml2 的 `XMLVisitor` + `Accept` 是其公共 API 的最后一大块，落地后能让 Cangjie 与 tinyxml2 的功能对齐度达到 90%+。
+3. 仓颉的函数式 `walk()` 可与经典 Visitor 并行提供，用最小代码覆盖最多风格。
 
