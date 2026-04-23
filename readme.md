@@ -17,10 +17,11 @@
 | M0 项目脚手架 | ✅ |
 | M1 DOM 内核  | ✅ |
 | M2 Writer    | ✅ |
-| M3 Parser    | ⏳ |
+| M3 Parser    | ✅ |
+| 质量红线（单文件 ≤ 300 行 / 无下划线前缀 / 常量化 / 低圈复杂度） | ✅ |
 
-现在已经可以 **手工构造** 完整的 XML DOM 树、对其进行增删改查，并把结果
-**确定性地序列化** 为 XML 字符串。**解析** 将在 M3 落地，届时闭合读写循环。
+现在读写循环已闭合：可以用 `XmlDocument.parseString(xml)` 解析字符串、
+增删改 DOM，再用 `XmlWriter` 确定性写回。测试 **65/65 通过**。
 
 ---
 
@@ -63,6 +64,33 @@ main() {
     println(doc.writeToString(XmlWriteOptions.compactPreset()))
     // <?xml version="1.0" encoding="UTF-8"?><catalog><book id="1">SICP</book></catalog>
 
+    0
+}
+```
+
+### 示例：解析 XML 字符串
+
+```cangjie
+import cangjie_xml.dom.*
+import cangjie_xml.parser.*
+import cangjie_xml.error.*
+
+main() {
+    try {
+        let doc = XmlDocument.parseString(
+            "<catalog><book id=\"1\">SICP</book></catalog>")
+        println(doc.rootElement.getOrThrow().firstChildElement(name: Some("book"))
+                   .getOrThrow().textContent())
+        // SICP
+
+        // Collapse 模式：折叠空白并删除纯空白文本节点
+        let opts = XmlParseOptions(whitespace: Collapse)
+        let doc2 = XmlDocument.parseString("<r>  a\n  b  </r>", opts)
+        println(doc2.rootElement.getOrThrow().textContent())
+        // "a b"
+    } catch (e: XmlParseException) {
+        println("parse error: ${e.error}")
+    }
     0
 }
 ```

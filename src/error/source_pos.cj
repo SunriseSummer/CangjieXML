@@ -3,7 +3,10 @@ package cangjie_xml.error
 /**
  * 表示源文本中的一个位置坐标。
  *
- * - `offset`：从文档起始字节（忽略 BOM 之后）算起的字节偏移，0 起。
+ * - `offset`：从文档起始（忽略 BOM 之后）算起的位置。单位由生产者决定：
+ *   目前的 `XmlDocument.parseString` 产出的 `SourcePos.offset` 是 **Rune（码点）索引**，
+ *   而非字节偏移——这与 `line` / `column` 以码点计数保持一致。后续若补入基于字节流的
+ *   IO 入口（见 M6），可在相应文档中再额外说明。
  * - `line`：行号，1 起。
  * - `column`：列号（以 UTF-8 码点计），1 起。
  *

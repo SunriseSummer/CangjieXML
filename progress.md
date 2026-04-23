@@ -11,8 +11,8 @@
 | M0 | 项目脚手架 | ✅ 已完成 | 迭代 1 |
 | M1 | DOM 内核 | ✅ 已完成 | 迭代 1 |
 | M2 | Writer | ✅ 已完成 | 迭代 2 |
-| 质量红线 | 单文件≤300行 / 无下划线前缀 / 低圈复杂度 / 无魔鬼数 | ✅ 已落地 | 迭代 3 |
-| M3 | Parser | 🟡 进行中 | **迭代 3（本次）** |
+| 质量红线 | 单文件≤300行 / 无下划线前缀 / 低圈复杂度 / 无魔鬼数 | ✅ 已落地 | 迭代 3（阶段 A） |
+| M3 | Parser | ✅ 已完成 | **迭代 3（本次，阶段 B）** |
 | M4 | Query + Builder | ⏳ 未开始 | |
 | M5 | Visit | ⏳ 未开始 | |
 | M6 | IO + Error + Options 收口 | ⏳ 未开始 | 错误枚举骨架已预落位 |
@@ -28,14 +28,14 @@ tinyxml2 v11.0.0 公共 API 能力清单（按 DESIGN.md §3.2 归纳），以�
 | # | tinyxml2 能力 | CangjieXML 对应 | 状态 |
 |---|---|---|---|
 | 1 | DOM：`XMLDocument` / `XMLElement` / `XMLText` / `XMLComment` / `XMLDeclaration` / `XMLUnknown` / `XMLAttribute` | `dom.XmlDocument` / `XmlElement` / `XmlText` / `XmlComment` / `XmlDeclaration` / `XmlUnknown` / `XmlAttribute` | ✅ 已覆盖（M1） |
-| 2 | 解析：`Parse(const char*)` / `LoadFile` / 流式 / 字节数组 | `XmlDocument.parseString` / `parseBytes` / `loadFile` | ⏳ M3 |
+| 2 | 解析：`Parse(const char*)` / `LoadFile` / 流式 / 字节数组 | `XmlDocument.parseString` / `parseBytes` / `loadFile` | 🟡 `parseString` 已完成（M3）；`parseBytes` / `loadFile` 见 M6 |
 | 3 | 序列化：`XMLPrinter` / `Print` / 紧凑 vs 格式化 | `writer.XmlWriter` + `XmlDocument/XmlElement.writeToString` | ✅ 已覆盖（M2） |
 | 4 | 类型化属性：`IntAttribute` / `BoolAttribute` / `QueryXxx` | `query.*` 扩展 + `XmlValueCodec<T>` | ⏳ M4 |
 | 5 | 访问者：`XMLVisitor` + `Accept` | `visit.XmlVisitor` + `walk()` | ⏳ M5 |
 | 6 | 安全导航：`XMLHandle` / `XMLConstHandle` | 以 `Option<T>` + `?.` / `??` 语言原生替代 | ✅ 已用语言特性替代（M1） |
-| 7 | 错误报告：错误码 + 行号 + 附加文本 | `error.XmlError` 枚举 + `SourcePos` | 🟡 骨架已落位，行列填值待 M3 |
-| 8 | 空白策略：`PRESERVE_WHITESPACE` / `COLLAPSE_WHITESPACE` / `PEDANTIC_WHITESPACE` | `parser.XmlWhitespaceMode` | ⏳ M3 |
-| 9 | 工程性保护：最大嵌套深度 | `XmlParseOptions.maxElementDepth`（默认 500） | ⏳ M3 |
+| 7 | 错误报告：错误码 + 行号 + 附加文本 | `error.XmlError` 枚举 + `SourcePos` + `XmlParseException` | ✅ 已完成（M3） |
+| 8 | 空白策略：`PRESERVE_WHITESPACE` / `COLLAPSE_WHITESPACE` / `PEDANTIC_WHITESPACE` | `parser.XmlWhitespaceMode` | ✅ `Preserve`/`Collapse` 已完成（M3）；`Pedantic` 按需再补 |
+| 9 | 工程性保护：最大嵌套深度 | `XmlParseOptions.maxElementDepth`（默认 500） | ✅ 已完成（M3） |
 | 10 | 全局静态写出开关（tinyxml2 有） | **不采用**，统一为 `XmlWriteOptions` 显式配置 | ✅（M2，显式优于隐式） |
 
 图例： ✅ 已完成  🟡 部分完成  ⏳ 未开始
@@ -148,7 +148,82 @@ src/internal/
   text_escape.cj           (173)  escapeText/Attribute/Cdata + BOM 常量
 ```
 
-### 5.3 M3 Parser（阶段 B，进行中）
+### 5.3 M3 Parser（阶段 B）
 
-见下一次 report_progress。
+#### 5.3.1 新增包结构
+
+```
+src/parser/
+  xml_parse_options.cj       (53)  XmlParseOptions / XmlWhitespaceMode / DEFAULT_MAX_ELEMENT_DEPTH
+  source_cursor.cj          (163)  SourceCursor + 字符分类工具
+  entity_decoder.cj         (184)  decodeEntities + 数值/命名实体 + XML 1.0 Char 校验
+  xml_parser.cj             (137)  XmlParser 类骨架 + 基础工具 (matchesChar/consumeExpected/readName)
+  xml_parser_toplevel.cj    (158)  extend XmlParser：顶层分派 + 声明 / 注释 / CDATA / 未知节点
+  xml_parser_element.cj     (194)  extend XmlParser：元素 / 属性 / 子节点 / 文本 / 闭合标签
+  dom_parse_ext.cj           (27)  extend XmlDocument.parseString
+  parser_test.cj            (286)  23 个测试用例
+src/error/
+  xml_parse_exception.cj     (25)  XmlParseException（包装 XmlError）
+```
+
+#### 5.3.2 功能覆盖
+
+| 语法构造 | 状态 |
+|---|---|
+| 自闭合元素、开 / 闭标签、嵌套元素 | ✅ |
+| 属性（单 / 双引号、实体还原、重复检查、`<` 禁用） | ✅ |
+| XML 声明 `<?xml ... ?>`（保留原始 payload） | ✅ |
+| 处理指令 `<?target ... ?>`（写入 `XmlUnknown`） | ✅ |
+| 注释 `<!-- ... -->` | ✅ |
+| CDATA `<![CDATA[ ... ]]>`（元素内合法；顶层报错） | ✅ |
+| `<!DOCTYPE ...>` / `<!ENTITY ...>`（`XmlUnknown` 原样收容） | ✅ |
+| 实体还原：`&amp; &lt; &gt; &quot; &apos; &#NN; &#xNN;` | ✅ |
+| UTF-8 BOM：可选接受 / 拒绝 | ✅ |
+| 空白策略：`Preserve` / `Collapse` | ✅ |
+| 最大嵌套深度（默认 500，可配置） | ✅ |
+| 根元素唯一性检查、空文档检查 | ✅ |
+| 源位置 `SourcePos` 精确到行列 | ✅ |
+
+#### 5.3.3 错误用例覆盖
+
+- `EmptyDocument`
+- `MismatchedElement`（`<a></b>` / EOF 未闭合）
+- `InvalidText`（未知实体 / 顶层文本 / 顶层 CDATA / 不匹配的 `</...>`）
+- `InvalidAttribute`（未引号化 / `<` 在属性内 / 未闭合 / 重复）
+- `InvalidDeclaration`（未终止 PI）
+- `InvalidComment`（未终止注释）
+- `InvalidUnknownNode`（未终止 `<!` 块）
+- `InvalidEncoding`（`acceptBom=false` 时遇到 BOM）
+- `ElementDepthExceeded`（可配置 `maxElementDepth`）
+
+#### 5.3.4 Round-trip
+
+两条测试覆盖 "parse → write → 再 parse → 等价"：
+1. `testParseRoundTripSimple`：普通元素/属性/文本
+2. `testParseRoundTripWithEntities`：文本中含 `&`/`<`/`>` 等需转义字符
+
+#### 5.3.5 质量门禁
+
+| 门禁 | 状态 |
+|---|---|
+| `cjpm build` | ✅ 成功（仅 unused-warning，预期） |
+| `cjpm test` | ✅ **65/65 通过**（20 DOM + 21 Writer + 23 Parser + 1 根包） |
+| 单文件 ≤ 300 行 | ✅ 最长 298（`xml_writer.cj`） |
+| 无下划线前缀标识符 | ✅ 全仓通过 |
+| 无魔鬼字符串 / 数字 | ✅ 标签 / 实体分隔符 / BOM / 嵌套深度默认值均常量化 |
+| 非标准库依赖 | ✅ 零 |
+
+#### 5.3.6 设计偏差
+
+| 原计划 | 实际 | 原因 |
+|---|---|---|
+| `XmlParser` 单文件包含所有解析流程 | 拆 `xml_parser.cj` + `xml_parser_toplevel.cj` + `xml_parser_element.cj` 三文件 | 单文件 300 行红线 + 绕开 cjc 1.0.5 下 "主类调用 extend 方法" 的解析限制 |
+| 错误以 `Result<T, XmlError>` 返回 | `XmlParseException(XmlError, SourcePos)` 异常 | 减少每层签名噪声；对外 `parseString` 一处捕获点即可；`error` 字段保留枚举可模式匹配 |
+
+### 5.4 下一步候选
+
+建议的下一次迭代：**M4 Query + Builder**。理由：
+1. 读写闭环已完成，类型化访问（`IntAttribute` / `BoolAttribute` / `QueryXxx`）是 tinyxml2 用户最常触达的第二层 API；
+2. `XmlValueCodec<T>` 在 DESIGN §7 已有详细签名，只需落地；
+3. Builder DSL 是"锦上添花"的体验优化，可与 Query 并行引入。
 
