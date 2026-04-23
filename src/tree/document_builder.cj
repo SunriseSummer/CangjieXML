@@ -145,7 +145,7 @@ public class DocumentBuilder {
         }
         let decl = match (xmlDecl) {
             case Some(d) => d
-            case None => XmlDecl(position: Position.unknown())
+            case None => XmlDecl(position: Position.unknown(), isSynthetic: true)
         }
         let root = match (rootElem) {
             case Some(r) => r

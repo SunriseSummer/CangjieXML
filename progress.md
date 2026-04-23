@@ -1,6 +1,6 @@
 # CangjieXML 开发进度
 
-> 相对 [libxml2 v2.15.3](./.libxml2-2.15.3) 全量功能的实现情况。最新更新：迭代 8 结束（Phase 4a —— `tree` 只读 DOM + `DocumentBuilder`）。
+> 相对 [libxml2 v2.15.3](./.libxml2-2.15.3) 全量功能的实现情况。最新更新：迭代 9 结束（Phase 5a —— 基础 `DocumentSerializer`：DOM → 字符串 + parse → serialize → parse 往返测试）。
 
 ---
 
@@ -13,7 +13,7 @@
 | 2 | `encoding` + `io` | `encoding.c`、`xmlIO.c` | ✅ 已完成 |
 | 3 | `parser` 词法 + 事件流 | `parser.c`、`parserInternals.c` | 🟢 词法 + 语法骨架已完成（Phase 3a+3b），容错模式 + 外部实体留待 Phase 3c |
 | 4 | `tree` + `sax` + `reader` | `tree.c`、`SAX2.c`、`xmlreader.c` | 🟢 只读 DOM + DocumentBuilder 完成（Phase 4a），变更 API / XmlReader / 验证器留待 Phase 4b+ |
-| 5 | `writer` + `save` | `xmlwriter.c`、`xmlsave.c` | ⬜ 未开始 |
+| 5 | `writer` + `save` | `xmlwriter.c`、`xmlsave.c` | 🟢 `DocumentSerializer` 基础版完成（Phase 5a），`XmlWriter` 推式接口 + 编码转换留待 Phase 5b |
 | 6 | `xpath` | `xpath.c` | ⬜ 未开始 |
 | 7 | `regexp` + `pattern` + `dtd` | `valid.c`、`xmlregexp.c`、`pattern.c` | ⬜ 未开始 |
 | 8 | `schema` | `xmlschemas.c`、`xmlschemastypes.c` | ⬜ 未开始 |
@@ -23,7 +23,7 @@
 | 12 | 工具链与发布 | `xmllint.c`、`xmlcatalog.c` | ⬜ 未开始 |
 | 13 | 硬化与优化 | `runtest.c`、`fuzz/` | ⬜ 未开始 |
 
-**粗略完成度**：核心功能 ≈ 32%（Phase 1 基础设施 + Phase 2 字符编解码 / I/O + Phase 3a 词法器 + Phase 3b XmlParser 骨架 + Phase 4a 只读 DOM + DocumentBuilder；不含容错模式 / 外部实体 / DOM 变更 API / XmlReader / 验证器 / 序列化器 / 工具链）。
+**粗略完成度**：核心功能 ≈ 38%（Phase 1 基础设施 + Phase 2 字符编解码 / I/O + Phase 3a 词法器 + Phase 3b XmlParser 骨架 + Phase 4a 只读 DOM + DocumentBuilder + Phase 5a 基础序列化器；不含容错模式 / 外部实体 / DOM 变更 API / XmlReader / XmlWriter 推式接口 / 验证器 / 工具链）。
 
 ---
 
@@ -538,3 +538,85 @@ Phase 3c（`EntityResolver` 加载外部实体 + `recover=true` 容错路径 + W
   不变量检查（`detached` / 父指针同步 / 跨文档节点拒绝）。
 - Phase 4c：`SaxHandler` 推式接口 + `XmlReader` 拉式接口。
 - Phase 3c：容错模式 + 外部实体 + W3C `xmltest` 黄金对比（继续延后）。
+
+---
+
+## 已实现（迭代 9 — Phase 5a：基础 DocumentSerializer）
+
+### 背景
+
+> Phase 4a 交付了 `DocumentBuilder: Iterator<SaxEvent> → Document`。
+> Phase 5a 把这条链路**闭合**：新增 `DocumentSerializer: Document → String`
+> 实现 **parse → serialize → parse** 往返，是 Phase 4/5 的共同出口准则。
+>
+> 与 libxml2 的 `xmlsave.c` 对齐但做了两处改进：
+>   - 非缩进模式下输出字节"贴源"：不自动合成 XML 声明、不注入空白 —— 适合
+>     diff-based 的黄金对比；
+>   - 缩进模式把"是否可能改变字符数据语义"交给调用方：只含直接 Text / CDATA
+>     的叶子元素保持同行，避免缩进污染文本内容。
+
+### 新增子包：`cangjie_xml.save`（3 个源文件 + 1 个测试文件）
+
+| 文件 | 行数 | 内容 |
+| --- | --- | --- |
+| `src/save/serialize_options.cj` | 65 | `SerializeOptions`：`omitXmlDeclaration` / `indent` / `indentString` / `lineSeparator` / `cdataAsText` / `omitSyntheticXmlDeclaration`；`defaults()` / `pretty()` 预设 |
+| `src/save/document_serializer.cj` | 67 | `DocumentSerializer` 主类：字段、公开入口 `write` / `toString` / `elementToString`；通过包级转发桥接 extend 实现 |
+| `src/save/document_serializer_nodes.cj` | 246 | `extend DocumentSerializer`：XmlDecl / DOCTYPE / Prolog / Epilog / 元素 / 属性 / 文本 / CDATA / Comment / PI / 缩进全部实现 |
+| `src/save/document_serializer_test.cj` | 215 | 24 条单元 + 往返测试 |
+
+### 关键设计决策
+
+1. **"无声明源不被无中生有地写入声明"** —— 为 `XmlDecl` 新增 `isSynthetic: Bool`
+   字段；parser 在缺失 `<?xml ...?>` 时将其置 `true`。默认选项
+   `omitSyntheticXmlDeclaration = true` 据此识别，避免 `<a/>` 被改写为
+   `<?xml version="1.0"?><a/>`。保留了字节等价性的下游能力。
+2. **主类 + extend 桥接模式** —— Cangjie 主类体不能直接调用 extend 成员，
+   沿用 `XmlParser` 同款：主类只放字段 + 公开入口 + 包级 `serializeDocument` /
+   `serializeElementOnly` 转发函数；所有输出逻辑集中在 extend 文件。
+3. **缩进采用"叶子文本保护"策略** —— `isLeafTextElement` 判定直接子节点是否
+   全部为 Text / CDATA；若是则保持同行输出，避免缩进空白修改字符数据。
+   与 libxml2 `xmlSaveFormatFile` 的默认行为一致。
+4. **CDATA 双模式** —— 默认保留为 `<![CDATA[...]]>` 独立节点；
+   `cdataAsText = true` 时降级为转义文本，字节更短但丢失 CDATA 语义。
+5. **复用现有工具** —— 文本 / 属性转义直接调 `core.escapeXml`；QName 输出
+   调 `QName.lexical()`；零额外依赖。
+
+### 新增测试（24 条，`src/save/document_serializer_test.cj`）
+
+基础（8）：`testSelfClosingEmpty` / `testPairedWithText` / `testNestedDefaultNoIndent` /
+`testAttributesEscapedAndQuoted` / `testNamespaceDeclarationsPreserved` /
+`testTextContentEscaped` / `testCdataPreservedByDefault` / `testCdataAsTextLowers`
+
+Prolog / Epilog / 声明 / DOCTYPE（6）：`testCommentAndPiInProlog` /
+`testCommentInEpilog` / `testRealXmlDeclPreserved` /
+`testSyntheticXmlDeclOmittedByDefault` / `testOmitXmlDeclarationForces` /
+`testDoctypeEmitted` / `testStandaloneFlags`
+
+缩进 + 片段（3）：`testPrettyIndent` / `testPrettyCustomIndentString` /
+`testElementToStringFragment`
+
+端到端 round-trip（6）：`testRoundTripSimple` / `testRoundTripAttributesAndNs` /
+`testRoundTripMixedContent` / `testRoundTripCdata` /
+`testRoundTripEntitiesInAttribute` / `testRoundTripPrettyPreservesStructure`
+
+### 顺带的基础设施改进
+
+- `XmlDecl` 新增 `isSynthetic: Bool`（默认 `false`，非破坏性）。
+- `XmlParser.handleStartDocument` / `DocumentBuilder.finalize()` 在合成 XmlDecl
+  时置 `isSynthetic: true`。
+- 既有 104 个 parser 测试 + 20 个 tree 测试不受影响。
+
+### 验证
+
+- `cjpm build` 干净。
+- `cjpm test` **267 / 267** 全绿（243 旧 + 24 新）。
+- 全部新增文件 ≤ 300 行。
+
+### 下一步（候选）
+
+- Phase 5b：`XmlWriter` 推式接口（`startElement` / `writeAttribute` / `endElement`
+  栈机）+ `IoSink` 整合 + 编码转换。
+- Phase 4b：DOM 变更 API（`appendChild` / `removeChild` / `replaceChild` +
+  不变量检查）。
+- Phase 4c：`SaxHandler` / `XmlReader`。
+- Phase 3c：容错 + 外部实体 + W3C `xmltest` 黄金对比（继续延后）。

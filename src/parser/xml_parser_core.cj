@@ -59,7 +59,7 @@ extend XmlParser {
                 let _ = readToken() // 消费 XmlDeclStart
                 pending.addLast(SaxEvent.StartDocument(parseXmlDecl(p)))
             case _ =>
-                pending.addLast(SaxEvent.StartDocument(XmlDecl(position: first.position())))
+                pending.addLast(SaxEvent.StartDocument(XmlDecl(position: first.position(), isSynthetic: true)))
         }
     }
 

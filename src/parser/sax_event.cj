@@ -59,17 +59,24 @@ public struct XmlDecl <: ToString {
     public let encoding: ?String
     public let standalone: Standalone
     public let position: Position
+    /**
+     * `true` 表示本声明由 parser 在缺失 `<?xml ...?>` 时合成，并非源自原文档。
+     * 序列化器据此实现 "无声明的源不被无中生有地写入声明" 的默认语义。
+     */
+    public let isSynthetic: Bool
 
     public init(
         version!: String = "1.0",
         encoding!: ?String = None,
         standalone!: Standalone = Standalone.Unspecified,
-        position!: Position = Position.unknown()
+        position!: Position = Position.unknown(),
+        isSynthetic!: Bool = false
     ) {
         this.version = version
         this.encoding = encoding
         this.standalone = standalone
         this.position = position
+        this.isSynthetic = isSynthetic
     }
 
     public func toString(): String {
