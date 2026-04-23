@@ -1,0 +1,12 @@
+# Build artifacts
+target/
+*.cjo
+*.cjvis
+*.cjfiles
+cjpm.lock
+
+# Editor / OS noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
