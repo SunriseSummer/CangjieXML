@@ -297,6 +297,12 @@ public sealed interface XmlNode {
 - `parent` / `previousSibling` / `nextSibling` 返回 `Option`，天然替代空指针与 Handle。
 - 具体子类由 `kind()` 暴露给 `match` 使用。
 
+> **落地备注**：在 M1 实现阶段，`XmlNode` 改以 `sealed abstract class` 承载，
+> 而非原文所写的 `sealed interface`。理由是 `prev` / `next` / `parentElement` /
+> `document` 四条内部导航引用对所有具体节点完全一致，放到抽象基类可以避免在
+> 6 个子类里重复实现同一套链表维护；对用户可见行为（封闭性、模式匹配入口）
+> 完全等价。这是 DESIGN 允许范围内的"合理性调整"。
+
 ### 6.2 `XmlDocument`
 
 ```cangjie

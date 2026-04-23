@@ -1,0 +1,8 @@
+target/
+*.o
+*.a
+*.so
+*.cjo
+*.bc
+cjpm.lock
+.DS_Store
