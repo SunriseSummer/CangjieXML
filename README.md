@@ -35,7 +35,8 @@ CangjieXML/
 ├── progress.md            # 相对 libxml2 的进度清单
 └── src/
     ├── cangjie_xml.cj     # 顶层门面（后续汇总 public import）
-    └── core/              # ✅ Phase 1 基础设施模块
+    ├── core/              # ✅ Phase 1 基础设施模块
+    └── encoding/          # ✅ Phase 2 前半：字符编解码模块
 ```
 
 > 项目采用单 `cjpm` 模块 + 子目录子包的布局（每个 `src/<name>/` 对应一个 `cangjie_xml.<name>` 子包），相比 `DESIGN.md` 最初构想的"多 workspace"方案更贴合 `cjpm 1.0.5` 的实际能力。后续阶段的各模块（`encoding`、`parser`、`tree` …）将以相同模式陆续引入 `src/` 下。
@@ -97,6 +98,67 @@ main() {
 
 ---
 
+### `encoding` —— 字符编解码（Phase 2 前半）
+
+对应 libxml2 的 `encoding.c`。提供 BOM 探测、流式解码器、一次性编码器以及名字归一化的编码注册表。
+
+| 文件 | 提供 |
+| --- | --- |
+| `status.cj` | `DecodeStatus` / `DecodeResult` / `EncodeStatus` / `EncodeResult` / `BomKind` / `encodingError` |
+| `bom.cj` | `detectBom`（严格 BOM 签名，UTF-32 优先于 UTF-16）/ `heuristicDetect`（W3C §F 附录 `<?xml` 对齐模式） |
+| `decoder.cj` | `abstract class Decoder`（流式状态保留，跨分片不丢半截序列） |
+| `encoder.cj` | `abstract class Encoder` |
+| `utf8.cj` | `Utf8Decoder`（RFC 3629 拒绝超长 / 代理 / > U+10FFFF）+ `Utf8Encoder` |
+| `utf16.cj` | `Utf16Decoder` / `Utf16Encoder` 的 LE + BE 两种构造器，严格代理对 + 可选 BOM 输出 |
+| `utf32.cj` | `Utf32Decoder` LE + BE，拒绝代理与越界码点 |
+| `single_byte.cj` | `SingleByteDecoder` / `SingleByteEncoder` 框架 + US-ASCII、ISO-8859-1/-2/-3/-4/-5/-9/-15 映射表 |
+| `registry.cj` | `EncodingRegistry`：按名字归一化 + 别名查找、`defaultRegistry()` 预注册全部内置编码 |
+
+#### 使用示例
+
+```cangjie
+import cangjie_xml.encoding.*
+
+main() {
+    // 1. BOM 探测（优先级正确：UTF-32 LE 不会被误判为 UTF-16 LE）
+    let head: Array<Byte> = [0xFFu8, 0xFEu8, 0x00u8, 0x00u8, 0x41u8]
+    println(detectBom(head))                      // Some(utf-32le)
+
+    // 2. 流式 UTF-8 解码（跨分片 state 自动保留）
+    let d = Utf8Decoder()
+    let r1 = d.decode([0xE4u8, 0xB8u8], 0, 2, false)
+    println(r1.status)                            // NeedMoreInput
+    let r2 = d.decode([0xADu8], 0, 1, true)
+    println(r1.text + r2.text)                    // 中
+
+    // 3. UTF-16 BE 往返
+    let be = Utf16Encoder.bigEndian(emitBom: false)
+    let bd = Utf16Decoder.bigEndian()
+    println(bd.decodeAll(be.encodeAll("😀")))      // 😀
+
+    // 4. 通过注册表按名字拿解码器（不区分大小写 / 连字符 / 下划线）
+    let reg = EncodingRegistry.defaultRegistry()
+    let latin = reg.newDecoder("ISO_8859-1").getOrThrow()
+    println(latin.decodeAll([0xE9u8]))            // é
+
+    // 5. 不可表达的码点 → 结构化诊断
+    match (reg.newEncoder("us-ascii").getOrThrow().encode("Hi 中")) {
+        case Unmappable(i, cp) => println("unmappable @${i} U+${cp}")
+        case Success            => ()
+    }
+}
+```
+
+#### 覆盖的 libxml2 等价点
+
+- BOM 探测覆盖 libxml2 `xmlDetectCharEncoding` 的所有前 4 字节签名（含 UTF-32 BE/LE）；
+- UTF-8 解码严格贯彻 RFC 3629：拒绝 0xC0/0xC1 前缀、overlong、> U+10FFFF、U+D800..DFFF 代理；
+- UTF-16 解码严格校验代理对配对，孤立 / 悬挂 / 双高位代理均给出 `InvalidBytes(offset)` 诊断；
+- 单字节编码差异表对照 Unicode.org 官方 `8859-x.TXT`，ISO-8859-3 保留"未定义"位并解码时报错；
+- `EncodingRegistry.normalize` 行为与 libxml2 `xmlParseCharEncoding` 的名字比较等价（大小写 / 连字符 / 下划线不敏感）。
+
+---
+
 ## 仍未实现
 
-见 [`progress.md`](./progress.md)。按 `ROADMAP.md` 顺序，下一迭代将进入 **Phase 2：编码与 I/O（`encoding` + `io` 包）**。
+见 [`progress.md`](./progress.md)。按 `ROADMAP.md` 顺序，下一迭代将完成 **Phase 2 后半：`io` 包（`IoSource` / `IoSink` / 装饰器）**，把本迭代的 `encoding` 模块接入 `xmlIO.c` 对标的 I/O 管线。
