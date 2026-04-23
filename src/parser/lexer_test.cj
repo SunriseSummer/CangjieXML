@@ -1,18 +1,8 @@
 /*
- * Lexer 单元测试。
+ * Lexer 单元测试：共享辅助 + 基本词法（元素 / 属性 / 文本 / CDATA / 注释 / PI / XML 声明）。
  *
- * 覆盖：
- *   - 元素开 / 闭 / 自闭合 / 嵌套；
- *   - 属性名 / 等号 / 单双引号属性值；
- *   - 属性值内的字符引用与实体引用；
- *   - 文本、CDATA、注释、PI；
- *   - XML 声明；
- *   - DOCTYPE 头部（含 ExternalID、内部子集括号、带引号字符串）；
- *   - 错误情形：未闭合、'<' 出现在属性值、']]>' 出现在文本、非法字符引用、
- *     未终结实体引用、非法 XML 字符、XML 声明出现位置错误、PI target 为 xml；
- *   - 字符引用 10 进制与 16 进制；
- *   - 属性值换行折叠（CR/LF/TAB → SPACE）；
- *   - 位置信息（行列）。
+ * 其余测试（DOCTYPE / 错误情形 / 字符引用 / 属性值换行折叠 / 位置信息）见
+ * `lexer_errors_test.cj`。
  */
 package cangjie_xml.parser
 
@@ -20,7 +10,8 @@ import std.unittest.*
 import std.collection.*
 import cangjie_xml.core.*
 
-private func lex(s: String): ArrayList<Token> {
+/** 把 `Lexer` 的整个 token 流收集为列表（到 Eof 截止）。 */
+func lex(s: String): ArrayList<Token> {
     let l = Lexer.fromString(s)
     let acc = ArrayList<Token>()
     while (true) {
@@ -37,7 +28,8 @@ private func lex(s: String): ArrayList<Token> {
     return acc
 }
 
-private func kind(t: Token): String {
+/** 返回 token 种类的短字符串名，便于 `@Expect` 比对。 */
+func lexKind(t: Token): String {
     match (t) {
         case XmlDeclStart(_) => return "XmlDeclStart"
         case XmlDeclEnd(_) => return "XmlDeclEnd"
@@ -66,22 +58,22 @@ private func kind(t: Token): String {
 public func testLexerEmptyElement(): Unit {
     let toks = lex("<a/>")
     @Expect(toks.size, 3)
-    @Expect(kind(toks[0]), "ElementOpenStart")
+    @Expect(lexKind(toks[0]), "ElementOpenStart")
     match (toks[0]) {
         case ElementOpenStart(_, n) => @Expect(n, "a")
         case _ => @Fail("expected ElementOpenStart")
     }
-    @Expect(kind(toks[1]), "ElementSelfClose")
-    @Expect(kind(toks[2]), "Eof")
+    @Expect(lexKind(toks[1]), "ElementSelfClose")
+    @Expect(lexKind(toks[2]), "Eof")
 }
 
 @Test
 public func testLexerOpenCloseTag(): Unit {
     let toks = lex("<root></root>")
     @Expect(toks.size, 4)
-    @Expect(kind(toks[0]), "ElementOpenStart")
-    @Expect(kind(toks[1]), "ElementOpenEnd")
-    @Expect(kind(toks[2]), "ElementClose")
+    @Expect(lexKind(toks[0]), "ElementOpenStart")
+    @Expect(lexKind(toks[1]), "ElementOpenEnd")
+    @Expect(lexKind(toks[2]), "ElementClose")
     match (toks[2]) {
         case ElementClose(_, n) => @Expect(n, "root")
         case _ => @Fail("expected ElementClose")
@@ -91,12 +83,12 @@ public func testLexerOpenCloseTag(): Unit {
 @Test
 public func testLexerNested(): Unit {
     let toks = lex("<a><b/></a>")
-    @Expect(kind(toks[0]), "ElementOpenStart")
-    @Expect(kind(toks[1]), "ElementOpenEnd")
-    @Expect(kind(toks[2]), "ElementOpenStart")
-    @Expect(kind(toks[3]), "ElementSelfClose")
-    @Expect(kind(toks[4]), "ElementClose")
-    @Expect(kind(toks[5]), "Eof")
+    @Expect(lexKind(toks[0]), "ElementOpenStart")
+    @Expect(lexKind(toks[1]), "ElementOpenEnd")
+    @Expect(lexKind(toks[2]), "ElementOpenStart")
+    @Expect(lexKind(toks[3]), "ElementSelfClose")
+    @Expect(lexKind(toks[4]), "ElementClose")
+    @Expect(lexKind(toks[5]), "Eof")
 }
 
 @Test
@@ -108,7 +100,7 @@ public func testLexerAttributesDoubleQuote(): Unit {
         case AttrName(_, n) => @Expect(n, "x")
         case _ => @Fail("expected AttrName")
     }
-    @Expect(kind(toks[2]), "AttrEq")
+    @Expect(lexKind(toks[2]), "AttrEq")
     match (toks[3]) {
         case AttrValueStart(_, q) => @Expect(q == AttrQuote.Double, true)
         case _ => @Fail("unexpected token kind")
@@ -117,8 +109,8 @@ public func testLexerAttributesDoubleQuote(): Unit {
         case AttrValueChunk(_, v) => @Expect(v, "1")
         case _ => @Fail("unexpected token kind")
     }
-    @Expect(kind(toks[5]), "AttrValueEnd")
-    @Expect(kind(toks[6]), "ElementSelfClose")
+    @Expect(lexKind(toks[5]), "AttrValueEnd")
+    @Expect(lexKind(toks[6]), "ElementSelfClose")
 }
 
 @Test
@@ -256,245 +248,4 @@ public func testLexerPiTargetXmlRejected(): Unit {
         threw = true
     }
     @Expect(threw, true)
-}
-
-@Test
-public func testLexerXmlDeclaration(): Unit {
-    let toks = lex("<?xml version=\"1.0\" encoding=\"UTF-8\"?><a/>")
-    @Expect(kind(toks[0]), "XmlDeclStart")
-    // version attr
-    match (toks[1]) {
-        case AttrName(_, n) => @Expect(n, "version")
-        case _ => @Fail("unexpected token kind")
-    }
-    @Expect(kind(toks[2]), "AttrEq")
-    @Expect(kind(toks[3]), "AttrValueStart")
-    match (toks[4]) {
-        case AttrValueChunk(_, v) => @Expect(v, "1.0")
-        case _ => @Fail("unexpected token kind")
-    }
-    @Expect(kind(toks[5]), "AttrValueEnd")
-    // encoding attr
-    match (toks[6]) {
-        case AttrName(_, n) => @Expect(n, "encoding")
-        case _ => @Fail("unexpected token kind")
-    }
-    // ... XmlDeclEnd somewhere before ElementOpenStart
-    var sawDeclEnd = false
-    var sawElem = false
-    for (t in toks) {
-        match (t) {
-            case XmlDeclEnd(_) => sawDeclEnd = true
-            case ElementOpenStart(_, _) => sawElem = true
-            case _ => ()
-        }
-    }
-    @Expect(sawDeclEnd, true)
-    @Expect(sawElem, true)
-}
-
-@Test
-public func testLexerXmlDeclMustBeFirst(): Unit {
-    var threw = false
-    try {
-        let _ = lex("<a><?xml version=\"1.0\"?></a>")
-    } catch (_: XmlException) {
-        threw = true
-    }
-    @Expect(threw, true)
-}
-
-@Test
-public func testLexerDoctypeSimple(): Unit {
-    let toks = lex("<!DOCTYPE html><html/>")
-    match (toks[0]) {
-        case DoctypeStart(_, n) => @Expect(n, "html")
-        case _ => @Fail("unexpected token kind")
-    }
-    @Expect(kind(toks[1]), "DoctypeEnd")
-}
-
-@Test
-public func testLexerDoctypeWithInternalSubset(): Unit {
-    let toks = lex("<!DOCTYPE x [ <!ENTITY a \"b\"> ]><x/>")
-    @Expect(kind(toks[0]), "DoctypeStart")
-    @Expect(kind(toks[1]), "DoctypeEnd")
-    @Expect(kind(toks[2]), "ElementOpenStart")
-}
-
-@Test
-public func testLexerDoctypeWithExternalId(): Unit {
-    let toks = lex("<!DOCTYPE x PUBLIC \"pub>id\" \"sys'id\"><x/>")
-    // `>` inside the quoted string must not terminate DOCTYPE
-    @Expect(kind(toks[0]), "DoctypeStart")
-    @Expect(kind(toks[1]), "DoctypeEnd")
-}
-
-@Test
-public func testLexerLiteralLtInAttrValueRejected(): Unit {
-    var threw = false
-    try {
-        let _ = lex("<a x=\"<\"/>")
-    } catch (_: XmlException) {
-        threw = true
-    }
-    @Expect(threw, true)
-}
-
-@Test
-public func testLexerCDataEndInTextRejected(): Unit {
-    var threw = false
-    try {
-        let _ = lex("<a>foo]]>bar</a>")
-    } catch (_: XmlException) {
-        threw = true
-    }
-    @Expect(threw, true)
-}
-
-@Test
-public func testLexerUnterminatedElement(): Unit {
-    var threw = false
-    try {
-        let _ = lex("<a")
-    } catch (_: XmlException) {
-        threw = true
-    }
-    @Expect(threw, true)
-}
-
-@Test
-public func testLexerCharRefOutOfRange(): Unit {
-    var threw = false
-    try {
-        let _ = lex("<a>&#xFFFFFFFF;</a>")
-    } catch (_: XmlException) {
-        threw = true
-    }
-    @Expect(threw, true)
-}
-
-@Test
-public func testLexerCharRefEmpty(): Unit {
-    var threw = false
-    try {
-        let _ = lex("<a>&#;</a>")
-    } catch (_: XmlException) {
-        threw = true
-    }
-    @Expect(threw, true)
-}
-
-@Test
-public func testLexerCharRefIllegalXmlChar(): Unit {
-    // U+0000 is never allowed in XML 1.0 or 1.1
-    var threw = false
-    try {
-        let _ = lex("<a>&#0;</a>")
-    } catch (_: XmlException) {
-        threw = true
-    }
-    @Expect(threw, true)
-}
-
-@Test
-public func testLexerEntityRefWithoutSemicolon(): Unit {
-    var threw = false
-    try {
-        let _ = lex("<a>&amp</a>")
-    } catch (_: XmlException) {
-        threw = true
-    }
-    @Expect(threw, true)
-}
-
-@Test
-public func testLexerUnterminatedComment(): Unit {
-    var threw = false
-    try {
-        let _ = lex("<a><!-- oops")
-    } catch (_: XmlException) {
-        threw = true
-    }
-    @Expect(threw, true)
-}
-
-@Test
-public func testLexerUnterminatedCData(): Unit {
-    var threw = false
-    try {
-        let _ = lex("<a><![CDATA[hi")
-    } catch (_: XmlException) {
-        threw = true
-    }
-    @Expect(threw, true)
-}
-
-@Test
-public func testLexerPositionTracking(): Unit {
-    let toks = lex("<a>\n  <b/>\n</a>")
-    // 找到 <b/> ElementOpenStart
-    var bpos: Position = Position.unknown()
-    for (t in toks) {
-        match (t) {
-            case ElementOpenStart(p, n) where n == "b" => bpos = p
-            case _ => ()
-        }
-    }
-    // <b/> 位于第 2 行第 4 列（1-based：两个空格 + '<' + 'b'，'<' 在第 3 列）
-    // ElementOpenStart 的 Position 指向 '<'，即第 2 行 3 列；但我们的实现把 ElementOpenStart
-    // 定位到"读到名字起点"，实际实现把 startPos = 读 '<' 之前的位置。
-    @Expect(bpos.line, 2)
-    @Expect(bpos.column, 3)
-}
-
-@Test
-public func testLexerTextBeforeRootIsWhitespaceOk(): Unit {
-    // 文档开头的空白（在 XML 声明之后 / 根元素之前）
-    let toks = lex("<?xml version=\"1.0\"?>\n<a/>")
-    var sawElem = false
-    for (t in toks) {
-        match (t) {
-            case ElementOpenStart(_, n) where n == "a" => sawElem = true
-            case _ => ()
-        }
-    }
-    @Expect(sawElem, true)
-}
-
-@Test
-public func testLexerMultipleAttributes(): Unit {
-    let toks = lex("<a x=\"1\" y='2' z=\"3\"/>")
-    var names = ArrayList<String>()
-    for (t in toks) {
-        match (t) {
-            case AttrName(_, n) => names.add(n)
-            case _ => ()
-        }
-    }
-    @Expect(names.size, 3)
-    @Expect(names[0], "x")
-    @Expect(names[1], "y")
-    @Expect(names[2], "z")
-}
-
-@Test
-public func testLexerElementNameWithColonAndDash(): Unit {
-    let toks = lex("<xmlns:pre-fix/>")
-    match (toks[0]) {
-        case ElementOpenStart(_, n) => @Expect(n, "xmlns:pre-fix")
-        case _ => @Fail("unexpected token kind")
-    }
-}
-
-@Test
-public func testLexerCrlfNormalizedInText(): Unit {
-    // RuneReader 把 CRLF -> LF
-    let toks = lex("<a>a\r\nb</a>")
-    for (t in toks) {
-        match (t) {
-            case Text(_, s) => @Expect(s, "a\nb")
-            case _ => ()
-        }
-    }
 }
