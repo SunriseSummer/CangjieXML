@@ -1,178 +1,734 @@
 # CangjieXML 软件设计文档
 
-> 用仓颉（Cangjie）编程语言对 [libxml2 v2.15.3](./.libxml2-2.15.3) 做**优化重构式复刻**。
-> 目标是在保持 W3C XML 规范语义与 libxml2 主要功能对等的前提下，充分运用仓颉的现代语言特性（enum + 模式匹配、sealed 接口、扩展、泛型、Option/Result 式错误处理、M:N 协程、原子/互斥/条件变量、宏元编程、反射等），抛弃 C 层面的句柄/指针/void\* 风格，建立一个**类型安全、内存安全、线程友好、可组合**的 XML 工具链。
+> 本文档描述用仓颉（Cangjie）编程语言对 [libxml2 v2.15.3](./.libxml2-2.15.3) 进行**优化重构式复刻**的架构与设计原则。
 >
-> 本文档只描述**做什么**与**为什么这样做**，不涉及具体代码实现。
+> 目标是在保持 W3C XML 规范语义与 libxml2 功能对等的前提下，摒弃 C 层面的指针、`void*`、全局 hook 风格，充分运用仓颉的现代语言特性，建立一个**类型安全、内存安全、线程友好、可组合、可扩展**的纯仓颉 XML 工具链。
+>
+> 本文件只描述 **做什么（What）** 与 **为什么（Why）**，不涉及具体代码。配套文件 [`ROADMAP.md`](./ROADMAP.md) 描述 **何时做（When）** 与 **如何分阶段（How）**。
+
+---
+
+## 目录
+
+1. [背景与目标](#1-背景与目标)
+2. [设计原则](#2-设计原则)
+3. [术语与命名约定](#3-术语与命名约定)
+4. [项目结构](#4-项目结构)
+5. [数据模型](#5-数据模型)
+6. [字符、编码与 I/O](#6-字符编码与-io)
+7. [解析器架构](#7-解析器架构)
+8. [树操作 API](#8-树操作-api)
+9. [XPath 与 Pattern](#9-xpath-与-pattern)
+10. [验证：DTD / XSD / RelaxNG / Schematron](#10-验证dtd--xsd--relaxng--schematron)
+11. [输出：Writer / Save / C14N](#11-输出writer--save--c14n)
+12. [HTML、XInclude、Catalog](#12-htmlxincludecatalog)
+13. [并发模型](#13-并发模型)
+14. [错误模型与诊断](#14-错误模型与诊断)
+15. [安全默认](#15-安全默认)
+16. [宏与元编程](#16-宏与元编程)
+17. [测试策略](#17-测试策略)
+18. [与 libxml2 的刻意差异](#18-与-libxml2-的刻意差异)
+19. [架构决策记录（ADR）](#19-架构决策记录adr)
+20. [与仓颉 SDK 的对齐](#20-与仓颉-sdk-的对齐)
+21. [风险与缓解](#21-风险与缓解)
 
 ---
 
 ## 1. 背景与目标
 
-### 1.1 libxml2 是什么
-libxml2 是 GNOME 项目孵化的 XML 工具集，以 C89 实现、约 17 万行核心 C 代码，提供：
+### 1.1 libxml2 概览
 
-| 领域 | libxml2 对应源文件 |
-| --- | --- |
-| DOM 树/节点模型 | `tree.c`, `include/libxml/tree.h` |
-| 解析器（推/拉/块/SAX） | `parser.c`, `parserInternals.c`, `SAX2.c` |
-| 实体、字典、符号表 | `entities.c`, `dict.c`, `hash.c`, `list.c` |
-| 字符串/缓冲/字符类 | `xmlstring.c`, `buf.c`, `chvalid.c` |
-| 编码 | `encoding.c` |
-| IO 抽象 | `xmlIO.c`, `nanohttp.c` |
-| URI / Catalog | `uri.c`, `catalog.c` |
-| DTD 验证 | `valid.c` |
-| 正则 / 自动机 / 模式 | `xmlregexp.c`, `pattern.c` |
-| XML Schema (XSD) | `xmlschemas.c`, `xmlschemastypes.c` |
-| RelaxNG / Schematron | `relaxng.c`, `schematron.c` |
-| XPath / XPointer / XInclude | `xpath.c`, `xpointer.c`, `xinclude.c` |
-| 规范化 C14N | `c14n.c` |
-| 流式读 / 流式写 | `xmlreader.c`, `xmlwriter.c`, `xmlsave.c` |
-| HTML 解析与输出 | `HTMLparser.c`, `HTMLtree.c` |
-| 错误/全局/线程 | `error.c`, `globals.c`, `threads.c` |
-| 命令行/调试 | `xmllint.c`, `xmlcatalog.c`, `shell.c`, `debugXML.c` |
+libxml2 是 GNOME 项目孵化的 XML 工具集，以 C89 实现，约 17 万行核心 C 代码，按职能可划分为下列子系统：
+
+| 领域                       | libxml2 主要源文件                                  |
+| -------------------------- | --------------------------------------------------- |
+| 树 / 节点模型              | `tree.c`, `include/libxml/tree.h`                   |
+| 解析器（推 / 拉 / SAX）    | `parser.c`, `parserInternals.c`, `SAX2.c`           |
+| 实体 / 字典 / 符号表       | `entities.c`, `dict.c`, `hash.c`, `list.c`          |
+| 字符串 / 缓冲 / 字符类     | `xmlstring.c`, `buf.c`, `chvalid.c`                 |
+| 字符编码                   | `encoding.c`                                        |
+| I/O 抽象                   | `xmlIO.c`, `nanohttp.c`                             |
+| URI / Catalog              | `uri.c`, `catalog.c`                                |
+| DTD 验证                   | `valid.c`                                           |
+| 正则 / 自动机 / 模式       | `xmlregexp.c`, `pattern.c`                          |
+| XML Schema (XSD)           | `xmlschemas.c`, `xmlschemastypes.c`                 |
+| RelaxNG / Schematron       | `relaxng.c`, `schematron.c`                         |
+| XPath / XPointer / XInclude| `xpath.c`, `xpointer.c`, `xinclude.c`               |
+| 规范化 C14N                | `c14n.c`                                            |
+| 流式读 / 写                | `xmlreader.c`, `xmlwriter.c`, `xmlsave.c`           |
+| HTML 解析与输出            | `HTMLparser.c`, `HTMLtree.c`                        |
+| 错误 / 全局 / 线程         | `error.c`, `globals.c`, `threads.c`                 |
+| 命令行 / 调试              | `xmllint.c`, `xmlcatalog.c`, `shell.c`, `debugXML.c`|
 
 ### 1.2 项目目标
-1. **功能对等（核心子集）**：支持 XML 1.0/1.1 解析与序列化、命名空间、DTD、XPath 1.0、XInclude、C14N 1.0/1.1、XML Schema 1.0 与 RelaxNG 的主要使用场景。
-2. **接口现代化**：抛弃 `void*` 上下文、`int` 返回码、全局 hook，改用仓颉的 `interface`、`enum`、`Result`/`Option`、`Iterator`、`Resource`。
-3. **纯仓颉实现**：只依赖 `std.*` 与 `stdx.*`（必要时，如压缩/TLS）；不调用 C 库、不走 CFFI。
-4. **线程安全**：核心数据结构（字典、编码注册表、错误处理）天然多线程安全；解析器为"每文档一个实例"模型，可并发运行。
-5. **可裁剪**：模块之间按 cjpm 子包划分，下游只导入需要的能力。
-6. **可扩展**：用户可用仓颉的 `extend` 为 `Node`/`Document` 添加方法，用自定义 `interface` 替换 IO 层、错误层、URI 解析层。
+
+1. **功能对等（核心子集）**：覆盖 XML 1.0/1.1 解析与序列化、命名空间、DTD、XPath 1.0、XInclude、C14N 1.0/1.1、XML Schema 1.0、RelaxNG 的主流使用场景。
+2. **接口现代化**：摒弃 `void*` 上下文、`int` 返回码、全局 hook，改用仓颉的 `interface`、`enum`、`Option` / `Result`、`Iterable` 与 `Resource`。
+3. **纯仓颉实现**：仅依赖 `std.*` 与必要的 `stdx.*`（如 TLS、压缩）；不调用 C 库、不走 CFFI。
+4. **线程友好**：编译产物（`CompiledXPath`、`CompiledSchema`）与已构造的 `Document` 视为不可变，可被多线程共享；可变状态封装在解析器/写入器实例中，单实例单线程使用。
+5. **可裁剪**：模块按 `cjpm` 子包划分，下游按需 import。
+6. **可扩展**：用户可用 `extend` 为节点添加方法，可实现 `EntityResolver`、`ParserInputSource`、`OutputSink` 等接口替换默认行为。
 
 ### 1.3 非目标
-- 不追求与 libxml2 ABI 级兼容（指针布局、宏、函数名完全不同）。
-- 不内嵌 HTTP/FTP 客户端（libxml2 的 `nanohttp.c`/`nanoftp.c` 不复刻，改成可插拔 URI 加载器接口，用户自行提供 `stdx.net.http`）。
-- 不提供 Python/Perl 绑定（属于宿主生态问题）。
-- 初版不复刻 `xmlmodule`（C 动态库插件机制），改为仓颉的 `package` + `interface` 插件机制。
+
+- 不追求与 libxml2 ABI 兼容（结构布局、宏、函数名完全不同）。
+- 不内嵌 HTTP / FTP 客户端；libxml2 的 `nanohttp.c` / `nanoftp.c` 不复刻，改为可插拔的 `EntityResolver` 接口，由调用方接入 `stdx.net.http`。
+- 不提供 Python / Perl 绑定（属于宿主语言生态范畴）。
+- 不复刻 `xmlmodule`（C 动态库插件机制）；改用仓颉 `package` + `interface` 的插件化方案。
 
 ---
 
-## 2. 设计原则（Cangjie-first）
+## 2. 设计原则
 
-| # | 原则 | libxml2 的 C 做法 | CangjieXML 的做法 |
-| --- | --- | --- | --- |
-| P1 | 代数数据类型优先 | `xmlElementType` 枚举 + 20 种布局略异的 `xmlNode` 结构 | 用 `sealed interface Node` + 各具体 `class`/`enum` 分支；用户用 `match` 穷尽处理 |
-| P2 | 不可变字符串 | 自定义 `xmlChar*`（UTF-8 字节串） | 直接用仓颉 `String`（UTF-8）；需原始字节时用 `Array<Byte>` |
-| P3 | 类型安全的错误 | `xmlError` 全局结构 + 返回码 | `enum XmlError` + `class XmlException <: Exception`；库内部用 `Result<T, XmlError>`，公共 API 用异常 |
-| P4 | 所有权与生命周期 | 手动 `xmlFree*`，易出 UAF | 仓颉 GC + 资源类 (`Resource`/try-with-resources) 管理 IO/锁 |
-| P5 | 组合优于继承 | SAX 回调为函数指针表 | `interface SAXHandler`，可用默认实现 + mixin 组合 |
-| P6 | 并发即一等公民 | 全局锁 + 线程局部 | `Mutex`/`AtomicReference`/`spawn`；解析器为值化上下文 |
-| P7 | 零拷贝读取 | 手写 parser state | 输入流分片 + `Array<Byte>` 视图 + 惰性字符串化 |
-| P8 | 迭代器与管道 | 手工 `next`/`prev` 指针 | 实现 `Iterable<Node>`；用 `\|>` 管道组合 XPath/Pattern 过滤 |
-| P9 | 元编程生成样板 | 宏 `#define XMLPUBFUN` | 用仓颉宏 (`@Visitor`, `@SchemaBuilder`) 自动派生访问器/构建器 |
-| P10 | 可测试优先 | 外部 `runtest.c` + 黄金文件 | 仓颉 `@Test` 单元测试 + XML W3C TestSuite 驱动器 |
+| 编号 | 原则                | libxml2 的 C 做法                              | CangjieXML 的做法                                                            |
+| ---- | ------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------- |
+| P1   | 代数数据类型优先    | `xmlElementType` + 单个超集 `xmlNode` 结构    | `sealed interface Node` + 各分支 `class`；用 `match` 穷尽处理                |
+| P2   | 不可变字符串        | 自定义 `xmlChar*`（UTF-8 字节串）              | 直接使用仓颉 `String`（UTF-8）；需要原始字节时使用 `Array<Byte>`             |
+| P3   | 类型化错误          | 全局 `xmlError` + 返回码                       | `enum XmlError` + `class XmlException <: Exception`；内部 `Result`，公共抛异常 |
+| P4   | 安全的资源管理      | 手工 `xmlFree*`，易触发 UAF                   | 仓颉 GC + `Resource` / try-with-resources 管理 I/O 与锁                      |
+| P5   | 组合优于继承        | SAX 回调为函数指针表                           | `interface SaxHandler` + 默认实现 + mixin 组合                               |
+| P6   | 并发即一等公民      | 全局锁 + 线程局部                              | `Mutex` / `AtomicReference` / `spawn`；不可变制品多线程共享                  |
+| P7   | 零拷贝读取          | 手写状态机 + 缓冲拷贝                          | 输入流分片 + `Array<Byte>` 视图 + 惰性字符串化                               |
+| P8   | 迭代器与管道        | 手工 `next` / `prev` 指针                      | 全部容器实现 `Iterable`；用 `\|>` 拼接过滤、转换、序列化                      |
+| P9   | 元编程消除样板      | 大量 `#define` 宏                              | 仓颉宏（`@Visitor`, `@SchemaModel`, `@XPathFunction`）派生样板               |
+| P10  | 测试优先            | 外部 `runtest.c` + 黄金文件                    | 包内 `xxx_test.cj` + `@Test` + W3C TestSuite 驱动器                          |
 
 ---
 
-## 3. 项目结构（cjpm 工作区）
+## 3. 术语与命名约定
 
-采用工作区（workspace）布局；每个目录是一个独立可发布的仓颉包，顶层 `cjpm.toml` 声明成员。
+为避免规范分歧，本项目所有源代码与文档遵循如下命名约定（与 [`cangjie-regulations`](./.github/skills/cangjie-regulations/) 保持一致）。
+
+### 3.1 标识符规则
+
+| 类别                                | 规则                          | 示例                                         |
+| ----------------------------------- | ----------------------------- | -------------------------------------------- |
+| 包名                                | 全小写 + 下划线               | `core`, `parser`, `xpath`, `relaxng`         |
+| 源文件名                            | 全小写 + 下划线 + `.cj`       | `name_table.cj`, `qname.cj`                  |
+| `class` / `struct` / `interface` / `enum` / 类型别名 | 大驼峰（PascalCase）          | `XmlParser`, `SaxHandler`, `XPathContext`    |
+| 函数 / 方法 / 局部变量              | 小驼峰（camelCase）           | `parseDocument`, `nodeName`                  |
+| 全局 `let` / `static let` / `const` | 全大写 + 下划线               | `XML_NAMESPACE_URI`, `DEFAULT_MAX_DEPTH`     |
+| 泛型类型参数                        | 单大写字母或 PascalCase       | `T`, `K`, `V`, `Item`                        |
+
+### 3.2 缩写处理（PascalCase 中）
+
+仓颉规范要求 PascalCase。所有 XML 领域常见缩写遵循"首字母大写其余小写"原则，唯一保留官方拼写形式的是 `XPath`：
+
+| 含义              | 文档与代码统一写法 |
+| ----------------- | ------------------ |
+| XML               | `Xml`              |
+| Document Type Definition | `Dtd`       |
+| XML Schema (XSD)  | `Xsd`              |
+| RelaxNG           | `RelaxNg`          |
+| HTML              | `Html`             |
+| URI               | `Uri`              |
+| URL               | `Url`              |
+| I/O               | `Io`               |
+| SAX               | `Sax`              |
+| CDATA             | `Cdata`            |
+| BOM               | `Bom`              |
+| UTF-8 / UTF-16    | `Utf8` / `Utf16`   |
+| XPath / XPointer  | `XPath` / `XPointer`（保留惯例，唯二例外） |
+
+由此派生的核心类型示例：`XmlParser`, `XmlReader`, `XmlWriter`, `XmlError`, `XmlException`, `SaxHandler`, `SaxEvent`, `DtdValidator`, `XsdValidator`, `RelaxNgValidator`, `HtmlParser`, `Uri`, `IoSource`, `XPathExpr`, `XPathContext`。
+
+### 3.3 术语对照表
+
+| W3C / libxml2 概念        | 本项目术语            | 说明                                       |
+| ------------------------- | --------------------- | ------------------------------------------ |
+| Element node              | `Element`             | 节点子类                                   |
+| Attribute node            | `Attr`                | 节点子类                                   |
+| Text node                 | `TextNode`            | 节点子类（避免与字段名 `text` 混淆）        |
+| CDATA section             | `CdataSection`        | 节点子类                                   |
+| Processing instruction    | `Pi`                  | 节点子类                                   |
+| Document                  | `Document`            | 根节点                                     |
+| Document fragment         | `DocumentFragment`    | 节点子类                                   |
+| Notation                  | `Notation`            | DTD 元数据，不进入 `Node` 体系              |
+| Entity declaration        | `EntityDecl`          | 同上                                        |
+| Element declaration       | `ElementDecl`         | 同上                                        |
+| Attribute declaration     | `AttributeDecl`       | 同上                                        |
+| `xmlChar*`                | `String` / `Array<Byte>` | 视语义而定                              |
+| `xmlNs`（命名空间节点）   | `Namespace`           | 仅作 XPath 语义节点存在，不进入 `Node` 体系 |
+| `xmlDict`                 | `NameTable`           | 字符串 intern 池                           |
+| `xmlSAXHandler`           | `SaxHandler`          | 接口而非函数指针表                         |
+| `xmlParserCtxt`           | `XmlParser`           | 解析器实例                                  |
+| `xmlTextReader`           | `XmlReader`           | 拉式读                                      |
+| `xmlTextWriter`           | `XmlWriter`           | 流式写                                      |
+| `xmlXPathContext`         | `XPathContext`        | XPath 求值上下文                           |
+| `xmlXPathObject`          | `XPathItem`           | XPath 值（节点集 / 字符串 / 数 / 布尔）     |
+
+---
+
+## 4. 项目结构
+
+采用 `cjpm` **工作区（workspace）** 布局；每个目录都是一个独立可发布的仓颉包，顶层 `cjpm.toml` 声明成员。包名内部不再加 `xml_` 冗余前缀——工作区本身已经叫 CangjieXML。
 
 ```
 CangjieXML/
-├── cjpm.toml                     # workspace + 顶层元数据
-├── DESIGN.md                     # 本文
-├── ROADMAP.md                    # 渐进开发计划
+├── cjpm.toml                      # workspace + 顶层元数据
+├── cangjie-format.toml            # 格式化配置
+├── DESIGN.md                      # 本文件
+├── ROADMAP.md                     # 渐进开发计划
+├── README.md                      # 使用入门
+├── docs/                          # 模块手册、设计补充、迁移指南
+├── examples/                      # 端到端可运行示例
 ├── packages/
-│   ├── xml_core/                 # 字符类、UTF 校验、缓冲、字典、URI、错误
-│   │   └── src/
-│   │       ├── char_valid.cj
-│   │       ├── buffer.cj
-│   │       ├── dict.cj            # 字符串 intern 池（替代 xmlDict）
-│   │       ├── uri.cj
-│   │       └── error.cj
-│   ├── xml_encoding/             # 编码注册表、UTF-8/16/ISO-8859-x、BOM 检测
-│   ├── xml_io/                   # ParserInputSource / OutputSink 抽象 + 文件/内存适配
-│   ├── xml_tree/                 # Document / Node / Attr / Namespace / DTD 数据模型
-│   ├── xml_sax/                  # SAXHandler 接口与缺省实现
-│   ├── xml_parser/               # 推/拉解析器 + 命名空间 + 实体处理
-│   ├── xml_html/                 # HTML5/4 宽松解析器（基于 xml_parser 复用词法器）
-│   ├── xml_writer/               # 流式序列化 Writer
-│   ├── xml_save/                 # DOM 序列化（缩进、编码转换）
-│   ├── xml_c14n/                 # 规范化（1.0 / 1.1 / 排他）
-│   ├── xml_dtd/                  # DTD 解析 + 验证
-│   ├── xml_regexp/               # 基于 XSD 正则子集的自动机
-│   ├── xml_pattern/              # 简化 XPath 模式匹配（用于 reader / schema）
-│   ├── xml_xpath/                # XPath 1.0 引擎（AST + 求值）
-│   ├── xml_xptr/                 # XPointer (element(), xpath())
-│   ├── xml_xinclude/             # XInclude 处理器
-│   ├── xml_schema/               # XML Schema 1.0 (XSD)
-│   ├── xml_relaxng/              # RelaxNG Compact/XML 语法
-│   ├── xml_schematron/           # Schematron（基于 xml_xpath）
-│   ├── xml_catalog/              # XML Catalog v1.1
-│   ├── xml_reader/               # 拉式流读（对应 xmlreader.c）
-│   ├── xml_testkit/              # W3C TestSuite 驱动 + 黄金对比
-│   ├── xml/                      # 门面包：public import 上述常用 API
-│   └── tools/
-│       ├── xmllint/              # 可执行：对应 xmllint
-│       └── xmlcatalog/           # 可执行：对应 xmlcatalog
-└── tests/                        # 工作区级集成测试（解析→验证→XPath 端到端）
+│   ├── core/                      # 字符类、缓冲、NameTable、错误、Position、Uri
+│   ├── encoding/                  # 编码注册表、Decoder/Encoder、BOM 探测
+│   ├── io/                        # IoSource / IoSink 接口与适配器
+│   ├── parser/                    # 词法器 + 事件流（SaxEvent 生成器）
+│   ├── tree/                      # Document / Node / Element / Attr / Namespace
+│   ├── sax/                       # SaxHandler 接口与默认实现
+│   ├── reader/                    # XmlReader（拉式）
+│   ├── writer/                    # XmlWriter（流式写）
+│   ├── save/                      # DocumentSerializer（DOM → 文本）
+│   ├── regexp/                    # XSD 正则：AST → NFA → DFA
+│   ├── pattern/                   # 流式 XPath 子集，用于 reader/schema selector
+│   ├── xpath/                     # XPath 1.0 引擎
+│   ├── xpointer/                  # XPointer（element() / xpath() 方案）
+│   ├── dtd/                       # DTD 解析与验证
+│   ├── schema/                    # XML Schema 1.0
+│   ├── relaxng/                   # RelaxNG（Brzozowski 导数算法）
+│   ├── schematron/                # Schematron（基于 xpath）
+│   ├── catalog/                   # OASIS XML Catalog 1.1
+│   ├── xinclude/                  # XInclude 1.0
+│   ├── c14n/                      # C14N 1.0 / 1.1 / Exclusive
+│   ├── html/                      # HTML 解析与序列化（共享 parser 词法）
+│   ├── testkit/                   # W3C TestSuite 驱动器、黄金文件比对
+│   └── facade/                    # 门面包：public import 上述常用 API
+├── tools/
+│   ├── xmllint/                   # 可执行：对应 libxml2 xmllint
+│   └── xmlcatalog/                # 可执行：对应 libxml2 xmlcatalog
+└── .libxml2-2.15.3/               # 上游参考源（只读）
 ```
 
-**依赖方向**（箭头表示"依赖"）：
+每个包均遵循仓颉项目标准布局：
 
 ```
-xml_core ──┬─> xml_encoding ──> xml_io ──> xml_sax ──> xml_parser ──> xml_tree ──┐
-           │                                                                     │
-           ├─> xml_regexp ──> xml_pattern ──> xml_xpath ──> xml_xptr ─────────────┤
-           │                                                                     │
-           │                           xml_dtd ───────────────────────────────> xml_reader
-           │                           xml_schema, xml_relaxng, xml_schematron ─>┘
-           │
-           └─> xml_catalog, xml_c14n, xml_xinclude, xml_writer, xml_save, xml_html
+packages/<name>/
+├── cjpm.toml
+├── src/
+│   ├── <main_files>.cj
+│   └── <main_files>_test.cj      # 单元测试与被测文件同目录
+└── examples/                      # 可选
 ```
 
-**工具包**（`xml/`、`tools/*`）只做 public import，不加新逻辑。
+### 4.1 依赖方向
+
+```
+core ──┬─> encoding ──> io ──> parser ──> sax ──> reader
+       │                          │
+       │                          └─> tree ──> writer ──> save
+       │                                ↑
+       ├─> regexp ──> pattern ──> xpath ──> xpointer
+       │                            │
+       │             dtd ───────────┘
+       │             schema, relaxng, schematron ──> 依赖 xpath / regexp / pattern
+       │
+       └─> catalog, xinclude, c14n, html
+                                   │
+                                   ▼
+                                facade ──> tools/xmllint, tools/xmlcatalog
+```
+
+依赖关系是**有向无环图**；所有跨包依赖均在各自 `cjpm.toml` 中显式声明。
 
 ---
 
-## 4. 核心数据模型
+## 5. 数据模型
 
-### 4.1 节点树：`sealed interface Node` + 分支类
+### 5.1 节点树
 
-libxml2 用一个超集结构体（`xmlNode`）覆盖 14 种节点类型，字段复用导致大量 `if (type == …)` 分支与字段不可见性污染。CangjieXML 的做法：
+libxml2 将 14 种节点塞进同一个超集结构 `xmlNode`，字段复用造成大量 `if (type == ...)` 分支，是历史上多次"类型混淆"CVE 的根源。CangjieXML 改用 `sealed interface` + 分支类：
 
 ```text
 sealed interface Node {
     prop parent: ?Element
     prop document: ?Document
-    func accept<R>(v: NodeVisitor<R>): R     // 访问者，和 match 二选一
+    func accept<R>(v: NodeVisitor<R>): R    // 配合 @Visitor 宏自动派生
 }
 
-class Document   <: Node { ... }              // 根，含 DTD、根元素、字符集、版本
-class Element    <: Node { ... }              // 元素：名字、命名空间、属性集、子节点
-class Attr       <: Node { ... }              // 属性：名字、命名空间、值（节点列表）
-class TextNode   <: Node { ... }              // #text
-class CData      <: Node { ... }              // CDATA section
-class Comment    <: Node { ... }              // <!--  -->
-class Pi         <: Node { ... }              // <?target data?>
-class EntityRef  <: Node { ... }              // &name;
-class DocFrag    <: Node { ... }              // 文档片段
-class Dtd        <: Node { ... }              // <!DOCTYPE …>
-class XIncludeMarker <: Node { ... }          // 合并 XINCLUDE_START/END
+class Document         <: Node { ... }      // 含 XmlDecl、Dtd?、根 Element
+class Element          <: Node { ... }      // 名字、命名空间、属性表、子节点
+class Attr             <: Node { ... }      // 属性节点
+class TextNode         <: Node { ... }      // #text
+class CdataSection     <: Node { ... }      // <![CDATA[...]]>
+class Comment          <: Node { ... }      // <!-- ... -->
+class Pi               <: Node { ... }      // <?target data?>
+class EntityRef        <: Node { ... }      // &name;
+class DocumentFragment <: Node { ... }      // 文档片段
+class XIncludeMarker   <: Node { ... }      // 合并 XINCLUDE_START / XINCLUDE_END
 ```
 
-- `sealed` 保证外部无法新增分支 → `match` 编译期穷尽。
-- 公开字段全部走 `prop`（仓颉属性），避免 libxml2 `XML_DEPRECATED_MEMBER` 标注仍暴露的问题。
-- `EntityDecl`、`ElementDecl`、`AttributeDecl`、`Notation` 不进入通用 `Node`，而是作为 `Dtd` 的成员，因为它们从未出现在普通文档主干中；这修复 libxml2 中的"类型混淆"安全分类。
-- **命名空间节点**（`XML_NAMESPACE_DECL`）在 libxml2 里偷用同样布局但实际是 `xmlNs`，历史上出过多次类型混淆 CVE。CangjieXML 把命名空间节点仅在 XPath 结果中作为独立 `class NsNode <: XPathItem` 出现，不混入 `Node`。
+设计要点：
 
-### 4.2 字符串表（Dict）
+- **`sealed`**：限制实现于 `tree` 包内，使外部 `match` 编译期穷尽。
+- **公开访问**：节点字段全部走 `prop`/`mut prop`，避免 libxml2 中 `XML_DEPRECATED_MEMBER` 仍暴露字段的尴尬。
+- **DTD 元数据**（`Notation` / `EntityDecl` / `ElementDecl` / `AttributeDecl`）**不进入** `Node`，而是 `Dtd` 的成员；它们从未出现在文档主干中，剥离即从类型上消除一类 CVE。
+- **命名空间节点**：libxml2 中复用 `xmlNode` 布局但实质为 `xmlNs`，是历史 CVE 重灾区。CangjieXML 把命名空间节点仅作为 XPath 语义节点（`class XPathNamespaceNode`），不进入 `Node` 体系。
 
-`xmlDict` 是 libxml2 性能核心（元素名/属性名去重）。仓颉版用 `HashMap<String, String>` 做不够，因为需要**引用相等比较**。设计：
+### 5.2 名字表（`NameTable`）
 
-- `class NameTable`：内部 `HashMap<String, String>`，`intern(s): String` 返回池内实例。
-- 借助仓颉 `String` 不可变 + GC，免除 libxml2 里 `xmlDictReference` 的引用计数。
-- `NameTable` 可按 `Document` 级作用域创建；一个进程内可安全多份（线程局部 or 按文档）。
-- 通过 `extend String` 增加 `internedIn(t: NameTable)` 这种链式调用语法糖。
+`xmlDict` 是 libxml2 性能核心。仓颉版本由于 `String` 不可变 + GC，去除了引用计数：
 
-### 4.3 URI 与 Catalog
+```text
+class NameTable {
+    func intern(s: String): String         // 返回池内规范实例
+    func interned(s: String): ?String      // 仅查询不插入
+}
+```
 
-- `struct Uri` 为不可变值类型（仓颉 `struct`），提供 `parse / resolve / normalize`。
-- `Catalog` 暴露为 `interface EntityResolver`；内置实现读 OASIS XML Catalog，用户也可替换为用 `stdx.net.http` 获取远程 schema 的解析器。
+可按 `Document` 作用域、按 `XmlParser` 作用域或全局共享；并发场景使用 `ConcurrentHashMap`（来自 `std.collection.concurrent`）。
 
-### 4.4 错误模型
+### 5.3 限定名（`QName`）
+
+```text
+public struct QName {
+    let localName: String
+    let prefix:    ?String
+    let uri:       ?String
+}
+```
+
+- 比较走三元组等价（`(localName, uri)`），避免 libxml2 中 `prefix:localname` 字符串解析的反复重做。
+- 不可变 `struct`，复用便利；构造点统一通过 `NameTable.intern`。
+
+### 5.4 命名空间上下文（`NsContext`）
+
+不可变持久化栈：`push(prefix, uri)` 返回新实例，结构共享。这与 C14N 命名空间作用域跟踪天然对齐，避免 libxml2 命名空间相关 CVE 的根因（指针与作用域混淆）。
+
+### 5.5 URI
+
+```text
+public struct Uri {
+    static func parse(s: String): Result<Uri, XmlError>
+    func resolve(base: Uri): Uri
+    func normalize(): Uri
+    prop scheme:    ?String
+    prop authority: ?String
+    prop path:      String
+    prop query:     ?String
+    prop fragment:  ?String
+}
+```
+
+严格遵循 RFC 3986；提供 `windowsPathCompat: Bool` 选项以兼容 libxml2 对 Windows 盘符的特殊处理。
+
+---
+
+## 6. 字符、编码与 I/O
+
+### 6.1 字符类
+
+对应 libxml2 `chvalid.c`。
+
+```text
+public const func isXmlNameStart(c: Rune, version: XmlVersion): Bool
+public const func isXmlName(c: Rune, version: XmlVersion): Bool
+public const func isXmlChar(c: Rune, version: XmlVersion): Bool
+public const func isXmlWhitespace(c: Rune): Bool
+public const func isPubidChar(c: Rune): Bool
+```
+
+- 全部 `const`，可在编译期常量折叠。
+- 区分 XML 1.0 / 1.1 通过 `enum XmlVersion { V10 \| V11 }` 参数化。
+
+### 6.2 编码（`encoding` 包）
+
+```text
+public interface Decoder {
+    func decode(input: Array<Byte>, output: StringBuilder): DecodeStatus
+    func reset(): Unit
+}
+public interface Encoder {
+    func encode(input: String, output: GrowableBuffer): EncodeStatus
+}
+public enum DecodeStatus { Ok | Incomplete | Invalid(Int64) }
+```
+
+- 内置：`Utf8Decoder`/`Encoder`、`Utf16LeDecoder`/`...BeDecoder`、`Utf32LeDecoder`/`...BeDecoder`、`AsciiDecoder`、`Iso8859Decoder(part: Int)`。
+- 其余编码（GB18030、Shift-JIS 等）通过 `EncodingRegistry.register(name, factory)` 可插拔，初版不内置。
+- BOM 探测：`func detectBom(prefix: Array<Byte>): (BomKind, skipLen: Int64)`。
+
+### 6.3 I/O（`io` 包）
+
+```text
+public interface IoSource <: Resource {
+    func read(buffer: Array<Byte>): Int64       // -1 表示 EOF
+    prop baseUri:  ?String
+    prop encodingHint: ?String
+}
+
+public interface IoSink <: Resource {
+    func write(bytes: Array<Byte>): Unit
+    func flush(): Unit
+}
+```
+
+适配器：`FileSource` / `MemorySource(bytes)` / `StringSource(s)` / `StreamSource(InputStream)`；输出端 `FileSink` / `MemorySink` / `StreamSink`。
+
+装饰器（用 `|>` 组合，避免 libxml2 中函数指针海）：
+
+- `BufferedSink(inner, bufSize)`
+- `IndentingSink(inner, indent: String)`
+- `EncodingSink(inner, encoder: Encoder)`
+
+---
+
+## 7. 解析器架构
+
+### 7.1 五层流水线
+
+将 libxml2 13k 行单文件 `parser.c` 拆为五层：
+
+```
+IoSource ──> ByteReader ──> RuneReader ──> Lexer ──> Parser ──> Iterator<SaxEvent>
+            (回退缓冲)    (解码 + 行列号)  (词法)   (语法 + NS)
+```
+
+每层均为小状态机或纯函数；任何一层独立单测、可被替换。
+
+### 7.2 统一事件流
+
+```text
+public enum SaxEvent {
+    | StartDocument(decl: XmlDecl)
+    | EndDocument
+    | StartElement(name: QName, attrs: Array<Attribute>, ns: NsContext)
+    | EndElement(name: QName)
+    | Characters(text: String)
+    | Cdata(text: String)
+    | Comment(text: String)
+    | Pi(target: String, data: String)
+    | DtdEvent(dtd: DtdSubset)
+    | EntityReference(name: String)
+    | ParseError(err: XmlError)        // 容错模式下以事件形式流出
+}
+```
+
+三种消费姿势共用同一份事件流：
+
+| 风格        | 对应 libxml2          | CangjieXML 实现                                               |
+| ----------- | --------------------- | ------------------------------------------------------------- |
+| SAX（推）   | `xmlSAXUserParseMemory` | 外层把 `Iterator<SaxEvent>` 分派到 `SaxHandler`               |
+| Reader（拉）| `xmlreader.c`           | 把迭代器再裹一层游标状态机，提供"当前节点"访问 API             |
+| DOM（树）   | `xmlReadMemory`         | 内部用一个特殊的 `SaxHandler` 收集事件构建 `Document`         |
+
+这一统一消除了 libxml2 中 push / pull 双实现行为偏差的隐患。
+
+### 7.3 命名空间
+
+`StartElement` 事件携带新 `NsContext`；前缀与 URI 一次性解析，下游不再重做字符串拆分。
+
+### 7.4 实体处理
+
+- 内置实体硬编码（`&lt;` `&gt;` `&amp;` `&apos;` `&quot;`）。
+- 字符引用 `&#x...;` / `&#...;` 由解析器直接消费。
+- 通用实体与参数实体：通过 `EntityResolver` 接口返回 `IoSource`，解析器递归下推。
+- **Billion Laughs 检测器**：实体展开计数 + 嵌套深度阈值，可由 `ParserOptions` 调整。
+- 默认 **拒绝外部实体**（XXE 防护），需显式 `loadExternal = true` 开启。
+
+### 7.5 解析器选项
+
+```text
+public struct ParserOptions {
+    var validate:           Bool        = false
+    var substituteEntities: Bool        = true
+    var loadExternal:       Bool        = false
+    var huge:               Bool        = false
+    var recover:            Bool        = false
+    var keepBlanks:         Bool        = true
+    var version:            XmlVersion  = V10
+    var maxDepth:           Int64       = DEFAULT_MAX_DEPTH
+    var maxEntityExpansion: Int64       = DEFAULT_MAX_ENTITY_EXPANSION
+    var nameTable:          ?NameTable  = None
+    var entityResolver:     ?EntityResolver = None
+}
+```
+
+不再使用 libxml2 风格的位掩码——结构体 + 命名参数 + 默认值，调用点自解释。
+
+---
+
+## 8. 树操作 API
+
+### 8.1 构建
+
+```text
+public class DocumentBuilder {
+    static func from(events: Iterator<SaxEvent>, opts: BuildOptions): ParseResult
+    static func build(scope: (DocumentScope) -> Unit): Document    // 流畅 API
+}
+```
+
+借助仓颉尾随 lambda：
+
+```text
+let doc = DocumentBuilder.build { d =>
+    d.root("book", ns: "http://...") { b =>
+        b.attr("id", "1")
+        b.child("title") { t => t.text("XML 之美") }
+    }
+}
+```
+
+### 8.2 遍历
+
+`Node` 实现 `Iterable<Node>`（按文档顺序 DFS），并提供细分迭代器：
+
+- `children()` / `descendants()` / `ancestors()`
+- `followingSiblings()` / `precedingSiblings()`
+- 全部惰性，避免 libxml2 中 `xmlNodeSet` 的全量复制。
+
+### 8.3 修改
+
+```text
+extend Element {
+    func appendChild(n: Node): Unit
+    func insertBefore(newNode: Node, ref: Node): Unit
+    func remove(child: Node): Unit
+    func replaceWith(newNode: Node): Unit
+}
+```
+
+不变量检查：
+
+- `Node.detached: Bool`：节点必须为分离态才能再插入；重复插入立即抛 `XmlException`。
+- 属性表内部为有序 `ArrayList<Attr>`（保留原始顺序，C14N 必需）+ 阈值切换的小哈希。
+
+### 8.4 用户扩展
+
+鼓励用户使用 `extend` 增加便利方法而非派生子类：
+
+```text
+extend Element {
+    func getElementsByTagName(name: String): Iterable<Element> { ... }
+    prop innerText: String { get() { ... } }
+}
+```
+
+---
+
+## 9. XPath 与 Pattern
+
+### 9.1 XPath 1.0
+
+三段式：
+
+```
+源串 ──> Lexer ──> Parser (AST: enum Expr / enum Step) ──> Evaluator ──> XPathItem
+```
+
+```text
+public enum Expr {
+    | Path(Array<Step>)
+    | Binary(Op, Expr, Expr)
+    | FuncCall(QName, Array<Expr>)
+    | Literal(String)
+    | Number(Float64)
+    | VarRef(QName)
+}
+
+public enum Axis {
+    | Self_      | Child      | Parent
+    | Descendant | DescendantOrSelf
+    | Ancestor   | AncestorOrSelf
+    | Following  | FollowingSibling
+    | Preceding  | PrecedingSibling
+    | Attribute  | Namespace
+}
+
+public enum XPathItem {
+    | NodeSet(NodeSet)
+    | StringValue(String)
+    | NumberValue(Float64)
+    | BoolValue(Bool)
+}
+```
+
+- AST 不可变；编译产物 `CompiledXPath` 可被多线程共享，配合不同 `XPathContext` 并发求值。
+- `NodeSet` 内部为惰性迭代器 + 按需唯一化 / 文档序排序。
+- 函数库：XPath 1.0 全部 28 个核心函数 + `XPathContext.registerFunction(name, fn)` 扩展点。
+
+### 9.2 Pattern
+
+`pattern` 包对应 libxml2 `pattern.c`：流式 XPath 严格下降子集（`/a/b/c`、`//x`、`*`、`@attr`），编译为自动机，**不走** XPath 完整求值器。供 reader 过滤、Schema selector 等高频路径使用。
+
+### 9.3 XPointer
+
+`xpointer` 包提供 `element()` 与 `xpath()` 方案；其余历史方案（`xmlns()`、`fragid`）按 libxml2 当前能力等价实现。
+
+---
+
+## 10. 验证：DTD / XSD / RelaxNG / Schematron
+
+### 10.1 DTD（`dtd` 包）
+
+- DTD 解析复用 `parser` 的词法层（DTD 是 XML 的子语言）。
+- 内容模型编译为 NFA → DFA（复用 `regexp` 包）。
+- 验证器实现 `interface Validator`：既可订阅 `SaxEvent` 流（流式），也可作用于 `Document`（树式）。
+
+### 10.2 正则与自动机（`regexp` 包）
+
+libxml2 `xmlregexp.c` / `xmlautomata.h` 是自家实现的 XSD 正则（不是 PCRE）。CangjieXML 做法：
+
+```text
+public sealed interface Re
+class CharRe(c: Rune)         <: Re
+class CharClassRe(set: CharSet) <: Re
+class SeqRe(parts: Array<Re>) <: Re
+class AltRe(parts: Array<Re>) <: Re
+class RepRe(inner: Re, min: Int, max: ?Int) <: Re
+```
+
+- `CharSet` 使用排序区间数组 + ASCII bitset 加速；支持 Unicode 块（XSD `\p{...}`）。
+- Thompson 构造 → NFA → 子集构造 DFA；提供"全匹配"与"流式进入 / 退出"两种 API。
+- **不**作为通用正则对外暴露（那是 `std.regex` 的职责）。
+
+### 10.3 XML Schema 1.0（`schema` 包）
+
+三阶段：**parse**（XSD 文档 → 元模型）→ **compile**（解析组件引用、派生展开、组扁平化）→ **validate**。
+
+```text
+public sealed interface SchemaType
+class SimpleType  <: SchemaType { ... }
+class ComplexType <: SchemaType { ... }
+
+public enum DerivationKind { Restriction | Extension | List | Union }
+
+public enum Facet {
+    | MinLength(Int64) | MaxLength(Int64) | Length(Int64)
+    | Pattern(Re)      | Enumeration(Array<String>)
+    | MinInclusive(String) | MaxInclusive(String)
+    | MinExclusive(String) | MaxExclusive(String)
+    | TotalDigits(Int64)   | FractionDigits(Int64)
+    | WhiteSpace(WhiteSpaceTreatment)
+}
+```
+
+- 内建 44 个 XSD 简单类型（`anyURI`, `dateTime`, `duration`, `decimal`, ...），每个都是 `class : SimpleType`，通过 `extend` 注册 `lexicalSpace` 与 `canonicalize`。
+- 身份约束（`xs:unique` / `xs:key` / `xs:keyref`）调用 `xpath` 求值。
+
+### 10.4 RelaxNG（`relaxng` 包）
+
+采用 **Brzozowski 导数算法**而非 libxml2 的自动机法：代码量小、证明清晰、极度契合 `sealed class` + `match`。
+
+```text
+public sealed interface Pattern
+class Empty       <: Pattern
+class NotAllowed  <: Pattern
+class Text        <: Pattern
+class Choice(a, b: Pattern) <: Pattern
+class Group(a, b: Pattern)  <: Pattern
+class Interleave(a, b: Pattern) <: Pattern
+class OneOrMore(p: Pattern) <: Pattern
+class ElementPattern(name: NameClass, p: Pattern) <: Pattern
+class AttributePattern(name: NameClass, p: Pattern) <: Pattern
+class DataValue(t: Datatype, value: String) <: Pattern
+```
+
+每个 `Pattern` 实现 `func deriv(event: SaxEvent): Pattern`，验证即对事件流做导数。
+
+### 10.5 Schematron（`schematron` 包）
+
+本质是"按规则求 XPath"：极薄的一层，直接复用 `xpath`。输出 SVRL 报告。
+
+---
+
+## 11. 输出：Writer / Save / C14N
+
+### 11.1 `XmlWriter`（流式，`writer` 包）
+
+```text
+public class XmlWriter <: Resource {
+    init(sink: IoSink, opts: WriterOptions)
+    func startDocument(version!: XmlVersion = V10, encoding!: ?String = None): Unit
+    func endDocument(): Unit
+    func startElement(name: QName): Unit
+    func endElement(): Unit
+    func attribute(name: QName, value: String): Unit
+    func text(s: String): Unit
+    func cdata(s: String): Unit
+    func comment(s: String): Unit
+    func pi(target: String, data: String): Unit
+}
+```
+
+内部用元素栈跟踪，发现 API 误用（如 `endElement` 多于 `startElement`）立即抛 `XmlException`，避免 libxml2 中产生非良构输出的隐患。
+
+### 11.2 `DocumentSerializer`（`save` 包）
+
+```text
+public struct SerializeOptions {
+    var indent:        Bool       = false
+    var indentString:  String     = "  "
+    var omitXmlDecl:   Bool       = false
+    var encoding:      ?String    = None
+    var c14nMode:      ?C14NMode  = None
+}
+```
+
+构建于 `XmlWriter` 之上；与 `c14n` 共享"命名空间作用域跟踪"基础设施。
+
+### 11.3 C14N（`c14n` 包）
+
+实现 C14N 1.0、Exclusive C14N、C14N 1.1。
+
+- 严格确定性的命名空间与属性排序（命名空间序 < 属性序）。
+- 节点过滤通过 `interface InclusionFilter { func includes(n: Node): Bool }`。
+- 由于使用不可变 `NsContext`，从设计层面规避 libxml2 中 attr-axis 命名空间相关的 CVE。
+
+---
+
+## 12. HTML、XInclude、Catalog
+
+### 12.1 HTML（`html` 包）
+
+- **共享** `parser` 的词法层，在其上叠加 `HtmlInsertionMode` 状态机（对齐 WHATWG 解析算法核心插入模式）。
+- 复用 `tree.Document`，加 `isHtml: Bool` 标记。
+- 不追求完整 HTML5 DOM（如 shadow DOM），覆盖 libxml2 现有能力（XPath 抓取场景）。
+
+### 12.2 XInclude（`xinclude` 包）
+
+- 实现 `xi:include` + `xi:fallback`，支持 `text` / `xml` 两种解析。
+- 与 `xpointer` 联动做 fragment 定位。
+
+### 12.3 Catalog（`catalog` 包）
+
+- 解析 OASIS XML Catalog 1.1，作为 `EntityResolver` 默认实现（"按 catalog 查找"）。
+- 远程 schema 抓取交由调用方注入实现 `stdx.net.http`。
+
+---
+
+## 13. 并发模型
+
+### 13.1 总原则
+
+| 角色             | 可变性     | 并发使用                       |
+| ---------------- | ---------- | ------------------------------ |
+| `XmlParser`      | 可变       | 单实例单线程                   |
+| `XmlWriter`      | 可变       | 单实例单线程                   |
+| `Document`       | 构造后视为不可变 | 多线程共享读 / XPath / 序列化 |
+| `CompiledXPath`  | 不可变     | 多线程共享                     |
+| `CompiledSchema` | 不可变     | 多线程共享                     |
+| `NameTable`      | 可变（线程安全实现） | 多线程共享                  |
+| 编码注册表       | 启动期写、运行期只读 | 多线程读                |
+
+### 13.2 显式注入替代全局状态
+
+libxml2 大量使用全局 hook（`xmlSetExternalEntityLoader` 等），并发场景易冲突。CangjieXML 全部通过 `ParserOptions` / `WriterOptions` 显式注入；不存在隐式全局状态。
+
+### 13.3 取消
+
+所有长耗时 API（解析、验证、XPath）接受 `CancellationToken`（基于仓颉 `Future.cancel` / `ThreadLocal` 机制）；上层超时或停止时及时中断，替换 libxml2 仅靠 `xmlParserMaxDepth` 等粗粒度阈值的做法。
+
+### 13.4 可选并行
+
+ROADMAP Phase 13 提供 `ParallelValidator` / 文档分段并行解析等高级能力；MVP 阶段不引入。
+
+---
+
+## 14. 错误模型与诊断
 
 ```text
 public enum XmlError {
@@ -182,409 +738,123 @@ public enum XmlError {
     | Io(IoKind, String)
     | Encoding(String, Position)
     | Schema(SchemaKind, Position, String)
-    | XPath(XpKind, String)
+    | XPath(XPathKind, String)
     | Internal(String)
 }
 
-public class XmlException <: Exception { ... }   // 包装 XmlError
-```
-
-- `Position` = `(uri: ?String, line: Int64, column: Int64, byteOffset: Int64)`。
-- 库内部大量使用 `Result<T, XmlError>`（用 `enum Result<T,E>`，也可沿用仓颉惯例返回 `?T` + 旁路日志）。
-- 公共 API 可选 fluent 模式："收集所有错误"或"首错即抛"，由 `ErrorCollector` 接口控制（替代 libxml2 `xmlStructuredErrorFunc` 全局函数指针）。
-- 没有全局错误状态：libxml2 的 `xmlGetLastError()` 是全局可变，线程下易冲突；CangjieXML 显式通过 `ParseResult` 返回 `List<XmlError>`。
-
----
-
-## 5. 字符/编码/IO 层
-
-### 5.1 字符类（`xml_core.char_valid`）
-
-libxml2 的 `chvalid.c` 手写了一堆 ASCII range。仓颉做法：
-
-- 用 `const` 函数 + 区间查找（`const func isXmlNameStart(c: Rune): Bool`）在编译期常量折叠。
-- 针对 XML 1.0 / 1.1 不同字符类，用**类型参数**区分：`XmlNameChecker<V>` where `V: XmlVersion`（零开销泛型）。
-- 提供 `Iterator<Rune>` 的扩展函数 `.validateXmlChars()` 惰性校验输入。
-
-### 5.2 编码（`xml_encoding`）
-
-- 定义 `interface Decoder`（`decodeChunk(bytes: Array<Byte>, into: StringBuilder): DecodeStatus`）和 `interface Encoder`。
-- 内置 UTF-8、UTF-16LE/BE、UTF-32LE/BE、ASCII、ISO-8859-1…15 纯仓颉实现。
-- 其它编码（GB18030、Shift-JIS 等）通过 `interface Decoder` 可插拔注册，不在初版范围。
-- BOM 检测器独立为 `enum BomKind { Utf8, Utf16LE, Utf16BE, Utf32LE, Utf32BE, None }` + `detect(bytes): (BomKind, prefixLen)`。
-- 与 libxml2 不同：**不依赖 iconv**；编码不支持时直接 `XmlError.Encoding` 而非隐式回落。
-
-### 5.3 IO 抽象（`xml_io`）
-
-```text
-public interface ParserInputSource <: Resource {
-    func read(buf: Array<Byte>): Int64   // 返回读入字节数，-1 表示 EOF
-    prop baseUri: ?String
-    prop encoding: ?String   // 由 HTTP header 等带进来的提示
+public struct Position {
+    let uri:        ?String
+    let line:       Int64
+    let column:     Int64
+    let byteOffset: Int64
 }
 
-public interface OutputSink <: Resource {
-    func write(bytes: Array<Byte>): Unit
-    func flush(): Unit
-}
+public class XmlException <: Exception { ... }
 ```
 
-适配器：
-
-- `FileInputSource` / `FileOutputSink`（基于 `std.fs`）
-- `MemoryInputSource(bytes: Array<Byte>)`
-- `StringInputSource(s: String)` — 自动 BOM 跳过 + UTF-8 标记
-- `ReaderInputSource` — 适配任意 `InputStream`
-
-`OutputSink` 支持装饰器：
-
-- `IndentingSink(inner, indent: String)`
-- `EncodingSink(inner, encoder: Encoder)`
-- `BufferedSink(inner, size: Int)`
-
-用 `|>` 或 `~>`（仓颉函数组合）拼接，避免 libxml2 中 `xmlOutputBuffer` 的函数指针海。
+- 库内部通过 `Result<T, XmlError>` 传播；公共 API 抛 `XmlException` 包装。
+- 解析返回 `ParseResult { doc: ?Document, errors: ArrayList<XmlError> }`，便于 IDE/lint 工具批量呈现。
+- 提供 `func formatError(err: XmlError, source: ?String): String`，模仿编译器风格（`file:line:column` + `^` 指针）。
+- **无全局 last-error**：libxml2 的 `xmlGetLastError()` 是全局可变，CangjieXML 不复刻。
 
 ---
 
-## 6. 解析器设计
+## 15. 安全默认
 
-### 6.1 核心思想：**状态机 + 分层词法器**，避免 libxml2 13k 行单文件
+| 风险                  | 默认策略                           | 选项                                     |
+| --------------------- | ---------------------------------- | ---------------------------------------- |
+| XXE（外部实体）       | 拒绝加载                           | `ParserOptions.loadExternal = true`      |
+| Billion Laughs        | 实体展开总数 ≤ `1e7`               | `ParserOptions.maxEntityExpansion`       |
+| 嵌套深度              | ≤ 256                              | `ParserOptions.maxDepth`                 |
+| DTD 大小              | 声明数量阈值                       | `ParserOptions.huge = true` 关闭         |
+| URL 自动取回          | 拒绝                               | 注入自定义 `EntityResolver`              |
+| 字符归一化            | 严格拒绝非法 UTF-8（不静默替换）    | 无                                       |
 
-把 libxml2 的 `parser.c` 拆成 5 层：
-
-1. **字节流层** (`ByteReader`)：负责从 `ParserInputSource` 读入并维持回滚缓冲（至少 `LOOKAHEAD=8` 字节）。
-2. **字符流层** (`RuneReader`)：按注册的 `Decoder` 把字节流转成 `Rune` 流，维护行列号、字节偏移。同时透明处理 XML 1.1 规定的换行归一化。
-3. **词法层** (`Lexer`)：`enum Token { TagOpen, TagClose, AttrName, AttrValue(String), Text(String), Cdata(String), PI, Comment, Dtd, Ref(EntityKind, String) … }`；词法器是**一个函数 + match 大状态机**，每个分支不超过 80 行。
-4. **语法层** (`Parser`)：不再用回调，而是**生成 `Iterator<SaxEvent>`**：
-   ```text
-   enum SaxEvent {
-       StartDocument(XmlDecl)
-       EndDocument
-       StartElement(QName, attrs: Array<Attribute>, nsCtx: NsContext)
-       EndElement(QName)
-       Characters(String)  | CData(String)
-       Comment(String)     | PI(target: String, data: String)
-       Dtd(DtdDecl) | EntityRef(String)
-       Error(XmlError)       // 非致命时以事件形式流出
-   }
-   ```
-5. **高层外观** (`XmlParser`)：包一层 `Iterator<SaxEvent>`，提供三种消费姿势（见 6.2）。
-
-这样每层都是纯函数或小状态机，**天然支持流式、易测、可惰性组合**。
-
-### 6.2 三种消费接口，一体实现
-
-| API 风格 | 对应 libxml2 | CangjieXML 做法 |
-| --- | --- | --- |
-| **SAX（推）** | `xmlSAXUserParseMemory` | 外部把 `Iterator<SaxEvent>` 分派到 `SAXHandler`（默认实现空函数，开发者只重写关心的） |
-| **Reader（拉）** | `xmlreader.c` | 把迭代器再裹一层状态机，增加"当前节点类型/属性"访问 |
-| **Tree/DOM** | `xmlReadMemory` | 消费事件构建 `Document`；内部就是个 SAX handler |
-
-推式由**外**推事件到 handler，拉式由**外**驱动迭代器，本质是同一个生成器。这消除了 libxml2 里 push/pull 双实现不一致的顽疾。
-
-### 6.3 命名空间
-
-- `NsContext` 为不可变堆栈：`{ prefix -> uri }`，push 后返回新实例（结构共享，参考持久化栈）。
-- 遇到 `xmlns` 属性，`StartElement` 事件同时携带新 `NsContext`。
-- QName 统一为 `struct QName { localName: String, prefix: ?String, uri: ?String }`；比较走三元组，避免 libxml2 中混用 `prefix:localname` 字符串解析。
-
-### 6.4 实体处理
-
-- 内置实体（`&lt;` 等）硬编码；**参数实体**与**通用实体**由 `EntityResolver` 返回 `ParserInputSource`，解析器递归下推。
-- 内建 `BillionLaughsDetector`：对实体展开计数 + 栈深度限制，默认阈值可由 `ParserOptions` 调整。
-- 默认关闭外部实体加载（对齐 XXE 安全最佳实践，libxml2 默认开启导致大量 CVE），用 `ParserOptions.loadExternal = true` 显式开启。
-
-### 6.5 解析器选项
-
-```text
-struct ParserOptions {
-    validate: Bool = false
-    substituteEntities: Bool = true
-    loadExternal: Bool = false        // 默认安全
-    huge: Bool = false                // 取消深度/大小限制
-    recover: Bool = false             // 容错模式
-    namespaces: Bool = true
-    keepBlanks: Bool = true
-    version: XmlVersion = V10
-    maxDepth: Int64 = 256
-    maxEntityExpansion: Int64 = 10_000_000
-    nameTable: ?NameTable = None
-}
-```
-
-不用 libxml2 的位掩码；仓颉结构体带命名参数 + 默认值，调用点自解释。
+每条都对应明确的 `ParserOptions` 字段，便于安全审计。
 
 ---
 
-## 7. Tree / DOM API
+## 16. 宏与元编程
 
-### 7.1 构建
+仓颉宏（`std.ast`）用于消除样板与保证穷尽，**绝不**用作"魔法 DSL"：
 
-- `class DocumentBuilder`：**流畅 API**。利用仓颉的尾随 lambda：
-  - `buildDoc { doc in doc.root("book") { b in b.attr("id","1").child("title"){...} } }`
-- 也可从 `Iterator<SaxEvent>` 一次性构造：`Document.from(events)`。
-
-### 7.2 遍历
-
-- `Node` 实现 `Iterable<Node>`（按文档顺序 DFS），亦提供 `children()`, `descendants()`, `ancestors()`, `followingSiblings()` 等迭代器。
-- 所有迭代器**惰性**；不再像 libxml2 拷贝 `xmlNodeSet`。
-
-### 7.3 修改
-
-- 节点提供 `appendChild/insertBefore/remove/replaceWith`。
-- 为避免 libxml2 "同一节点被插到两处导致双链断裂" 的隐患，增加 `Node.detached: Bool` 检查；重复插入立即 `XmlException`。
-- 属性表采用有序 `ArrayList<Attr>` + 小哈希（阈值切换）；既保留属性原始顺序（C14N 需要），又 O(1) 查找。
-
-### 7.4 扩展（`extend`）
-
-鼓励用户**用扩展加功能而非修改核心**：
-
-- `extend Element` 添加 `getElementsByTagName`, `innerText`, `serialize`。
-- `extend Node where Node <: Iterable<Node>` 可加 `findFirst(pred)`、`toList()` 等泛型工具。
+| 宏                       | 用途                                                                  |
+| ------------------------ | --------------------------------------------------------------------- |
+| `@Visitor`               | 为 `sealed interface Node` 自动派生 `NodeVisitor<R>` 与各分支 `accept` |
+| `@SchemaModel`           | 为 XSD 类型元模型派生 `derive(kind, base)` 等结构性函数                |
+| `@XPathFunction("ns")`   | 标记 XPath 自定义函数，自动生成注册代码                                |
 
 ---
 
-## 8. XPath 1.0 引擎
+## 17. 测试策略
 
-### 8.1 架构三段式
-
-```
-Source String
-   └─> Lexer   (enum Token)
-          └─> Parser (产出 AST: enum Expr / enum Step)
-                 └─> Evaluator (动态 dispatch on Expr, 访问 Node 树)
-                        └─> XPathItem (Nodeset / Boolean / Number / StringValue)
-```
-
-### 8.2 语言对照优势
-
-- `enum Expr { Path(Array<Step>), Binary(Op, Expr, Expr), FuncCall(String, Array<Expr>), Literal(String), Number(Float64), VarRef(QName) }` — 极简 AST，模式匹配求值。
-- Axis 用 `enum Axis { Self, Child, Parent, Descendant, DescendantOrSelf, Ancestor, AncestorOrSelf, Following, FollowingSibling, Preceding, PrecedingSibling, Attribute, Namespace }`；每个 axis 实现为 `Iterator<Node>` 生成器。
-- 节点集合用 `class NodeSet` 内部为**惰性迭代器 + 按需唯一化/文档序排序**，避免 libxml2 里频繁的全量拷贝。
-- 函数库用 `HashMap<String, XPathFunc>` 注册；用户可扩展 `registerFunction`。
-
-### 8.3 并发
-
-- XPath AST 是**不可变**的；同一 compiled expression 可被多线程同时求值（每次求值自带上下文 `XPathContext`）。用 `class CompiledXPath` 提供 `eval(ctx: XPathContext): XPathItem`。
-
-### 8.4 XPointer / Pattern
-
-- `xml_xptr` 在 XPath 基础上实现 `element()` 与 `xpath()` 方案；
-- `xml_pattern` 实现 libxml2 `pattern.c` 子集（流式节点匹配，用于 reader / schema 选择器）。它是 XPath 的"纯下降子集"，内部编译成自动机，**不走 XPath 完整求值器**。
+| 层次       | 内容                                                                                      |
+| ---------- | ----------------------------------------------------------------------------------------- |
+| 单元测试   | 每包 `src/xxx_test.cj`，使用 `@Test` / `@TestCase` / `@Expect` / `@PowerAssert`           |
+| 黄金对比   | 拷贝 `.libxml2-2.15.3/test/` 与 `result/` 中的样例，作为端到端回归                        |
+| 规范套件   | `testkit` 包提供 W3C `xmlconf` 驱动器，对应 libxml2 `runxmlconf.c`                        |
+| 模糊测试   | 复用 `.libxml2-2.15.3/fuzz/` 语料，编写仓颉 harness 做随机变异                            |
+| 性能基线   | 选 1 MB / 10 MB / 100 MB 三档 XML，跑解析 / XPath / 序列化基准；用 `cjprof` 做火焰图分析  |
+| 覆盖率     | `cjcov` 分支覆盖率 ≥ 80%（关键包 ≥ 90%）                                                   |
 
 ---
 
-## 9. 验证：DTD / XSD / RelaxNG / Schematron
+## 18. 与 libxml2 的刻意差异
 
-### 9.1 DTD（`xml_dtd`）
+| libxml2 行为                                | CangjieXML 行为                          | 理由                       |
+| ------------------------------------------- | ---------------------------------------- | -------------------------- |
+| 默认加载外部 DTD / 实体                     | 默认禁用                                 | 安全默认                   |
+| `xmlGetLastError` 线程局部全局              | 无全局；`ParseResult.errors`             | 可测、线程友好             |
+| `void*` SAX `userData`                      | `class` / `interface` 显式               | 类型安全                   |
+| `xmlNode` 超集结构                          | `sealed interface Node` + 分支类         | 类型安全 + 穷尽 `match`    |
+| 内嵌 HTTP / FTP 客户端                      | 移除，留 `EntityResolver` 钩子           | 单一职责                   |
+| iconv 耦合                                  | 纯仓颉编码表 + `Decoder` 接口            | 可移植、零原生依赖         |
+| 手工引用计数 + `xmlFree*`                   | GC + `Resource`                          | 内存安全                   |
+| `xmlXPathObjectPtr` 联合体                  | `enum XPathItem`                         | 表达力                     |
+| 全局 hook 设置                              | `ParserOptions` / `WriterOptions` 注入   | 显式优于隐式               |
 
-- DTD 解析复用 `xml_parser` 的词法器（DTD 词法是 XML 一种子语言）。
-- 内容模型编译为**非确定自动机** → 用子集构造法转 DFA（复用 `xml_regexp`）。
-- 验证器实现 `interface Validator`：
-  - SAX 式：订阅 `SaxEvent` 流，在线验证 → 适合 `xml_reader`。
-  - Tree 式：对 DOM 遍历。
-
-### 9.2 正则 / 自动机（`xml_regexp`）
-
-libxml2 的 `xmlregexp.c`/`xmlautomata.h` 是自家实现的 XSD 正则（不是 PCRE）。CangjieXML 做法：
-
-- `enum Re { Char(Rune), CharClass(CharSet), Seq(Array<Re>), Alt(Array<Re>), Rep(Re, min, max), Capture(Int, Re) }`。
-- `CharSet` 使用**排序区间数组**（`Array<(Rune,Rune)>`) + bitset 加速 ASCII，支持 Unicode block（XSD 的 `\p{IsBasicLatin}` 等）。
-- Thompson 构造 → NFA → 子集构造 DFA；提供"匹配"与"进入/退出"（流式）两种 API。
-- **不**暴露给最终用户做通用正则（那是 `std.regex` 的事）；仅供 XSD/DTD/Schema 选择器使用。
-
-### 9.3 XML Schema 1.0（`xml_schema`）
-
-- 三阶段：**parse**（XSD 文档→元模型）、**compile**（解析组件引用、类型派生、group/attrGroup 展开）、**validate**（同时支持 DOM 与流式）。
-- 元模型用大量 `sealed class` + `enum`：
-  - `sealed class SchemaType` → `SimpleType` / `ComplexType`。
-  - `enum DerivationKind { Restriction, Extension, List, Union }`。
-- Facets 定义在 `enum Facet { MinLength(Int), MaxLength(Int), Pattern(Re), Enumeration(Array<String>), ... }`。
-- 用 `xml_xpath` 做 XPath-based `xs:unique` / `xs:key` 约束。
-- 内建 44 个 XSD 简单类型（anyURI, dateTime, duration, decimal…），每个都是 `class : SimpleType`，通过 `extend` 注册 `lexicalSpace` 和 `canonicalize`。
-
-### 9.4 RelaxNG（`xml_relaxng`）
-
-- 采用 "Derivative-based" 验证算法（Brzozowski 导数，比 libxml2 的自动机法更简洁正确）。
-- Pattern 为 `sealed class`，导数运算是一组 `override func deriv(event): Pattern`。
-- Compact syntax 由 `tools/` 中单独转换器转成 XML Syntax（非核心路径）。
-
-### 9.5 Schematron（`xml_schematron`）
-
-- 本质是"按规则求 XPath"：极薄的一层，直接复用 `xml_xpath`。
+**所有差异均不违反 W3C 规范**；CangjieXML 与 libxml2 应通过同一批 W3C 测试。
 
 ---
 
-## 10. 输出侧
+## 19. 架构决策记录（ADR）
 
-### 10.1 Writer（流式，`xml_writer`）
+- **ADR-001**：节点采用 `sealed interface Node` + 分支类，而非单一 `enum Node`。理由：节点附带较多子状态，`class` 比带 payload 的 `enum` 在字段访问与扩展上更自然。
+- **ADR-002**：解析器输出统一为 `Iterator<SaxEvent>`，SAX / Reader / DOM 均为其消费者。理由：单一真理来源，消除 push / pull 双实现行为偏差。
+- **ADR-003**：不提供 C ABI / CFFI 绑定。理由：项目目标为"重构式复刻"；如需互操作，属于另立项目。
+- **ADR-004**：用 `NameTable`（普通哈希 + GC）替换 `xmlDict` 引用计数字典。理由：仓颉不可变 `String` + GC 使引用计数失去意义。
+- **ADR-005**：默认安全（禁用外部实体、深度 / 展开阈值默认开启）。理由：规避 libxml2 历史 CVE 模式。
+- **ADR-006**：HTML 解析器与 XML 共享词法层。理由：减少重复代码，同步修复两端。
+- **ADR-007**：RelaxNG 采用 Brzozowski 导数算法，而非 libxml2 的自动机法。理由：实现简洁、证明清晰、契合 `sealed` + `match`。
+- **ADR-008**：移除每个包的 `xml_` 前缀，包名按职能命名（`core`、`parser`、`xpath` 等）。理由：工作区已名为 CangjieXML，前缀冗余且不优雅。
 
-- 对应 libxml2 `xmlwriter.c`。
-- API：`class XmlWriter(sink: OutputSink)` + 一组 `startElement / endElement / writeAttribute / writeText` 方法。
-- 内部用栈跟踪打开的元素，避免 libxml2 里松散的 API 滥用导致的非良构输出。
-- 支持缩进、编码转换（借 `EncodingSink`）。
-
-### 10.2 Save（DOM 序列化，`xml_save`）
-
-- 对应 libxml2 `xmlsave.c`。基于 Writer，再加上"优先使用 CDATA 段/字符引用"等选项。
-- 序列化选项通过 `struct SaveOptions { indent, indentString, noDecl, asXmlElemOnly, encoding, c14nMode: ?C14NMode }`。
-
-### 10.3 Canonicalization（`xml_c14n`）
-
-- 实现 C14N 1.0、Exclusive C14N、C14N 1.1。
-- 把历史上多次 CVE 的 attr-axis 实现重新设计：用**不可变** `NsContext` + **确定性排序**（命名空间序 < 属性序），天然避免类型混淆。
-- 节点过滤用 `interface C14NInclusionFilter { func include(n: Node): Bool }`；默认全包含。
-
----
-
-## 11. HTML（`xml_html`）
-
-- libxml2 `HTMLparser.c` 是独立的宽松解析器。
-- CangjieXML 做法：**共享** `xml_parser` 的词法层，但在 `Lexer` 之上加 `HtmlInsertionMode` 状态机（对齐 WHATWG HTML 解析算法的核心插入模式）。
-- 文档模型复用 `xml_tree` 的 `Document` + 属性（`isHtml: Bool`）。
-- 不追求完整 HTML5 DOM（如 shadow DOM），只覆盖 libxml2 当前能力（主要用于 xpath/scraping）。
-
----
-
-## 12. 并发
-
-### 12.1 总原则
-- 数据结构默认**值语义**或**只读共享**；可变状态集中在"解析器实例"与"Writer 实例"上，单线程使用。
-- 全局注册表（编码注册表、内建实体、默认 Entity Resolver）在进程启动期 `const` 或 `static` 初始化，运行期不再写。用户自定义注册通过**显式注入**进具体 `ParserOptions`，不走全局。
-- 共享可变（字典、Schema 编译缓存）用 `Mutex` / `ReentrantLock` / `AtomicReference`。
-
-### 12.2 并行能力
-- `Document` 一旦构造完成视为不可变（不提供并发修改 API），多线程可同时：
-  - XPath 查询（已编译表达式线程安全）
-  - 序列化
-  - 验证
-- 大文档分片解析用 `spawn` + 多 `ParserInputSource`：例如根元素下 `chunked` 段，由上层切分后并行构造子树再拼装（作为可选优化，见 ROADMAP Phase 12）。
-- Schema 编译结果（`CompiledSchema`）不可变，天然可被多线程共享 / 并发验证多个文档。
-
-### 12.3 取消
-
-所有长耗时 API（解析、验证、XPath）接受 `CancellationToken`（基于仓颉 `Future` 的 `cancel`/ `ThreadLocal` 机制），用于在超时或上层停止时及时中断，避免 libxml2 中靠全局 `xmlParserMaxDepth` 粗粒度保护的问题。
-
----
-
-## 13. 宏与元编程
-
-利用 `std.ast` 与仓颉宏，降低样板代码：
-
-1. **`@Visitor`**：为 `sealed interface Node` 自动派生 `NodeVisitor<R>` 接口与 `accept` 实现。
-   - 开发者只需写 `@Visitor class Node { ... }` 即可得到 `visitElement/visitText/...` 派生。
-2. **`@SchemaModel`**：对 XSD 类型元模型的数据类自动派生 `derive(kind, base)` 等类型派生函数。
-3. **`@XPathFunction("namespace-uri")`**：标记 XPath 自定义函数，自动生成注册代码。
-4. **`@Test`**（沿用仓颉单测宏）：每个包自己的单元测试。
-
-宏仅用于**消除样板与保证穷尽性**，不做"魔法" DSL，确保可读性。
-
----
-
-## 14. 错误与诊断
-
-- 每个事件/异常携带 `Position`。
-- 解析器运行期产生 `List<XmlError>`，通过 `ParseResult { doc: ?Document, errors: List<XmlError> }` 返回，便于 IDE/工具逐条显示。
-- 提供格式化器：`func formatError(err: XmlError, source: ?String): String`，模仿编译器风格（文件:行:列 + ^ 指针）。
-- 调试包 `xml_debug`（暂不单独出包，合入 `xml_tree`）：`dump(n: Node): String` 打印结构，类似 `debugXML.c`。
-
----
-
-## 15. 安全性默认
-
-对齐 OWASP XML 处理安全建议：
-
-| 风险 | 默认策略 |
-| --- | --- |
-| XXE（外部实体） | `loadExternal=false` |
-| Billion Laughs | 实体展开计数阈值 1e7，超限抛错 |
-| 深层嵌套 | `maxDepth=256` |
-| DTD 大小 | DTD 声明数量有阈值 |
-| URL 自动取回 | 默认禁止，需显式 `EntityResolver` |
-| 字符归一化 | 严格拒绝非法 UTF-8，不使用"替换字符"静默替换 |
-
-每条都对应一个显式 `ParserOptions` 字段，易审计。
-
----
-
-## 16. 测试策略
-
-1. **单元测试**：每包 `src/test/*.cj`，`@Test`；覆盖字符类、编码、URI、词法、AST、自动机构造等。
-2. **属性测试**：为 `Uri.parse/normalize` 等写随机化属性（可先手工，框架化等 stdx 完善）。
-3. **黄金文件**：从 `.libxml2-2.15.3/test/` 与 `result/` 目录拷贝标准测试集（数千个样例，涵盖 XML、DTD、Schema、XPath、C14N、XInclude），作为端到端回归。
-4. **W3C TestSuite**：`xml_testkit` 提供驱动器，消费 `xmlconf/xmlconf.xml` 清单；对应 libxml2 `runxmlconf.c`。
-5. **模糊测试**：`.libxml2-2.15.3/fuzz/` 里的种子语料库可直接喂给 CangjieXML 的解析器做崩溃测试（用仓颉简单 harness + 随机 mutation，先不接外部 libFuzzer）。
-6. **性能基线**：选一组 XML（1MB / 10MB / 100MB）做解析/XPath/序列化 benchmark；用 `std.time` + 仓颉 `cjprof`。
-
----
-
-## 17. 与 libxml2 行为差异（刻意不兼容的地方）
-
-| libxml2 行为 | CangjieXML | 理由 |
-| --- | --- | --- |
-| 默认加载外部 DTD/实体 | 默认禁用 | 默认安全 |
-| `xmlGetLastError` 线程局部全局 | 无全局；`ParseResult.errors` | 可测、线程友好 |
-| `void*` SAX userData | `class`/`interface` 显式 | 类型安全 |
-| `xmlNode` 超集结构 | `sealed interface` + 分支 | 类型安全 + 穷尽 match |
-| 内嵌 HTTP/FTP | 去除，留 `EntityResolver` 钩子 | 单一职责 |
-| iconv 耦合 | 纯仓颉编码表 + `Decoder` 接口 | 可移植 |
-| 手工引用计数/free | GC + `Resource` | 内存安全 |
-| XPath `xmlXPathObjectPtr` | `enum XPathItem` | 表达力 |
-
-上述差异均**不违反 W3C 规范**；规范层面 CangjieXML 可通过同一批 W3C 测试。
-
----
-
-## 18. 初版范围界定（MVP vs Full）
-
-- **MVP（ROADMAP Phase 0–6）**：良构解析、DOM、SAX、Reader、命名空间、UTF-8/16、序列化、XPath 1.0、基本错误。
-- **Full v1.0（Phase 7–12）**：DTD 验证、XSD、RelaxNG、XInclude、C14N、HTML、Catalog、`xmllint` 工具、性能优化。
-- **Post v1.0**：Schematron 完整、XPath 2.0/3.x（如需）、Streaming Schema（单独项目）。
-
----
-
-## 19. 决策记录（ADR 摘要）
-
-- **ADR-001**：采用 `sealed interface Node` 而非枚举 `Node`。理由：节点附带大量子成员状态，`class` 比 `enum` payload 读写更自然。
-- **ADR-002**：解析器输出 `Iterator<SaxEvent>` 统一 SAX/Reader/DOM。理由：单一真理来源。
-- **ADR-003**：不提供 C ABI/CFFI 绑定。理由：目标是"重构式复刻"，下游仓颉项目通过包机制使用；如需与 C 互操作，属于另立项目。
-- **ADR-004**：`xmlDict` 替换为 `NameTable`（普通哈希 + GC）。理由：仓颉 GC + 不可变 `String` 使引用计数字典失去意义。
-- **ADR-005**：默认安全（禁用外部实体、深度/展开阈值）。理由：规避 libxml2 历史 CVE 模式。
-- **ADR-006**：HTML 解析器与 XML 共享词法。理由：减少重复代码；同步修复两边。
-- **ADR-007**：RelaxNG 采用 Brzozowski 导数而非 libxml2 的自动机。理由：代码少、证明清晰、易模式匹配。
+后续重大变更须追加 ADR。
 
 ---
 
 ## 20. 与仓颉 SDK 的对齐
 
-- **标准库依赖**：`std.collection`（HashMap/ArrayList）、`std.sync`（Mutex/Atomic）、`std.io`（Stream）、`std.fs`、`std.time`、`std.convert`、`std.unicode`、`std.regex`（仅工具侧，不在核心路径）、`std.ast`（宏）、`std.unittest`（测试）。
-- **扩展库**：仅 `tools/` 下可选使用 `stdx.net.http`（下载远程 schema）与 `stdx.encoding.json`（`xmllint` 输出格式化）。
-- **工具链**：`cjpm` 做依赖管理与工作区；`cjfmt` 强制格式化；`cjlint` 与 `cangjie-regulations` 对齐；`cjcov` 做覆盖率；`cjprof` 做热点分析。
+| 类别        | 使用                                                                                       |
+| ----------- | ------------------------------------------------------------------------------------------ |
+| 标准库      | `std.collection`（HashMap/ArrayList）、`std.collection.concurrent`（ConcurrentHashMap）、 `std.sync`（Mutex/Atomic/Condition）、`std.io`、`std.fs`、`std.time`、`std.convert`、`std.unicode`、`std.ast`（宏）、`std.unittest` |
+| 扩展库      | 仅 `tools/` 可选使用 `stdx.net.http`（远程 schema 抓取）、`stdx.encoding.json`（输出格式化） |
+| 工具链      | `cjpm`（工作区 / 依赖 / 构建）、`cjfmt`（格式化）、`cjlint`（静态检查）、`cjcov`（覆盖率）、`cjprof`（性能分析）、`cjdb`（调试）|
+
+格式化配置 `cangjie-format.toml` 与 lint 规则集统一在仓库根目录维护。
 
 ---
 
 ## 21. 风险与缓解
 
-| 风险 | 缓解 |
-| --- | --- |
-| XML Schema 规模大（libxml2 28k 行） | 分两步：先过 XML TestSuite 的 minimal 子集，再扩 XSD，用 Schema-for-Schemas 做自举测试 |
-| XPath 求值性能 | 编译期常量折叠 + NodeSet 惰性 + 文档序索引 |
-| 多字节编码缺失 | 以接口开放；初版明确不支持 GB18030 等，必要时由使用者注入 |
-| 黄金对比差异（空白处理、编码声明顺序） | 建"规范化比较器"：序列化 → parse → 再序列化，比较语义等价而非字节等价 |
-| libxml2 历史怪兽 API（deprecated 字段） | 直接不复刻；给迁移指南 |
+| 风险                                  | 缓解                                                                          |
+| ------------------------------------- | ----------------------------------------------------------------------------- |
+| XML Schema 规模大（28k 行）           | 拆 8a / 8b 两里程碑：先打通骨架（含 Schema-for-Schemas 自举），再补全语义       |
+| XPath 求值性能                        | AST 编译期常量折叠 + NodeSet 惰性 + 文档序索引                                  |
+| 多字节编码缺失                        | 通过 `EncodingRegistry` 开放注册；初版明确不支持 GB18030 等                     |
+| 黄金对比差异（空白处理、声明顺序）    | 提供"语义等价比较器"：序列化 → parse → 再序列化，比较语义而非字节               |
+| libxml2 历史 deprecated 字段          | 直接不复刻；在 `docs/migration.md` 提供迁移指南                                |
+| 仓颉 SDK 快速迭代                     | `cjpm.toml` 锁定 SDK 1.0.5；升级走单独分支做整体回归                          |
 
 ---
 
-## 22. 交付物
-
-最终交付（见 ROADMAP 分期）：
-
-1. 本设计文档（`DESIGN.md`）与渐进计划（`ROADMAP.md`）。
-2. `cjpm` 工作区的多个包源码 + 单测 + 黄金测试。
-3. CLI 工具 `xmllint`（仓颉可执行）。
-4. `README.md` 快速上手；`docs/` 里按模块的 API 参考（通过仓颉 doc 生成）。
-5. 与 libxml2 v2.15.3 功能对照表（作为独立文档，列出支持/不支持项）。
-
----
-
-_本文件遵循 `cangjie-regulations` 中的项目结构、命名与文档规范；任何重大架构变更须补充 ADR 并在本文件 §19 追加记录。_
+_本文档遵循 [`cangjie-regulations`](./.github/skills/cangjie-regulations/) 中的项目结构、命名、格式化、文档规范。任何重大架构变更须补充 ADR 并在 §19 追加记录；命名/术语调整须同步更新 §3。_
