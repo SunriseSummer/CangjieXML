@@ -221,6 +221,48 @@ main() {
 
 ---
 
+### `parser` —— 词法层（Phase 3a）
+
+对应 libxml2 `parser.c` / `parserInternals.c` 的**词法路径**。包含 `RuneReader`（字符输入 + 换行归一 + 行列号）、`Token` 枚举与 `Lexer`（`Iterator<Token>`）。
+
+Phase 3 在 `ROADMAP.md` 中是一个巨型阶段，按 `DESIGN.md §7` 建议自顶向下切片，本次交付 **Phase 3a：词法器**；Phase 3b（`XmlParser → Iterator<SaxEvent>`）留给下一迭代。
+
+#### 使用示例
+
+```cangjie
+import cangjie_xml.io.*
+import cangjie_xml.parser.*
+
+main() {
+    let src = DecodingSource(StringSource("<greeting who=\"世界\">Hello&#x21;</greeting>"))
+    let lexer = Lexer(RuneReader(src))
+    for (tok in lexer) {
+        println(tok)
+        // 依次输出：
+        //   ElementOpenStart(greeting)
+        //   AttrName(who)
+        //   AttrEq
+        //   AttrValueStart(")
+        //   AttrValueChunk(世界)
+        //   AttrValueEnd(")
+        //   ElementOpenEnd
+        //   Text(Hello)
+        //   CharRef(33)
+        //   ElementClose(greeting)
+        //   Eof
+    }
+}
+```
+
+#### 覆盖的 libxml2 等价点
+
+- `RuneReader` ⇔ `xmlCurrentChar` + `xmlNextChar` + `xmlParserInputRead` 换行归一；
+- `Token` 为本项目新增（libxml2 直接从词法路径产出 SAX 事件），显式 token 层便于单测和 Phase 3b 的容错恢复；
+- `Lexer` 覆盖 libxml2 的 `xmlParseStartTag` / `xmlParseAttribute` / `xmlParseCharData` / `xmlParsePI` / `xmlParseComment` / `xmlParseCDSect` / `xmlParseDocTypeDecl`（仅 DOCTYPE 头部）的**词法侧**；
+- 字符级 well-formedness 已经在词法层兜住：`]]>` 不能出现在文本、`--` 不能出现在注释、PI target `xml` 受限、XML 声明只能在文档最前等。
+
+---
+
 ## 仍未实现
 
-见 [`progress.md`](./progress.md)。按 `ROADMAP.md` 顺序，下一迭代进入 **Phase 3 —— `parser` 包（词法 + SAX 事件流）**，会把本迭代的 `DecodingSource` 作为词法器的字符输入。
+见 [`progress.md`](./progress.md)。按 `ROADMAP.md` 顺序，下一迭代进入 **Phase 3b —— `XmlParser`**：把本迭代的 `Iterator<Token>` 聚合成 `Iterator<SaxEvent>`，处理元素栈 / 命名空间 / 预定义实体展开 / `ParserOptions` / Billion-Laughs 限制 / 容错模式。
