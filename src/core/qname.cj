@@ -90,7 +90,9 @@ public struct QName <: Equatable<QName> & Hashable & ToString {
 
 /** 混合两个哈希值。使用 wrapping 乘法以避免 Int64 溢出。 */
 func combineHash(a: Int64, b: Int64): Int64 {
-    // 使用 XOR + 位旋转，避免 `*` 操作符默认的溢出检查。
+    // 使用 XOR + 位旋转，避免 `*` 操作符默认的溢出检查；
+    // 末尾与 Int64 正数域掩码相与，保证哈希值始终为非负，便于下游
+    // 基于取模的桶分发（部分容器实现假设 hashCode >= 0）。
     let shifted = (a << 5) | (a >> 59)
     return (shifted ^ a ^ b) & 0x7FFFFFFFFFFFFFFF
 }

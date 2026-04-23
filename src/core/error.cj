@@ -181,11 +181,7 @@ public class ListErrorCollector <: ErrorCollector {
 
     /** 到目前为止收集到的全部诊断。 */
     public func entries(): Array<(Severity, XmlError)> {
-        let out = Array<(Severity, XmlError)>(items.size, repeat: (Severity.Error, XmlError.Other(Position.unknown(), "")))
-        for (i in 0..items.size) {
-            out[i] = items[i]
-        }
-        return out
+        return items.toArray()
     }
 
     public func isEmpty(): Bool {

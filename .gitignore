@@ -10,3 +10,7 @@ cjpm.lock
 .idea/
 .vscode/
 *.swp
+
+# Stray executables (e.g. from cjpm run)
+/main
+
