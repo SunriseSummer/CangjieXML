@@ -27,20 +27,20 @@ public interface XmlSink {
  * 非线程安全——并发使用需要外部同步。
  */
 public class StringXmlSink <: XmlSink {
-    private let _sb: StringBuilder
+    private let buffer: StringBuilder
 
     public init() {
-        this._sb = StringBuilder()
+        this.buffer = StringBuilder()
     }
 
     public init(initialCapacity: Int64) {
-        this._sb = StringBuilder()
+        this.buffer = StringBuilder()
         // 预分配提示（当前 StringBuilder 无公开容量 API，保留入参形态以兼容未来）。
         let _ = initialCapacity
     }
 
     public func write(text: String): Unit {
-        _sb.append(text)
+        buffer.append(text)
     }
 
     public func flush(): Unit {
@@ -49,6 +49,6 @@ public class StringXmlSink <: XmlSink {
 
     /** 读取已累积的输出。调用多次结果相同；不会清空缓冲区。 */
     public func toString(): String {
-        _sb.toString()
+        buffer.toString()
     }
 }

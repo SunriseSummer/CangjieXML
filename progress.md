@@ -10,8 +10,9 @@
 |---|---|---|---|
 | M0 | 项目脚手架 | ✅ 已完成 | 迭代 1 |
 | M1 | DOM 内核 | ✅ 已完成 | 迭代 1 |
-| M2 | Writer | ✅ 已完成 | **迭代 2（本次）** |
-| M3 | Parser | ⏳ 未开始 | 下一迭代候选 |
+| M2 | Writer | ✅ 已完成 | 迭代 2 |
+| 质量红线 | 单文件≤300行 / 无下划线前缀 / 低圈复杂度 / 无魔鬼数 | ✅ 已落地 | 迭代 3 |
+| M3 | Parser | 🟡 进行中 | **迭代 3（本次）** |
 | M4 | Query + Builder | ⏳ 未开始 | |
 | M5 | Visit | ⏳ 未开始 | |
 | M6 | IO + Error + Options 收口 | ⏳ 未开始 | 错误枚举骨架已预落位 |
@@ -111,13 +112,43 @@ DOM 内核及脚手架。详见上一轮进度记录（commit `8d6cecd`）。
 
 ---
 
-## 5. 下一步候选
+## 5. 迭代 3（质量重构 + M3 Parser）——本次
 
-建议的下一次迭代：**M3 Parser**。理由：
+### 5.1 存量质量重构（阶段 A）
 
-1. Writer 已为 Parser 提供"round-trip"黄金基线——解析完再写出应与规范化输入一致；
-2. Parser 上线后即闭合读写循环，库可独立完成 tinyxml2 的核心使用场景；
-3. `error.XmlError` 的解析类构造器（`MismatchedElement` / `InvalidAttribute` / …）
-   在 M1 已预落位，M3 只需填值，不需重构签名；
-4. 代码量与 50 分钟 / 1 万行预算相容。
+按项目工程红线统一处理：
+
+| 规则 | 落实 |
+|---|---|
+| 单源文件 ≤ 300 行 | `xml_element.cj` 457 → 145（拆 `xml_element_attrs.cj` / `xml_element_children.cj` / `xml_element_iters.cj`）；`dom_test.cj` 429 → 拆 `dom_document_test.cj` / `dom_element_test.cj`；`xml_writer.cj` 重构后 298 |
+| 不得以下划线起名 | 全局替换 35 个 `_fooBar` 名为 `fooBar` / `fooRef` / `headChild` 等语义化名；`throw_` → `throwDom` |
+| 降圈复杂度 | `XmlWriter.writeElementBlock` 拆 `chooseLayout` + `finishSelfClosing/Inline/Block`；`XmlElement.checkInsertable` 拆 `rejectSelfInsertion/IllegalKind/CrossDocument/AncestorCycle`；`escapeCdata` 内 while 拆 `appendWithCdataSplit`+`isCdataTerminatorAt` |
+| 避免魔鬼数字/字符串 | `TAG_OPEN/CLOSE/SELF_CLOSE`、`PI_OPEN/CLOSE`、`COMMENT_OPEN/CLOSE`、`CDATA_OPEN/CLOSE/TERMINATOR_LEN`、`BOM_BYTE_0/1/2`、`DEFAULT_XML_DECLARATION_VALUE` / `DEFAULT_DECLARATION_VALUE` 等常量集中 |
+| 公共 API 契约 | 完全不变；42/42 测试零修改通过 |
+
+### 5.2 重构后的文件布局
+
+```
+src/dom/
+  xml_element.cj           (145)  类、字段、kind、textContent、link/detach 工具
+  xml_element_attrs.cj      (91)  extend：attribute/hasAttribute/setAttribute/removeAttribute
+  xml_element_children.cj  (208)  extend：appendChild/removeChild/insertChildBefore/遍历
+  xml_element_iters.cj      (84)  XmlChildIter / XmlChildElementIter
+  xml_document.cj          (259)
+  xml_node.cj              (125)
+  xml_node_kind.cj          (27)
+  xml_text.cj / xml_comment.cj / xml_attribute.cj / xml_declaration.cj / xml_unknown.cj
+  dom_constants.cj          (10)  DEFAULT_DECLARATION_VALUE
+  dom_document_test.cj     (160)  文档层测试
+  dom_element_test.cj      (272)  元素层测试
+src/writer/
+  xml_writer.cj            (298)  含常量、排版决策、块/内联分派
+  xml_write_options.cj / xml_sink.cj / dom_write_ext.cj / writer_test.cj
+src/internal/
+  text_escape.cj           (173)  escapeText/Attribute/Cdata + BOM 常量
+```
+
+### 5.3 M3 Parser（阶段 B，进行中）
+
+见下一次 report_progress。
 

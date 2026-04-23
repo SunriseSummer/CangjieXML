@@ -20,9 +20,8 @@ public class XmlDocument <: XmlNode {
 
     // 所有顶层节点（声明、根元素、注释、未知节点）以链表形式存储，
     // 与 XmlElement 保持一致的结构语义，便于后续 Visit / Writer 统一遍历。
-    private var _firstChild: ?XmlNode = None
-    private var _lastChild: ?XmlNode = None
-
+    private var headChild: ?XmlNode = None
+    private var tailChild: ?XmlNode = None
     /** 文档是否检测到 / 将写出 UTF-8 BOM。 */
     public var hasBom: Bool = false
     public var writeBom: Bool = false
@@ -48,13 +47,13 @@ public class XmlDocument <: XmlNode {
     /** 文档的 XML 声明（若存在）。 */
     public prop declaration: ?XmlDeclaration {
         get() {
-            var cur = _firstChild
+            var cur = headChild
             while (let Some(n) <- cur) {
                 match (n.kind()) {
                     case Declaration(d) => return Some(d)
                     case _ => ()
                 }
-                cur = n._next
+                cur = n.nextRef
             }
             None
         }
@@ -63,13 +62,13 @@ public class XmlDocument <: XmlNode {
     /** 文档的根元素（若存在）。 */
     public prop rootElement: ?XmlElement {
         get() {
-            var cur = _firstChild
+            var cur = headChild
             while (let Some(n) <- cur) {
                 match (n.kind()) {
                     case Element(e) => return Some(e)
                     case _ => ()
                 }
-                cur = n._next
+                cur = n.nextRef
             }
             None
         }
@@ -77,17 +76,17 @@ public class XmlDocument <: XmlNode {
 
     /** 首个顶层节点（任意类型）。 */
     public prop firstChild: ?XmlNode {
-        get() { _firstChild }
+        get() { headChild }
     }
 
     /** 末尾顶层节点（任意类型）。 */
     public prop lastChild: ?XmlNode {
-        get() { _lastChild }
+        get() { tailChild }
     }
 
     /** 按顺序遍历所有顶层节点。 */
     public func childNodes(): Iterable<XmlNode> {
-        XmlChildIter(_firstChild)
+        XmlChildIter(headChild)
     }
 
     // ==================================================================
@@ -118,7 +117,7 @@ public class XmlDocument <: XmlNode {
      * 创建 XML 声明节点。`value` 省略时使用默认声明：`xml version="1.0" encoding="UTF-8"`。
      */
     public func createDeclaration(value!: ?String = None): XmlDeclaration {
-        let v = value ?? "xml version=\"1.0\" encoding=\"UTF-8\""
+        let v = value ?? DEFAULT_DECLARATION_VALUE
         XmlDeclaration(this, v)
     }
 
@@ -141,27 +140,27 @@ public class XmlDocument <: XmlNode {
      * - 节点必须归属本文档。
      */
     public func appendChild(node: XmlNode): Unit {
-        _checkTopLevelInsertable(node)
+        checkTopLevelInsertable(node)
         node.removeSelf()
-        _linkAtEnd(node)
+        linkAtEnd(node)
     }
 
     /**
      * 在顶层开头插入节点。其他约束同 `appendChild`。
      */
     public func prependChild(node: XmlNode): Unit {
-        _checkTopLevelInsertable(node)
+        checkTopLevelInsertable(node)
         node.removeSelf()
-        match (_firstChild) {
-            case None => _linkAtEnd(node)
+        match (headChild) {
+            case None => linkAtEnd(node)
             case Some(first) =>
-                node._prev = None
-                node._next = Some(first)
-                first._prev = Some(node)
-                _firstChild = Some(node)
-                node._parentElement = None
-                node._document = Some(this)
-                node._inDocument = true
+                node.prevRef = None
+                node.nextRef = Some(first)
+                first.prevRef = Some(node)
+                headChild = Some(node)
+                node.parentRef = None
+                node.documentRef = Some(this)
+                node.inDocFlag = true
         }
     }
 
@@ -169,28 +168,28 @@ public class XmlDocument <: XmlNode {
      * 从文档移除顶层节点。成功返回 `true`；若 `node` 不是本文档的直接顶层节点，返回 `false`。
      */
     public func removeChild(node: XmlNode): Bool {
-        if (!node._inDocument) {
+        if (!node.inDocFlag) {
             return false
         }
         // 检查确实挂在本文档上
-        match (node._document) {
+        match (node.documentRef) {
             case Some(d) => if (!refEq(d, this)) { return false }
             case None => return false
         }
 
-        let prev = node._prev
-        let next = node._next
+        let prev = node.prevRef
+        let next = node.nextRef
         match (prev) {
-            case Some(p) => p._next = next
-            case None => _firstChild = next
+            case Some(p) => p.nextRef = next
+            case None => headChild = next
         }
         match (next) {
-            case Some(n) => n._prev = prev
-            case None => _lastChild = prev
+            case Some(n) => n.prevRef = prev
+            case None => tailChild = prev
         }
-        node._prev = None
-        node._next = None
-        node._inDocument = false
+        node.prevRef = None
+        node.nextRef = None
+        node.inDocFlag = false
         true
     }
 
@@ -198,60 +197,60 @@ public class XmlDocument <: XmlNode {
      * 清空文档所有顶层节点，重置为初始状态。`hasBom` / `writeBom` 不受影响。
      */
     public func clear(): Unit {
-        var cur = _firstChild
+        var cur = headChild
         while (let Some(n) <- cur) {
-            let nxt = n._next
-            n._prev = None
-            n._next = None
-            n._inDocument = false
+            let nxt = n.nextRef
+            n.prevRef = None
+            n.nextRef = None
+            n.inDocFlag = false
             cur = nxt
         }
-        _firstChild = None
-        _lastChild = None
+        headChild = None
+        tailChild = None
     }
 
     // ==================================================================
     // 内部
     // ==================================================================
 
-    private func _linkAtEnd(node: XmlNode): Unit {
-        node._parentElement = None
-        node._document = Some(this)
-        node._inDocument = true
-        node._prev = _lastChild
-        node._next = None
-        match (_lastChild) {
-            case Some(l) => l._next = Some(node)
-            case None => _firstChild = Some(node)
+    private func linkAtEnd(node: XmlNode): Unit {
+        node.parentRef = None
+        node.documentRef = Some(this)
+        node.inDocFlag = true
+        node.prevRef = tailChild
+        node.nextRef = None
+        match (tailChild) {
+            case Some(l) => l.nextRef = Some(node)
+            case None => headChild = Some(node)
         }
-        _lastChild = Some(node)
+        tailChild = Some(node)
     }
 
-    private func _checkTopLevelInsertable(node: XmlNode): Unit {
+    private func checkTopLevelInsertable(node: XmlNode): Unit {
         match (node.kind()) {
-            case Document(_) => throw_("cannot insert XmlDocument into another XmlDocument")
-            case Text(_) => throw_("XmlText is not allowed at the document top-level")
+            case Document(_) => throwDom("cannot insert XmlDocument into another XmlDocument")
+            case Text(_) => throwDom("XmlText is not allowed at the document top-level")
             case _ => ()
         }
-        // 文档归属一致性：允许节点的 _document 为 None（代表尚未插入过任何文档），
+        // 文档归属一致性：允许节点的 documentRef 为 None（代表尚未插入过任何文档），
         // 或已经指向本文档；其他情况禁止跨文档插入。
-        match (node._document) {
+        match (node.documentRef) {
             case None => ()
             case Some(d) =>
                 if (!refEq(d, this)) {
-                    throw_("cross-document insertion is not allowed")
+                    throwDom("cross-document insertion is not allowed")
                 }
         }
         // 根元素与声明的唯一性约束
         match (node.kind()) {
             case Element(_) =>
                 match (rootElement) {
-                    case Some(_) => throw_("XmlDocument already has a root element")
+                    case Some(_) => throwDom("XmlDocument already has a root element")
                     case None => ()
                 }
             case Declaration(_) =>
                 match (declaration) {
-                    case Some(_) => throw_("XmlDocument already has an XML declaration")
+                    case Some(_) => throwDom("XmlDocument already has an XML declaration")
                     case None => ()
                 }
             case _ => ()

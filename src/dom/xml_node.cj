@@ -28,20 +28,20 @@ sealed abstract class XmlNode {
     // ------------------------------------------------------------------
     // 内部导航状态（包内可见，仅供 XmlElement / XmlDocument 维护链表使用）
     // ------------------------------------------------------------------
-    // `_document` 允许在 XmlDocument 构造早期为 None，
+    // `documentRef` 允许在 XmlDocument 构造早期为 None，
     // 所有其他具体节点类型构造时必须传入非空文档。
-    var _document: ?XmlDocument = None
-    var _parentElement: ?XmlElement = None
-    var _prev: ?XmlNode = None
-    var _next: ?XmlNode = None
-    // 对 Document 的直接子节点，_inDocument=true 表示它直接挂在文档下；
-    // 对挂在 Element 下的节点，_inDocument=false。
-    var _inDocument: Bool = false
+    var documentRef: ?XmlDocument = None
+    var parentRef: ?XmlElement = None
+    var prevRef: ?XmlNode = None
+    var nextRef: ?XmlNode = None
+    // 对 Document 的直接子节点，inDocFlag=true 表示它直接挂在文档下；
+    // 对挂在 Element 下的节点，inDocFlag=false。
+    var inDocFlag: Bool = false
 
     init() {}
 
     init(document: XmlDocument) {
-        this._document = Some(document)
+        this.documentRef = Some(document)
     }
 
     /**
@@ -51,7 +51,7 @@ sealed abstract class XmlNode {
      */
     public open prop document: XmlDocument {
         get() {
-            match (_document) {
+            match (documentRef) {
                 case Some(d) => d
                 case None => throw Exception("XmlNode has no owning XmlDocument (internal invariant violated)")
             }
@@ -64,21 +64,21 @@ sealed abstract class XmlNode {
      * 对根元素、顶层声明/注释、以及尚未插入到树中的节点，返回 `None`。
      */
     public prop parent: ?XmlElement {
-        get() { _parentElement }
+        get() { parentRef }
     }
 
     /**
      * 前一个兄弟节点；若本节点为首个子节点，返回 `None`。
      */
     public prop previousSibling: ?XmlNode {
-        get() { _prev }
+        get() { prevRef }
     }
 
     /**
      * 后一个兄弟节点；若本节点为末尾子节点，返回 `None`。
      */
     public prop nextSibling: ?XmlNode {
-        get() { _next }
+        get() { nextRef }
     }
 
     /**
@@ -97,11 +97,11 @@ sealed abstract class XmlNode {
      *   到同一文档的其他位置。
      */
     public func removeSelf(): Bool {
-        if (let Some(parentEl) <- _parentElement) {
+        if (let Some(parentEl) <- parentRef) {
             return parentEl.removeChild(this)
         }
-        if (_inDocument) {
-            match (_document) {
+        if (inDocFlag) {
+            match (documentRef) {
                 case Some(d) => return d.removeChild(this)
                 case None => return false
             }
