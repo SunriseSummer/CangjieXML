@@ -36,7 +36,8 @@ CangjieXML/
 └── src/
     ├── cangjie_xml.cj     # 顶层门面（后续汇总 public import）
     ├── core/              # ✅ Phase 1 基础设施模块
-    └── encoding/          # ✅ Phase 2 前半：字符编解码模块
+    ├── encoding/          # ✅ Phase 2 前半：字符编解码模块
+    └── io/                # ✅ Phase 2 后半：I/O 抽象与装饰器
 ```
 
 > 项目采用单 `cjpm` 模块 + 子目录子包的布局（每个 `src/<name>/` 对应一个 `cangjie_xml.<name>` 子包），相比 `DESIGN.md` 最初构想的"多 workspace"方案更贴合 `cjpm 1.0.5` 的实际能力。后续阶段的各模块（`encoding`、`parser`、`tree` …）将以相同模式陆续引入 `src/` 下。
@@ -159,6 +160,67 @@ main() {
 
 ---
 
+### `io` —— I/O 抽象与装饰器（Phase 2 后半）
+
+对应 libxml2 的 `xmlIO.c`（不含 nano-HTTP / FTP —— 按 `DESIGN.md` 非目标，网络资源通过 `StreamSource` 包裹 `stdx.net` 流接入）。
+
+| 文件 | 提供 |
+| --- | --- |
+| `source.cj` | `interface IoSource` + `MemorySource` / `StringSource` / `StreamSource` / `FileSource` + `readAll` |
+| `sink.cj` | `interface IoSink` + `MemorySink` / `StreamSink` / `FileSink` |
+| `buffered_sink.cj` | `BufferedSink` 装饰器（小写聚合、大写旁路、`close` 自动 flush） |
+| `indenting_sink.cj` | `IndentingSink` 装饰器（命令式 `increase/decrease/writeIndent`，可配置 `indentUnit` / `newline`） |
+| `encoding_sink.cj` | `EncodingSink` 装饰器（UTF-8 → 任意编码；复用 `encoding.Encoder`；支持流式分片与 BOM） |
+| `decoding_source.cj` | `DecodingSource`（字节 `IoSource` → 字符串；BOM / hint / 显式优先级协商、自动跳 BOM） |
+
+#### 使用示例
+
+```cangjie
+import cangjie_xml.io.*
+import cangjie_xml.encoding.*
+
+main() {
+    // 1. 把 String 当输入源，读出字节
+    let src = StringSource("Hello 中", baseUri: Some("mem://demo"))
+    println(readAll(src).size)                // 10（6 ASCII + 中 = 3 字节 + 空格 = 10）
+
+    // 2. BufferedSink + IndentingSink 组合，输出到内存
+    let mem = MemorySink()
+    let indent = IndentingSink(BufferedSink(mem, capacity: 64), indentUnit: "  ")
+    indent.write("<root>".toArray())
+    indent.increaseIndent()
+    indent.writeIndent()
+    indent.write("<child/>".toArray())
+    indent.decreaseIndent()
+    indent.writeIndent()
+    indent.write("</root>".toArray())
+    indent.close()                            // 级联 flush + close
+    println(String.fromUtf8(mem.toBytes()))   // <root>\n  <child/>\n</root>
+
+    // 3. 用 EncodingSink 把 UTF-8 源字节转成 UTF-16 BE + BOM
+    let out = MemorySink()
+    let enc = EncodingSink(out, Utf16Encoder.bigEndian(emitBom: false), writeBom: true)
+    enc.write("A".toArray())
+    enc.close()                               // → [FE FF 00 41]
+
+    // 4. DecodingSource 自动识别编码，剥离 BOM
+    let bytes = [0xFEu8, 0xFFu8, 0x00u8, 0x41u8, 0x00u8, 0x42u8]    // UTF-16 BE BOM + "AB"
+    let ds = DecodingSource(MemorySource(bytes))
+    println(ds.detectedEncoding)              // utf-16be
+    println(ds.readAllAsString())             // AB
+}
+```
+
+#### 覆盖的 libxml2 等价点
+
+- `IoSource` / `IoSink` 对齐 `xmlParserInputBuffer` / `xmlOutputBuffer` 的核心回调（`read` / `write` / `close`），但摒弃 `void*` 上下文；
+- `BufferedSink` 等价于 libxml2 output buffer 的内部缓冲；
+- `IndentingSink` 提供 libxml2 `xmlSaveFormatFile*` 的缩进能力，但把"何时换行"的语义责任留给上层 writer；
+- `EncodingSink` 对齐 `xmlCharEncOutFunc` 的转码桥；
+- `DecodingSource` 对齐 libxml2 解析器启动时的"检测编码 → 切换解码器 → 跳 BOM"流程，优先级与 W3C XML §4.3.3 + libxml2 实现一致。
+
+---
+
 ## 仍未实现
 
-见 [`progress.md`](./progress.md)。按 `ROADMAP.md` 顺序，下一迭代将完成 **Phase 2 后半：`io` 包（`IoSource` / `IoSink` / 装饰器）**，把本迭代的 `encoding` 模块接入 `xmlIO.c` 对标的 I/O 管线。
+见 [`progress.md`](./progress.md)。按 `ROADMAP.md` 顺序，下一迭代进入 **Phase 3 —— `parser` 包（词法 + SAX 事件流）**，会把本迭代的 `DecodingSource` 作为词法器的字符输入。

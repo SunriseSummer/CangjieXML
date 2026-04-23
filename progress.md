@@ -1,6 +1,6 @@
 # CangjieXML 开发进度
 
-> 相对 [libxml2 v2.15.3](./.libxml2-2.15.3) 全量功能的实现情况。最新更新：迭代 2 结束（Phase 2 前半 `encoding` 模块）。
+> 相对 [libxml2 v2.15.3](./.libxml2-2.15.3) 全量功能的实现情况。最新更新：迭代 3 结束（Phase 2 完成 —— `encoding` + `io`）。
 
 ---
 
@@ -10,7 +10,7 @@
 | --- | --- | --- | --- |
 | 0 | 项目骨架 | — | ✅ 已完成 |
 | 1 | `core` 基础设施 | `chvalid`、`xmlstring`、`buf`、`dict`、`hash`、`error`、`uri` | ✅ 已完成 |
-| 2 | `encoding` + `io` | `encoding.c`、`xmlIO.c` | 🟡 `encoding` 已完成，`io` 下一迭代 |
+| 2 | `encoding` + `io` | `encoding.c`、`xmlIO.c` | ✅ 已完成 |
 | 3 | `parser` 词法 + 事件流 | `parser.c`、`parserInternals.c` | ⬜ 未开始 |
 | 4 | `tree` + `sax` + `reader` | `tree.c`、`SAX2.c`、`xmlreader.c` | ⬜ 未开始 |
 | 5 | `writer` + `save` | `xmlwriter.c`、`xmlsave.c` | ⬜ 未开始 |
@@ -23,7 +23,7 @@
 | 12 | 工具链与发布 | `xmllint.c`、`xmlcatalog.c` | ⬜ 未开始 |
 | 13 | 硬化与优化 | `runtest.c`、`fuzz/` | ⬜ 未开始 |
 
-**粗略完成度**：核心功能 ≈ 10%（Phase 1 基础设施 + Phase 2 的字符编解码；不含解析器 / DOM / 验证器 / 序列化器 / 工具链）。
+**粗略完成度**：核心功能 ≈ 13%（Phase 1 基础设施 + Phase 2 的字符编解码与 I/O 抽象；不含解析器 / DOM / 验证器 / 序列化器 / 工具链）。
 
 ---
 
@@ -150,9 +150,55 @@
 
 ---
 
+## 已实现（迭代 3 — Phase 2 后半：`io` 模块）
+
+### 对应 libxml2 `xmlIO.c`（不含 nano-HTTP / FTP）
+
+#### 输入侧
+- [x] `interface IoSource <: Resource`：`read(buffer) -> Int64`、`baseUri`、`encodingHint`
+- [x] `MemorySource`：字节数组零拷贝源
+- [x] `StringSource`：把 `String` 当 UTF-8 字节源（自动设置 `encodingHint = "utf-8"`）
+- [x] `StreamSource`：包装任意 `std.io.InputStream`，`owned` 标志控制级联关闭
+- [x] `FileSource`：基于 `std.fs.File(path, OpenMode.Read)`，自动设置 `baseUri = path`，错误统一包装为 `XmlException(IoError)`
+- [x] `readAll(source)` 便利函数
+
+#### 输出侧
+- [x] `interface IoSink <: Resource`：`write(bytes)`、`flush()`
+- [x] `MemorySink`：累积到 `GrowableBuffer`；`toBytes()` 取快照
+- [x] `StreamSink`：包装 `std.io.OutputStream`
+- [x] `FileSink`：`OpenMode.Write`（截断）或 `OpenMode.Append`
+
+#### 装饰器
+- [x] `BufferedSink`：固定容量缓冲（默认 4096）；大块旁路直写、小块聚合；`close` 自动 flush；`owned` 控制级联
+- [x] `IndentingSink`：命令式缩进 API（`increaseIndent` / `decreaseIndent` / `writeIndent`），可配置 `indentUnit` 与 `newline`；字节 pass-through 不扫描内容（语义判断交给上层 writer）
+- [x] `EncodingSink`：UTF-8 输入 → 任意目标编码输出，复用上一迭代 `encoding.Decoder` + `Encoder`；支持流式分片（拼接半截 UTF-8）；可选首字节 BOM；`flush()` 对半截 UTF-8 抛 `IoError`
+
+#### 编码感知输入
+- [x] `DecodingSource`：在 `IoSource` 之上再包一层，提供字符级读取
+  - 探测优先级：**显式 encoding > BOM > `encodingHint` > UTF-8 默认**
+  - 自动跳过 BOM 字节
+  - 暴露 `detectedEncoding: String` / `bom: ?BomKind` 供 parser 查询
+  - `readChunk()` 流式、`readAllAsString()` 一次性
+  - 非法字节抛 `XmlException(EncodingError)` 附带字节偏移
+
+### 测试（`cjpm test` 119/119 全绿）
+
+新增 37 个测试用例（io 子包），覆盖：
+- MemorySource 分片读 / close 后 EOF / encodingHint 传递
+- StringSource UTF-8 字节序一致性
+- StreamSource 包裹 `ByteBuffer`
+- MemorySink 累积 / close 后写拒绝
+- StreamSink 向 `ByteBuffer` 写 + flush
+- BufferedSink：缓冲聚合、满时自动 flush、大块旁路、close 级联、capacity 下限校验
+- IndentingSink：pass-through、`writeIndent` 换行 + N 级缩进、嵌套层次、自定义换行符（`\r\n`）
+- EncodingSink：UTF-8 身份、UTF-16 BE 有/无 BOM、ASCII 不可映射、流式三片解码、flush 时半截 UTF-8 检测、close 级联
+- DecodingSource：UTF-8 无/有 BOM、UTF-16 LE/BE BOM、UTF-32 LE BOM 优先于 UTF-16 LE、`encodingHint` 生效、显式 > hint、空输入 EOF、非法字节抛异常、`ownedSource` 级联关闭
+
+---
+
 按 `ROADMAP.md` 顺序依次推进：
 
-- Phase 2 `io`：`IoSource` / `IoSink` / `BufferedSink` / `IndentingSink` / `EncodingSink`（使用上一迭代的 `encoding` 模块作为转换层）
+- ✅ ~~Phase 2 `io`：`IoSource` / `IoSink` / `BufferedSink` / `IndentingSink` / `EncodingSink`~~（本迭代完成，详见上文）
 - Phase 3 `parser`：`ByteReader` / `RuneReader` / `Lexer` / `XmlParser` → `Iterator<SaxEvent>`
 - Phase 4 `tree` / `sax` / `reader`：`sealed interface Node` + DOM / SAX / XmlReader
 - Phase 5 `writer` / `save`：`XmlWriter` + `DocumentSerializer`
