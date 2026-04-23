@@ -1,331 +1,437 @@
-# CangjieXML 渐进开发计划（Roadmap）
+# CangjieXML 渐进开发计划
 
-> 本文件与 [`DESIGN.md`](./DESIGN.md) 配套使用。
-> 开发基调：**小步快跑、每个里程碑可独立交付与回归**。每一阶段结束时项目都应处于"可编译、可测试、可运行示例"的状态。
+> 本路线图以 [`DESIGN.md`](./DESIGN.md) 为准绳，目标是在 **不引入实现层混乱** 的前提下，把设计稳定落地为可发布的纯仓颉 XML 库。
 >
-> 工具链：`cjpm`（构建/依赖/测试）、`cjfmt`（格式化）、`cjlint`（静态检查）、`cjprof`（性能）、`cjcov`（覆盖率）。
-> 仓颉 SDK：https://github.com/SunriseSummer/CangjieSDK/releases/download/1.0.5/cangjie-sdk-linux-x64-1.0.5.tar.gz
+> 关键词：**小步实现、边界稳定、命名统一、阶段可验收**。
 
 ---
 
-## 路线全景图
+## 1. 路线图总览
 
-```
-M0 项目脚手架 ──▶ M1 数据模型 ──▶ M2 序列化 ──▶ M3 解析器 ──▶ M4 查询/扩展/Builder
-                                                                    │
-                                      ┌─────────────────────────────┤
-                                      ▼                             ▼
-                               M5 访问者/迭代              M6 IO/错误/options 完善
-                                      │                             │
-                                      └──────────────┬──────────────┘
-                                                     ▼
-                                       M7 并发/线程安全/parseMany
-                                                     ▼
-                                        M8 回归/基准/文档 1.0
-                                                     ▼
-                                        M9+ 进阶（宏、SAX、XPath 子集）
+### 1.1 版本视图
+
+```text
+Phase A 基础骨架   : M0
+Phase B 核心内核   : M1 ~ M3
+Phase C 体验增强   : M4 ~ M5
+Phase D 完整工程性 : M6 ~ M7
+Phase E 发布收口   : M8
+Future RFC         : M9+
 ```
 
-每个里程碑包含：**目标（What） / 交付物（Deliverables） / 验收标准（DoD） / 技术要点 / 风险**。
+### 1.2 里程碑总图
+
+```text
+M0 脚手架
+  ↓
+M1 DOM 内核
+  ↓
+M2 Writer
+  ↓
+M3 Parser
+  ↓
+M4 Query + Builder
+  ↓
+M5 Visit
+  ↓
+M6 IO + Error + Options 收口
+  ↓
+M7 Batch / Concurrency 边界
+  ↓
+M8 回归 / 基准 / 文档 / v1.0 发布
+```
+
+### 1.3 路线图原则
+
+1. **先稳定结构，再丰富能力。**
+2. **先 Writer，后 Parser。** 这样可以尽早建立字符串黄金测试。
+3. **Query / Builder 属于体验层，必须建立在 DOM 稳定之后。**
+4. **并发最后进场。** 避免为了并发破坏核心模型的简洁性。
+5. **每个里程碑都必须可构建、可测试、可回滚。**
 
 ---
 
-## M0 — 工程脚手架与基础设施
+## 2. M0 — 项目脚手架
 
 ### 目标
-拉起可构建的仓颉项目骨架，接通测试与 CI。
+建立符合仓颉规范的项目骨架，确认模块命名、目录布局、CI 入口和最小测试链路。
 
 ### 交付物
-- 根目录 `cjpm.toml`（module = `cangjie_xml`，版本 `0.1.0`）。
-- `src/cangjie_xml/lib.cj` 导出占位 API，`src/cangjie_xml/prelude.cj` 定义 `MAX_ELEMENT_DEPTH` 等常量。
-- `tests/smoke_test.cj`：调用一个占位函数并断言 `true`，跑通 `cjpm test`。
-- `examples/hello/` 可以 `cjpm run`。
-- `.gitignore`、`README.md`（项目简介 + 如何构建）。
-- （可选）GitHub Actions：下载 SDK → `cjpm build` → `cjpm test`。
+- `cjpm.toml`
+- `src/cangjie_xml/lib.cj`
+- `src/cangjie_xml/version.cj`
+- `tests/smoke_test.cj`
+- `README.md` 初版
+- `.gitignore`
+- CI 初版：`build + test`
+
+### 命名与结构要求
+- 采用 `dom / parser / writer / query / build / visit / io / error / internal` 的模块布局。
+- 文件名全部采用小写下划线。
+- 公共类型统一使用 `Xml` 前缀。
 
 ### DoD
 - `cjpm build` 成功。
-- `cjpm test` 所有用例通过。
-- `cjfmt -c .` / `cjlint` 零告警。
+- `cjpm test` 成功。
+- 目录骨架与 `DESIGN.md` 保持一致。
 
 ### 风险
-- SDK 下载与 CI 环境兼容性 → 在本地 Linux x64 先行验证。
+- SDK 与 CI 环境兼容性。
+- `cjpm.toml` 最初模板字段是否满足后续演进需求。
 
 ---
 
-## M1 — 核心 DOM 数据模型（只读骨架）
+## 3. M1 — DOM 内核
 
 ### 目标
-落地 `XmlNode`/`XmlNodeKind`/`XmlElement`/`XmlAttribute`/`XmlText`/`XmlComment`/`XmlDeclaration`/`XmlUnknown`/`XmlDocument` 类型，以及内部的 `ChildList` 双向链表。**此阶段没有解析器**，只能通过 API 手工构造 DOM。
+实现不依赖 Parser 的 DOM 模型，使文档、元素、文本、属性与基本树操作先稳定下来。
+
+### 范围
+- `XmlNode`
+- `XmlNodeKind`
+- `XmlDocument`
+- `XmlElement`
+- `XmlAttribute`
+- `XmlText`
+- `XmlComment`
+- `XmlDeclaration`
+- `XmlUnknown`
 
 ### 交付物
-- `model` 子包全部文件。
-- `errors/error.cj` 的 `XmlError` / `SourcePos` / `XmlException`（暂不填实现细节）。
-- 基础单元测试：
-  - 构造空文档、添加子元素、设置属性、读取属性。
-  - `parent/document/firstChild/nextSibling` 链路正确。
-  - `append/prepend/insertBefore/remove` 行为。
-  - `shallowClone`、`shallowEqual`。
-  - `kind()` 与模式匹配穷举性。
+- `src/cangjie_xml/dom/` 下全部核心类型
+- 基础树操作：追加、前插、移除、兄弟导航、根元素定位
+- 属性管理：查找、设置、删除、枚举
 
-### 技术要点
-- `sealed interface XmlNode` 保证仅内部实现子类。
-- `XmlNodeKind` 枚举构造器承载具体子类型引用。
-- 双向链表内部实现，O(1) 插入/删除；属性内部 `ArrayList<XmlAttribute>` + `HashMap<String, Int64>` 索引。
-- 全部使用 `String`（不暴露 `Array<Byte>`）；内部暂不做零拷贝（v1.0 性能优化期再引入）。
+### 测试重点
+- 子节点与兄弟关系正确。
+- 文档与节点的关联正确。
+- 属性顺序与覆盖行为正确。
+- `XmlNodeKind` 模式匹配穷举性明确。
 
 ### DoD
-- 至少 30 个单元用例通过。
-- `cjcov` 模型包覆盖率 ≥ 85%。
+- DOM 相关单元测试全部通过。
+- DOM 包覆盖率 ≥ 85%。
+- 所有公共类型与方法具备文档注释。
 
-### 风险
-- `sealed` + 跨包实现：确认所有节点子类必须与 `XmlNode` 同包（`cangjie_xml.model`）。
+### 设计警戒线
+- 不要在这一阶段引入解析或序列化逻辑。
+- 不要让 `XmlDocument` 承担批量解析、锁管理等额外职责。
 
 ---
 
-## M2 — 序列化器（Printer）
+## 4. M2 — Writer
 
 ### 目标
-先做"写"再做"读"——这样 M3 可以直接用 "构造 → 打印 → 字符串对比" 做测试。
+把 DOM 稳定输出为 XML 文本，为后续 Parser 与回归测试建立黄金基线。
+
+### 范围
+- `XmlWriteOptions`
+- `XmlWriter`
+- 文本 / 属性转义
+- 格式化输出与紧凑输出
+- `XmlDocument.writeToString()`
 
 ### 交付物
-- `print/printer.cj` 实现 `XmlPrinter`（至少支持写入 `StringOutput`）。
-- `print/escape.cj`：文本/属性/CDATA 转义。
-- `print/format.cj`：缩进、紧凑、自闭合元素策略。
-- `XmlDocument.toString(compact! = false)` 接通。
-- `XmlVisitor` 接口与 `XmlPrinter` 作为其实现。
-- 单元测试：
-  - 打印平凡文档、嵌套、属性、文本、CDATA、注释、声明、未知节点。
-  - 紧凑 vs 缩进格式的黄金字符串。
-  - 特殊字符转义。
-  - 空元素自闭合。
+- `src/cangjie_xml/writer/xml_write_options.cj`
+- `src/cangjie_xml/writer/xml_writer.cj`
+- `src/cangjie_xml/internal/text_escape.cj`
+
+### 测试重点
+- 空元素、自闭合元素、嵌套元素。
+- 注释、声明、CDATA、未知节点输出。
+- `compact` 与缩进模式对比。
+- 相同 DOM + 相同 options 的输出确定性。
 
 ### DoD
-- 手工构造的 10+ DOM 场景，`toString()` 输出与 tinyxml2 参考输出（离线生成）字节一致（除可解释的空白差异外）。
-- 公共 API 100% 文档注释。
+- 形成第一批黄金字符串测试。
+- `XmlWriter` 相关测试全部通过。
+- `XmlWriteOptions` 足以替代 tinyxml2 中全局静态写出配置。
 
-### 风险
-- tinyxml2 对空白与自闭合元素的细节差异——通过黄金文件对齐。
+### 设计警戒线
+- 核心类型叫 `XmlWriter`，不要让 `XmlPrinter` 反客为主。
+- Writer 的配置必须全部显式进入 `XmlWriteOptions`。
 
 ---
 
-## M3 — 解析器（Parser）
+## 5. M3 — Parser
 
 ### 目标
-支持从 `String` / `Array<Byte>` / 文件路径解析出完整 DOM。
+把字符串、字节数组和文件稳定解析为 DOM，形成 v1 核心闭环。
+
+### 范围
+- `XmlParseOptions`
+- BOM 识别
+- 换行规范化
+- 按需词法扫描
+- 递归下降解析
+- `XmlError` 与 `SourcePos` 打通
 
 ### 交付物
-- `parse/source.cj`：`XmlSource`、BOM 识别、换行规范化、行偏移表。
-- `parse/entity.cj`：预定义实体 + 字符引用解码。
-- `parse/lexer.cj`：按需 token 化。
-- `parse/parser.cj`：递归下降生成 DOM。
-- `parse/options.cj`：`ParseOptions { whitespace, processEntities, maxDepth, strictUtf8 }`。
-- `XmlDocument.parse` / `parseBytes` / `loadFile` 接通。
-- 单元测试：
-  - 所有节点类型（Element/Text/CDATA/Comment/PI/Declaration/Doctype-as-Unknown）。
-  - 深度 499 成功 / 501 失败（`ElementDepthExceeded`）。
-  - BOM、UTF-8 多字节内容。
-  - 错误路径：`MismatchedElement`, `ParsingAttribute`, `EmptyDocument`, …
-  - `ParseOptions.whitespace`: Preserve / Collapse / Pedantic。
-  - **parse → print → parse 幂等测试**（与 M2 联动，至少 20 组）。
+- `src/cangjie_xml/parser/xml_parse_options.cj`
+- `src/cangjie_xml/parser/xml_source.cj`
+- `src/cangjie_xml/parser/xml_parser.cj`
+- `src/cangjie_xml/internal/slice.cj`
+- `src/cangjie_xml/internal/normalized_buffer.cj`
+- `src/cangjie_xml/internal/entity_decoder.cj`
 
-### 技术要点
-- Slice 机制（`data` 引用 + start/end 下标）。
-- 错误统一返回 `Result<_, XmlError>`；顶层 `parse` 再把 `Err` 同步写入 `XmlDocument.error` 字段并返回 `Err`。
-- 源位置通过 `SourcePos` 精确指出（含行号）。
+### 测试重点
+- 元素 / 文本 / CDATA / 注释 / 声明 / 未知节点解析。
+- 深度保护（500 / 501）。
+- `XmlWhitespaceMode` 三种策略。
+- `parse -> write -> parse` 一致性。
+- 典型错误路径与定位信息。
 
 ### DoD
-- 从 tinyxml2 `test/resources` 移植≥ 8 个 XML 样例，全部通过 parse → print → parse 幂等。
-- 18 个 `XMLError` 枚举值对应至少 1 个用例。
-- `cjcov` parse 包覆盖率 ≥ 80%。
+- 建立 Parser 黄金样例库。
+- tinyxml2 关键资源文件可成功迁移并通过 round-trip。
+- Parser 包覆盖率 ≥ 80%。
 
-### 风险
-- 实体解码、空白策略的细节；通过对照 tinyxml2 `xmltest.cpp` 的断言移植消化。
-- UTF-8 非法字节的处理：固定"非严格"默认值，严格模式作为可选开关。
+### 设计警戒线
+- 保持“首错即止”，不做激进容错恢复。
+- `internal` 中的 `Slice` 等结构不进入公共 API。
 
 ---
 
-## M4 — 查询 / 扩展 / 构建器
+## 6. M4 — Query + Builder
 
 ### 目标
-让日常使用体验达到"现代脚本语言"水准：类型化属性访问、方便的子节点查找、DSL 式构建。
+在不污染 DOM 核心的前提下，提供仓颉用户真正会高频使用的便利能力。
+
+### 范围
+- `extend XmlElement`
+- `XmlValueCodec<T>`
+- 类型化属性查询
+- 子元素快捷查找
+- 轻量 Builder DSL
 
 ### 交付物
-- `query/element_attr_ext.cj`：`intAttr/boolAttr/...`、`queryXxxAttr` 返回 `Result`。
-- `query/element_text_ext.cj`：`innerText/setInnerText`。
-- `query/iteration.cj`：`children/elements/elements(name)/descendants/ancestors/siblings`。
-- `query/find.cj`：`findFirst(predicate)` / `findAll(predicate)`。
-- `XmlAttrConvertible` 接口 + `Int64/UInt64/Float64/Bool/String/Rune` 等内置扩展。
-- `build/document_builder.cj` + `build/element_builder.cj` 构建器。
-- 示例：`examples/config_reader/`、`examples/dsl_writer/`。
-- 单元测试：
-  - 类型化属性读写全类型覆盖，含错误路径。
-  - 自定义类型通过 `XmlAttrConvertible` 双向转换。
-  - 迭代器惰性求值（不应一次物化整个子树）。
-  - Builder 链式构造得到的 DOM == 对应解析结果（深比较）。
+- `src/cangjie_xml/query/xml_element_query_ext.cj`
+- `src/cangjie_xml/query/xml_node_iter_ext.cj`
+- `src/cangjie_xml/query/xml_find_ext.cj`
+- `src/cangjie_xml/build/xml_document_builder.cj`
+- `src/cangjie_xml/build/xml_element_builder.cj`
+
+### 测试重点
+- `intAttribute` / `boolAttribute` / `doubleAttribute` 等常见扩展。
+- `attributeAs(..., using: XxxCodec)` 的通用路径。
+- Builder 构造结果与手工 DOM 等价。
+- 子节点 / 后代迭代器行为正确。
 
 ### DoD
-- `setAttr<T>` / `pushAttribute<T>` 支持所有内置数值类型 + `Bool` + `String`。
-- 至少 25 个查询/构建用例通过。
+- Query 与 Builder 足够支撑 README 中的主要示例。
+- 核心 DOM 类型没有因便利 API 膨胀失控。
 
-### 风险
-- 扩展函数的命名冲突（确保 `query` 子包独立，按需 `import`）。
+### 设计警戒线
+- 简写函数只能作为扩展存在，不直接塞进 `dom` 核心。
+- `XmlValueCodec` 是体验层协议，不要倒灌进入 Parser 内核。
 
 ---
 
-## M5 — 访问者 & 高阶遍历
+## 7. M5 — Visit
 
 ### 目标
-提供两种遍历风格：OO 风格的 `XmlVisitor`、函数式的 `walk + WalkControl`。
+提供统一遍历模型，使 Writer、统计、搜索、转换等能力共享一套机制。
+
+### 范围
+- `XmlVisitor`
+- `XmlWalkControl`
+- `walk(node, fn)`
+- `accept(visitor)` 完整实现
 
 ### 交付物
-- `visitor/visitor.cj`：`XmlVisitor` 接口（默认方法全部 `return true`）。
-- `XmlDocument.accept(visitor)` / `XmlElement.accept(visitor)`（已在 M2 完成架子，这里补齐行为）。
-- 函数式：`walk(node, (XmlNodeKind) -> WalkControl)`。
-- 示例：提取所有 `<a href>` 链接、统计各 tag 出现次数。
-- 用例：
-  - Visitor 在 `visitEnter` 返回 `false` 时跳过子树。
-  - `walk` 返回 `SkipChildren`/`Stop` 行为正确。
-  - 序列化器正是一个 `XmlVisitor`（用黄金字符串验证）。
+- `src/cangjie_xml/visit/xml_visitor.cj`
+- `src/cangjie_xml/visit/xml_walk.cj`
+
+### 测试重点
+- `visitEnter/visitExit` 调用顺序。
+- `SkipChildren` / `Stop` 的控制流语义。
+- Writer 通过 Visit 驱动输出的可行性。
 
 ### DoD
-- Visitor / walk 双路径均通过全部 M2 的打印测试。
+- Visit 能支撑 Writer 和用户自定义遍历。
+- 访问控制语义稳定，不产生重复访问或漏访问。
+
+### 设计警戒线
+- Visit 是遍历机制，不要演变成查询 DSL。
+- Visitor 默认实现应尽量简单、可预测。
 
 ---
 
-## M6 — IO / 错误 / 选项完善
+## 8. M6 — IO + Error + Options 收口
 
 ### 目标
-补齐 `saveFile`、流式输入输出、`ParseOptions` / `PrinterOptions`，以及错误报告的长文本描述。
+把所有输入输出边界、错误表达与配置对象收束为稳定的公共形态。
+
+### 范围
+- `loadFile()` / `saveFile()`
+- `XmlError` 完整枚举
+- `SourcePos`
+- `XmlParseOptions` / `XmlWriteOptions` 最终定版
+- 长格式错误说明
 
 ### 交付物
-- `io/loader.cj`: `loadFile` 使用 `try-with-resources` + `InputStream.readToEnd()`。
-- `io/writer.cj`: `saveFile(path, compact)`。
-- `errors/error.cj`: `XmlError.message()` / `XmlError.pos()`, `XmlError.toLongForm()` 友好诊断（含行/列）。
-- `PrinterOptions { compact, indent, selfClosing, boolFormat }`。
-- 用例：
-  - 文件不存在 → `FileNotFound`。
-  - 写入只读目录 → `FileWriteError`。
-  - 大文件（≥ 5 MB）可正常解析并打印。
-  - `toLongForm()` 的断言文案。
+- `src/cangjie_xml/error/source_pos.cj`
+- `src/cangjie_xml/error/xml_error.cj`
+- `src/cangjie_xml/io/xml_loader.cj`
+- `src/cangjie_xml/io/xml_saver.cj`
+
+### 测试重点
+- 文件不存在、读写失败。
+- 错误位置信息可读。
+- `options` 默认值合理且相互不冲突。
 
 ### DoD
-- 所有面向用户的错误场景都能给出"人类可读、含位置信息"的描述。
+- 公共 API 中不再出现模糊的临时配置参数。
+- 错误信息足以直接用于 CLI 或日志输出。
+
+### 设计警戒线
+- 避免 `XmlError` 失控膨胀为“异常信息垃圾桶”。
+- `io` 只做边界适配，不混入语法规则。
 
 ---
 
-## M7 — 并发与线程安全
+## 9. M7 — Batch / Concurrency 边界
 
 ### 目标
-落地并发解析能力 & 只读 DOM 共享安全保证。
+在不破坏核心 DOM 简洁性的前提下，提供多文档批量解析与并发消费能力。
+
+### 范围
+- `XmlBatchParser`
+- 并发数配置
+- 批量结果聚合
+- 只读 DOM 并行消费示例
 
 ### 交付物
-- `XmlDocument.parseMany(inputs: Array<XmlSource>): Array<Result<XmlDocument, XmlError>>`：内部用 `spawn` + `Future` 并行化，线程数默认 = CPU 核心。
-- `XmlDocument.withWriteLock { doc => ... }`：基于 `Mutex` 的可选写锁封装，帮助用户同步修改。
-- 文档中明确"只读 DOM 多线程安全，写入需用户同步"的契约。
-- 并发测试：
-  - 4 线程并行解析 20 份文档全部成功，线性扩展 ≥ 3×。
-  - 多线程只读迭代同一个 DOM 不崩溃、结果等价单线程。
-  - 压力测试（1 分钟）无死锁、无异常逃逸。
+- `src/cangjie_xml/batch/xml_batch_parser.cj`（如决定采用独立包）
+- 并发测试与示例
+
+### 测试重点
+- 多文档并行解析。
+- 错误与成功结果并存时的聚合语义。
+- 并发顺序与输出顺序约定是否清晰。
 
 ### DoD
-- 并发包全部测试在 `cjpm test --parallel` 模式下稳定通过 100 次。
+- 并发能力是“加法”，而不是对核心模型的侵入式改写。
+- 只读共享访问具备清晰文档说明。
 
-### 风险
-- `spawn` 与 GC 的交互 → 参考 `cangjie-lang-features/concurrency`，优先使用 `Future` 汇聚，避免裸线程生命周期管理。
+### 设计警戒线
+- 不在 `XmlDocument` 内部内建锁。
+- 不让并发需求倒逼 DOM API 失去朴素性。
 
 ---
 
-## M8 — 1.0 回归、基准、文档
+## 10. M8 — 回归 / 基准 / 文档 / 发布
 
 ### 目标
-**发布 `cangjie_xml` v1.0.0**。
+把库从“功能存在”提升到“可以发布”。
+
+### 范围
+- tinyxml2 回归迁移
+- 性能基准
+- README / 示例 / API 文档
+- v1.0 发布检查表
 
 ### 交付物
-- **回归套件**：把 tinyxml2 `xmltest.cpp` 的断言逐条移植（≥ 200 条），全部通过。
-- **基准**：`cjprof` 脚本 + 一页 `BENCH.md` 报告：解析 MB/s、打印 MB/s、`parseMany` 线性比、峰值内存。
-- **文档**：
-  - `README.md`：安装、快速上手、API 一览表。
-  - `docs/guide/` 目录：五到十篇教程（解析、构建、查询、访问者、并发、扩展自定义类型、错误处理、与 tinyxml2 迁移对照）。
-  - API 注释全部到位，`cjdoc`（或等效工具）可生成。
-- 打好 tag `v1.0.0`，在仓库 Release 页面发布。
+- 回归测试集
+- 基准测试结果
+- 使用指南
+- 发布说明
+
+### 测试重点
+- tinyxml2 `xmltest.cpp` 中关键行为的迁移对照。
+- 大文档解析与写出基线。
+- 用户从 README 跟随示例可成功运行。
 
 ### DoD
-- 覆盖率 ≥ 85%（核心包 ≥ 90%）。
-- 公共 API 100% 有文档。
-- 基准达成 §DESIGN §10 的性能目标。
-- CI 全绿。
+- 回归测试稳定通过。
+- 基准数据可复现。
+- 文档与实际 API 无漂移。
+- 可以打出 `v1.0.0`。
+
+### 设计警戒线
+- 文档必须反映真实实现，而不是超前承诺。
+- 基准结果用于观察趋势，不为数字而扭曲架构。
 
 ---
 
-## M9+ — 1.x 进阶特性（并行规划）
+## 11. 未来 RFC（M9+）
 
-> 每一项独立里程碑，发布为 minor 版本。
+这些能力进入 Future RFC，而不抢占 v1.0 主线：
 
-### M9.1 — SAX 风格流式解析 (`v1.1`)
-- 接口：`XmlDocument.stream(source: XmlSource): Iterator<XmlEvent>`。
-- `XmlEvent` enum：`StartElement / EndElement / Text / Comment / Decl / Unknown / Error`。
-- 适用于 > 100 MB 文档；不构建 DOM。
+### RFC-A：流式事件解析
+- `XmlEvent`
+- pull / iterator 风格解析
+- 大文件场景优化
 
-### M9.2 — 宏驱动的 POCO 绑定 (`v1.2`)
-- 属性宏：`@XmlRoot("book") class Book { @XmlAttr("id") var id: Int64 = 0; @XmlElement("title") var title: String = "" }`。
-- 代码生成 `fromXml / toXml`，与 `XmlDocument` 互通。
-- 依赖 `std.ast`、`@Annotation`、反射（已评估仓颉支持）。
+### RFC-B：宏驱动对象绑定
+- `@XmlRoot`
+- `@XmlAttribute`
+- `@XmlElement`
+- 面向 POCO / DTO 的双向转换
 
-### M9.3 — XPath 子集 (`v1.3`)
-- 支持 `/a/b`, `//b`, `//b[@x='1']`, `b[2]`, `text()`。
-- 以 `XmlElement.xpath(expr: String): Iterable<XmlNode>` 暴露。
+### RFC-C：XPath 子集
+- 基础路径、谓词、位置过滤
+- 作为独立查询层，不反向污染 DOM
 
-### M9.4 — 性能优化（可选 `v1.4`）
-- 内部节点对象池（保持 API 不变）。
-- `String` interning（tag/attr 名）。
-- 解析阶段尝试零拷贝 `Slice` → `String` 延迟物化。
+### RFC-D：内部性能优化
+- 节点池
+- 名称字符串驻留
+- 更激进的延迟物化
 
----
-
-## 质量门禁（跨里程碑统一适用）
-
-每次 PR（含中间推送）都必须满足：
-
-1. `cjpm build` 零错误、零警告。
-2. `cjpm test` 全通过。
-3. `cjfmt -c .` 无变更建议。
-4. `cjlint` 0 error。
-5. 新增 / 变更代码必须带单元测试。
-6. 公共 API 必须有 `///` 文档注释。
-7. 不引入非仓颉标准库的三方依赖（`stdx.*` 可在明确需要时引入，需在 PR 描述中说明）。
-8. 不含 `// TODO` 外的 FIXME；必要时用 issue 替代代码注释。
+这些方向都值得做，但都不应抢占 v1.0 的结构确定性。
 
 ---
 
-## 依赖与范围声明
+## 12. 追溯矩阵：设计决策到里程碑
 
-- **仅使用**仓颉标准库 `std.*`：`std.collection`、`std.io`、`std.sync`、`std.unittest`、`std.time` 等。
-- **不使用**：FFI/CFFI、C/C++ 源码、任何非仓颉包管理器的三方库。
-- `stdx.*` 的使用策略：默认不启用；若在 M9+ 需要日志/编码辅助再评估引入，必须在 `DESIGN.md` 与 `ROADMAP.md` 中登记。
-
----
-
-## 追溯矩阵：tinyxml2 功能 → 里程碑
-
-| tinyxml2 能力 | 里程碑 |
+| 设计决策 | 里程碑 |
 |---|---|
-| 空文档/声明解析 | M3 |
-| 嵌套元素 + 属性 | M1 (模型)、M3 (解析) |
-| CDATA / Comment / Doctype / PI | M3 |
-| BOM / 换行规范化 | M3 |
-| Whitespace 三模式 | M3 |
-| 属性类型化访问（Int/Int64/UInt/UInt64/Bool/Float/Double） | M4 |
-| QueryXxxAttribute（带错误码） | M4 |
-| Printer（紧凑 / 缩进 / 流式） | M2 / M5 |
-| Visitor | M2 骨架 / M5 完善 |
-| Handle / ConstHandle | **删除**（由 `Option<T>` + `?.` 取代） |
-| MemPool | **删除**（由 GC 替代，必要时 v1.4 内部优化） |
-| 错误码 & `ErrorStr()` | M6 |
-| `LoadFile` / `SaveFile` | M6 |
-| 深度保护 500 | M3 |
-| 并发（tinyxml2 本身无） | M7（**新增能力**） |
+| 统一模块命名与目录结构 | M0 |
+| `XmlNodeKind` + `XmlNode` | M1 |
+| `XmlWriter` 取代 `XmlPrinter` 作为核心命名 | M2 |
+| `XmlParseOptions` / `XmlWriteOptions` | M2 / M3 / M6 |
+| `XmlWhitespaceMode` | M3 |
+| `XmlValueCodec` | M4 |
+| Query / Builder 作为扩展层 | M4 |
+| `XmlVisitor` + `walk()` | M5 |
+| `XmlError` + `SourcePos` | M3 / M6 |
+| 并发能力从 DOM 中解耦 | M7 |
 
 ---
 
-以上计划是"滚动式"的：每完成一个里程碑，回顾并调整后续计划中的细节。最终的验收标准以 `DESIGN.md` §10（性能目标）与本文件各 M 的 DoD 为准。
+## 13. 每阶段统一质量门禁
+
+所有里程碑统一遵守：
+
+1. `cjpm build`
+2. `cjpm test`
+3. `cjfmt`
+4. `cjlint`
+5. 新增公共 API 必须有文档注释
+6. 新能力必须附带测试
+7. 不引入非标准库依赖
+
+对于本项目而言，**结构一致性本身就是质量门禁的一部分**：
+
+- 新类型命名是否仍然优雅？
+- 新能力是否仍然落在正确模块？
+- 新便利函数是否污染了核心层？
+
+如果答案是否定的，即使测试通过，也不应合入。
+
+---
+
+## 14. 结语
+
+这份路线图的中心思想不是“尽快堆完功能”，而是：
+
+> **先把骨架做美，再把肌肉长实。**
+
+也就是说：
+
+- M0~M3 保证结构、DOM、Writer、Parser 四根主梁立住；
+- M4~M6 再补足日常体验与工程边界；
+- M7 最后以“可选能力层”的方式加入并发；
+- M8 才进入真正的发布收口。
+
+这样实现出来的 CangjieXML，不只是“能用的 tinyxml2 仓颉版”，而会是一套真正适合仓颉生态长期维护的 XML 基础库。
