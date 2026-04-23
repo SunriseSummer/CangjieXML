@@ -1,8 +1,8 @@
 # CangjieXML 软件设计文档
 
-> 本文面向仓颉语言，系统分析 `.tinyxml2-11.0.0` 的功能边界与工程经验，给出一套更符合仓颉语言气质的 XML 库设计方案。
+> 本文面向仓颉语言，系统分析目录 `.tinyxml2-11.0.0` 的能力边界与工程经验，并给出一套更符合仓颉语言气质的 XML 库设计方案。
 >
-> 这不是把 tinyxml2 从 C++ 逐行翻译到仓颉，而是要在保持 XML 语义、DOM 能力与 tinyxml2 实用主义优势的前提下，借助仓颉的 `enum`、模式匹配、`Option`、扩展、泛型与并发能力，以及规范化包结构，设计一套 **结构清晰、命名优雅、职责对称、可渐进实现** 的纯仓颉 XML 库。
+> 目标不是翻译 tinyxml2 的 C++ 写法，而是在保留 XML 语义、DOM 能力与 tinyxml2 实用主义优势的前提下，综合运用仓颉的 `enum`、模式匹配、`Option`、扩展、泛型与并发能力，以及规范化包结构，设计一套 **结构清晰、命名优雅、职责对称、可渐进实现** 的纯仓颉 XML 库。
 
 ---
 
@@ -232,31 +232,17 @@ CangjieXML/
 
 ### 5.2 分层关系
 
-```text
-           +-------------------+
-           |      query        |
-           +---------+---------+
-                     |
-+--------+  +--------v--------+  +--------+
-| build  +->+       dom       +<-+ visit  |
-+--------+  +---+----------+--+  +--------+
-                ^          ^
-                |          |
-         +------+--+   +---+------+
-         | parser  |   |  writer   |
-         +----+----+   +-----+-----+
-              ^                ^
-              |                |
-           +--+----------------+--+
-           |         io            |
-           +-----------+-----------+
-                       |
-                 +-----v-----+
-                 |   error   |
-                 +-----------+
-
-   internal：仅供 parser / writer / io 复用，不直接暴露给用户
-```
+| 层 | 直接依赖 | 说明 |
+|---|---|---|
+| `dom` | `error` | 核心稳定层，只承载节点模型与基础导航 |
+| `parser` | `dom`, `error`, `internal`, `io` | 负责把输入解析为 DOM |
+| `writer` | `dom`, `error`, `internal`, `io`, `visit` | 负责把 DOM 或事件写出为 XML |
+| `query` | `dom`, `error` | 通过扩展提供只读便利 API |
+| `build` | `dom`, `error` | 提供链式构建体验，不形成平行模型 |
+| `visit` | `dom` | 提供访问者与高阶遍历能力 |
+| `batch` | `parser`, `error` | 可选层，承载批量解析与并发能力 |
+| `internal` | 无公共依赖约束 | 仅供 `parser` / `writer` / `io` 复用，不对外暴露 |
+| `io` | `error` | 只做输入输出边界适配，不承载 XML 语法知识 |
 
 ### 5.3 架构判断
 
@@ -429,11 +415,13 @@ main() {
         """<catalog><book id="1">SICP</book></catalog>"""
     ).getOrThrow()
 
-    if let root = doc.rootElement {
-        for (book in root.childElements(name: Some("book"))) {
-            let id = book.intAttribute("id").getOrDefault(0)
-            println("${id}: ${book.textContent()}")
-        }
+    match (doc.rootElement) {
+        case Some(root) =>
+            for (book in root.childElements(name: Some("book"))) {
+                let id = book.intAttribute("id").getOrDefault(0)
+                println("${id}: ${book.textContent()}")
+            }
+        case None => ()
     }
 }
 ```
