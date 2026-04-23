@@ -221,11 +221,14 @@ main() {
 
 ---
 
-### `parser` —— 词法层（Phase 3a）
+### `parser` —— 词法层 (Phase 3a) + 语法层 (Phase 3b)
 
-对应 libxml2 `parser.c` / `parserInternals.c` 的**词法路径**。包含 `RuneReader`（字符输入 + 换行归一 + 行列号）、`Token` 枚举与 `Lexer`（`Iterator<Token>`）。
+对应 libxml2 `parser.c` / `parserInternals.c` / `SAX2.c` 的完整**词法 + 语法骨架**。
 
-Phase 3 在 `ROADMAP.md` 中是一个巨型阶段，按 `DESIGN.md §7` 建议自顶向下切片，本次交付 **Phase 3a：词法器**；Phase 3b（`XmlParser → Iterator<SaxEvent>`）留给下一迭代。
+- 词法层：`RuneReader`（字符输入 + 换行归一 + 行列号）、`Token` 枚举与 `Lexer`（`Iterator<Token>`）。
+- 语法层：`XmlParser`（`Iterator<SaxEvent>`），聚合 Token 为事件流，处理元素栈 / 命名空间 / 属性组装 / 预定义实体展开 / 深度 + Billion-Laughs 防护 / `ParserOptions`。
+
+Phase 3c 将补齐：外部实体加载（基于 `EntityResolver` + `IoSource`）、`recover = true` 容错模式、W3C `xmltest` 黄金对比。
 
 #### 使用示例
 
@@ -234,35 +237,55 @@ import cangjie_xml.io.*
 import cangjie_xml.parser.*
 
 main() {
-    let src = DecodingSource(StringSource("<greeting who=\"世界\">Hello&#x21;</greeting>"))
-    let lexer = Lexer(RuneReader(src))
-    for (tok in lexer) {
-        println(tok)
-        // 依次输出：
-        //   ElementOpenStart(greeting)
-        //   AttrName(who)
-        //   AttrEq
-        //   AttrValueStart(")
-        //   AttrValueChunk(世界)
-        //   AttrValueEnd(")
-        //   ElementOpenEnd
-        //   Text(Hello)
-        //   CharRef(33)
-        //   ElementClose(greeting)
-        //   Eof
+    let src = "<?xml version=\"1.0\"?>
+<greeting xmlns=\"urn:demo\" who=\"世界\">Hello&#x21;</greeting>"
+    let parser = XmlParser.fromString(src)
+    for (e in parser) {
+        println(e)
+        // StartDocument(<?xml version="1.0"?>)
+        // StartElement(greeting, 2 attrs)          // 含 xmlns + who
+        // Characters(6 chars)                       // "Hello!"
+        // EndElement(greeting)
+        // EndDocument
     }
 }
+```
+
+事件流构造方式：
+
+| 风格 | 入口 | 适用场景 |
+| --- | --- | --- |
+| **Pull（拉）** | `for (e in XmlParser.fromString(s))` / `parser.next()` | 直接控制解析步长、管道式处理 |
+| **Push（推）** | 在 `for` 里把事件分派到自己的 `SaxHandler`（Phase 4 提供辅助类） | 兼容经典 SAX 风格回调 |
+| **DOM（树）** | Phase 4 的 `DocumentBuilder.from(events, ...)` | 一次性构建树模型 |
+
+#### `ParserOptions` 要点（默认安全）
+
+```cangjie
+ParserOptions(
+    version: XmlVersion.V10,
+    substituteEntities: true,     // 展开预定义 / 用户实体到 Characters
+    recover: false,               // 非容错模式；Phase 3c 提供容错
+    keepBlanks: true,
+    loadExternal: false,          // XXE 默认禁用
+    maxDepth: 256,
+    maxEntityExpansion: 10_000_000,  // Billion-Laughs 防护
+    nameTable: None,              // 传入 NameTable 可 intern 大文档的重复名
+    entityResolver: None          // 传入 MapEntityResolver 可注入用户实体
+)
 ```
 
 #### 覆盖的 libxml2 等价点
 
 - `RuneReader` ⇔ `xmlCurrentChar` + `xmlNextChar` + `xmlParserInputRead` 换行归一；
-- `Token` 为本项目新增（libxml2 直接从词法路径产出 SAX 事件），显式 token 层便于单测和 Phase 3b 的容错恢复；
-- `Lexer` 覆盖 libxml2 的 `xmlParseStartTag` / `xmlParseAttribute` / `xmlParseCharData` / `xmlParsePI` / `xmlParseComment` / `xmlParseCDSect` / `xmlParseDocTypeDecl`（仅 DOCTYPE 头部）的**词法侧**；
-- 字符级 well-formedness 已经在词法层兜住：`]]>` 不能出现在文本、`--` 不能出现在注释、PI target `xml` 受限、XML 声明只能在文档最前等。
+- `Lexer` ⇔ `xmlParseStartTag` / `xmlParseAttribute` / `xmlParseCharData` / `xmlParsePI` / `xmlParseComment` / `xmlParseCDSect` / `xmlParseDocTypeDecl` 的**词法侧**；
+- `XmlParser` ⇔ `parser.c` 主解析 + `SAX2.c` 的 `xmlSAX2StartElementNs` / `xmlSAX2EndElementNs` / `xmlSAX2Characters` 聚合；
+- `SaxEvent` ⇔ `SAX2.c` 回调参数（合一为单个枚举，消除 push/pull 行为偏差）；
+- `NsContext` ⇔ `xmlNsPtr` 链（改为不可变持久化，规避 CVE 根因）；
+- `EntityResolver` ⇔ `xmlSetExternalEntityLoader`（改为 `ParserOptions.entityResolver` 显式注入，无全局 hook）。
 
 ---
 
 ## 仍未实现
 
-见 [`progress.md`](./progress.md)。按 `ROADMAP.md` 顺序，下一迭代进入 **Phase 3b —— `XmlParser`**：把本迭代的 `Iterator<Token>` 聚合成 `Iterator<SaxEvent>`，处理元素栈 / 命名空间 / 预定义实体展开 / `ParserOptions` / Billion-Laughs 限制 / 容错模式。
+见 [`progress.md`](./progress.md)。按 `ROADMAP.md` 顺序，下一迭代进入 **Phase 3c —— 解析器补完**：外部实体 + `recover=true` 容错 + W3C `xmltest` 黄金对比；之后进入 **Phase 4**（`tree` / `sax` / `reader`）。

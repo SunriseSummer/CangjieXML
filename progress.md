@@ -1,6 +1,6 @@
 # CangjieXML 开发进度
 
-> 相对 [libxml2 v2.15.3](./.libxml2-2.15.3) 全量功能的实现情况。最新更新：迭代 4 结束（Phase 3a —— `parser` 词法层：`RuneReader` + `Lexer` + `Token`）。
+> 相对 [libxml2 v2.15.3](./.libxml2-2.15.3) 全量功能的实现情况。最新更新：迭代 5 结束（Phase 3b —— `parser` 语法层：`XmlParser` → `Iterator<SaxEvent>`）。
 
 ---
 
@@ -11,7 +11,7 @@
 | 0 | 项目骨架 | — | ✅ 已完成 |
 | 1 | `core` 基础设施 | `chvalid`、`xmlstring`、`buf`、`dict`、`hash`、`error`、`uri` | ✅ 已完成 |
 | 2 | `encoding` + `io` | `encoding.c`、`xmlIO.c` | ✅ 已完成 |
-| 3 | `parser` 词法 + 事件流 | `parser.c`、`parserInternals.c` | 🟡 词法层已完成（Phase 3a），语法层待做（Phase 3b） |
+| 3 | `parser` 词法 + 事件流 | `parser.c`、`parserInternals.c` | 🟢 词法 + 语法骨架已完成（Phase 3a+3b），容错模式 + 外部实体留待 Phase 3c |
 | 4 | `tree` + `sax` + `reader` | `tree.c`、`SAX2.c`、`xmlreader.c` | ⬜ 未开始 |
 | 5 | `writer` + `save` | `xmlwriter.c`、`xmlsave.c` | ⬜ 未开始 |
 | 6 | `xpath` | `xpath.c` | ⬜ 未开始 |
@@ -23,7 +23,7 @@
 | 12 | 工具链与发布 | `xmllint.c`、`xmlcatalog.c` | ⬜ 未开始 |
 | 13 | 硬化与优化 | `runtest.c`、`fuzz/` | ⬜ 未开始 |
 
-**粗略完成度**：核心功能 ≈ 18%（Phase 1 基础设施 + Phase 2 的字符编解码与 I/O 抽象 + Phase 3a 词法器；不含语法层 / DOM / 验证器 / 序列化器 / 工具链）。
+**粗略完成度**：核心功能 ≈ 26%（Phase 1 基础设施 + Phase 2 字符编解码 / I/O + Phase 3a 词法器 + Phase 3b XmlParser 骨架；不含容错模式 / 外部实体 / DOM / 验证器 / 序列化器 / 工具链）。
 
 ---
 
@@ -199,8 +199,9 @@
 按 `ROADMAP.md` 顺序依次推进：
 
 - ✅ ~~Phase 2 `io`：`IoSource` / `IoSink` / `BufferedSink` / `IndentingSink` / `EncodingSink`~~
-- 🟡 Phase 3a `parser` 词法层（**本迭代完成**）：`RuneReader` / `Token` / `Lexer`
-- Phase 3b `parser` 语法层：`XmlParser` → `Iterator<SaxEvent>`（元素栈、命名空间、属性组装、预定义实体 + `EntityResolver`、Billion Laughs 限制、`ParserOptions`、容错模式）
+- ✅ ~~Phase 3a `parser` 词法层：`RuneReader` / `Token` / `Lexer`~~
+- ✅ ~~Phase 3b `parser` 语法层：`XmlParser` → `Iterator<SaxEvent>`（元素栈、命名空间、属性聚合、预定义实体、深度 / 扩展限制、`ParserOptions` 基础字段、`NameTable` intern）~~
+- 🟡 Phase 3c `parser` 补完：`EntityResolver` 加载外部实体 + `recover=true` 容错路径 + W3C `xmltest` 黄金对比
 - Phase 4 `tree` / `sax` / `reader`：`sealed interface Node` + DOM / SAX / XmlReader
 - Phase 5 `writer` / `save`：`XmlWriter` + `DocumentSerializer`
 - Phase 6 `xpath`：XPath 1.0 引擎
@@ -296,7 +297,122 @@
 - 位置追踪（行列精确到多行中的嵌套元素）
 ---
 
+## 已实现（迭代 5 — Phase 3b：`parser` 语法层 / SAX 事件流）
+
+对应 libxml2 `parser.c` 主解析函数 + `SAX2.c` 的回调聚合。架构完全重写为
+`Iterator<SaxEvent>`（`DESIGN.md §7.1`），消除 libxml2 推/拉双实现的行为偏差。
+
+### 新增类型
+
+| 类型 | 位置 | 作用 |
+| --- | --- | --- |
+| `SaxEvent` | `parser/sax_event.cj` | 统一事件枚举（StartDocument / EndDocument / StartElement / EndElement / Characters / Cdata / CommentEvent / Pi / Doctype / EntityReference / ParseError）|
+| `XmlDecl` | `parser/sax_event.cj` | XML 声明三元组（version / encoding / Standalone） |
+| `Attribute` | `parser/sax_event.cj` | 解析后的属性（QName + 展开后值 + 位置 + `isNamespaceDeclaration`） |
+| `Standalone` | `parser/sax_event.cj` | 三态枚举（`Yes` / `No` / `Unspecified`） |
+| `NsContext` | `parser/ns_context.cj` | **不可变持久化**命名空间栈，规避 libxml2 `xmlNs*` 指针相关 CVE |
+| `EntityResolver` / `DefaultEntityResolver` / `MapEntityResolver` / `EntityResolution` | `parser/entity_resolver.cj` | 实体解析接口 + 仅预定义实体的默认实现（XXE 防护） |
+| `ParserOptions` | `parser/parser_options.cj` | 结构体 + 命名参数（取代 libxml2 位掩码） |
+| `XmlParser` | `parser/xml_parser.cj` | `Iterator<SaxEvent>`，从 `Lexer` 产出 SAX 事件 |
+
+### 关键特性
+
+- **文档骨架恒常化**：无论源文档是否带 `<?xml ?>`，事件流恒以 `StartDocument` 开始、`EndDocument` 结束。
+- **XML 声明属性顺序校验**：`version` / `encoding` / `standalone` 按 W3C 规定的顺序出现；`encoding` 值走 `[A-Za-z][A-Za-z0-9._-]*` 语法白名单。
+- **元素栈 + 开闭匹配**：开闭标签的词法名必须完全一致；根元素唯一；未闭合元素 EOF 触发 `UnexpectedEof`。
+- **属性聚合**：从 Lexer 的 `AttrName` + `AttrValueStart/Chunk/EntityRef/CharRef/End` 序列里组装 `Attribute`，展开预定义实体 + 字符引用 + `MapEntityResolver` 的用户实体。
+- **命名空间组装**（W3C Namespaces 1.0 / 1.1 严格对齐）：
+  - 元素 / 属性 QName 一次性解析出 `uri`；
+  - 默认命名空间**不**应用于属性（§6.2）；
+  - `xml` 前缀硬绑定到 `http://www.w3.org/XML/1998/namespace`；`xmlns` 前缀硬绑定到 `http://www.w3.org/2000/xmlns/`；
+  - 拒绝 `xmlns:xml=` 绑定到非 XML NS、拒绝 `xmlns:xmlns=...`、拒绝其他前缀绑定 XML / xmlns 命名空间 URI；
+  - 属性唯一性按**扩展名**（URI + localName）去重：允许 `a:x` 与 `b:x` 映射到不同 URI 时共存，相同 URI 时拒绝。
+- **事件合并**：连续 Text / CharRef / 展开后的 EntityRef 合并为单个 `Characters` 事件；CDATA 独立为 `Cdata`（语义保留）。
+- **深度限制 / Billion Laughs 防护**：元素嵌套超 `maxDepth` / 实体展开总字符超 `maxEntityExpansion` → `XmlError.LimitExceeded`。
+- **选项**：
+  - `substituteEntities = false` → 透传 `EntityReference(name)` 事件；
+  - `keepBlanks = false` → 跳过仅空白的 `Characters`；
+  - `nameTable` 配置后，元素 / 属性的 local + prefix 走 intern 池，对大文档降低内存占用；
+  - `entityResolver` 注入自定义实体（预定义 5 个永远优先，用户不得覆盖，W3C §4.6）。
+
+### 存量复盘（按用户要求）
+
+| 模块 | 复用方式 | 结论 |
+| --- | --- | --- |
+| `core.qname.QName` | 元素 / 属性名一次性构造 `(local, prefix, uri)` | 已最优，无需重构 |
+| `core.name_table.NameTable` | `ParserOptions.nameTable` 直接 intern | 已最优 |
+| `core.error.XmlError.{Malformed,LimitExceeded,NamespaceError,UnexpectedEof}` | 全部错误枚举变体已足够 | 已最优 |
+| `parser.Token` | 粒度刚好适配聚合路径（`AttrValueChunk` / `EntityRef` / `CharRef` 分片） | 已最优，无需改动 |
+| `parser.Lexer` | 直接以 `Iterator<Token>` 喂给 `XmlParser` | 已最优 |
+| `std.collection.ArrayStack` | 元素栈 + NsContext 栈 | 使用 `add / remove / peek` 契约 |
+
+**无需重构存量**。本次仅在 `progress.md` / `README.md` 中把完成度估算从 18% 更新到 26%。
+
+### 测试（新增 57 个用例，`cjpm test` 223/223 全绿）
+
+- `sax_event_test.cj`（6）：`XmlDecl` / `Attribute` / `SaxEvent.toString()` / `position()` / `Standalone` 等值。
+- `ns_context_test.cj`（8）：root / push / shadow / unbind / 不可变性 / bindings / xmlns 硬绑定。
+- `entity_resolver_test.cj`（4）：预定义 / 未知 / 用户扩展 / 预定义优先。
+- `xml_parser_test.cj`（39）：骨架、嵌套、自闭合、属性展开、引号两种、多根元素拒绝、开闭错配、EOF、XML 声明所有约束、命名空间所有规则、连续文本合并、CDATA 独立、Comment / PI / DOCTYPE、`keepBlanks` / `substituteEntities` / `maxDepth` / `maxEntityExpansion` / `nameTable` / 自定义 `EntityResolver`、非空白根外文本、前导 Comment/PI、两前缀同 URI 重复、两前缀异 URI 允许。
+
+---
+
 ## 与 `DESIGN.md` / `ROADMAP.md` 的对齐调整
+
+### 新增类型
+
+| 类型 | 位置 | 作用 |
+| --- | --- | --- |
+| `SaxEvent` | `parser/sax_event.cj` | 统一事件枚举（StartDocument / EndDocument / StartElement / EndElement / Characters / Cdata / CommentEvent / Pi / Doctype / EntityReference / ParseError）|
+| `XmlDecl` | `parser/sax_event.cj` | XML 声明三元组（version / encoding / Standalone） |
+| `Attribute` | `parser/sax_event.cj` | 解析后的属性（QName + 展开后值 + 位置 + `isNamespaceDeclaration`） |
+| `Standalone` | `parser/sax_event.cj` | 三态枚举（`Yes` / `No` / `Unspecified`） |
+| `NsContext` | `parser/ns_context.cj` | **不可变持久化**命名空间栈，规避 libxml2 `xmlNs*` 指针相关 CVE |
+| `EntityResolver` / `DefaultEntityResolver` / `MapEntityResolver` / `EntityResolution` | `parser/entity_resolver.cj` | 实体解析接口 + 仅预定义实体的默认实现（XXE 防护） |
+| `ParserOptions` | `parser/parser_options.cj` | 结构体 + 命名参数（取代 libxml2 位掩码） |
+| `XmlParser` | `parser/xml_parser.cj` | `Iterator<SaxEvent>`，从 `Lexer` 产出 SAX 事件 |
+
+### 关键特性
+
+- **文档骨架恒常化**：无论源文档是否带 `<?xml ?>`，事件流恒以 `StartDocument` 开始、`EndDocument` 结束。
+- **XML 声明属性顺序校验**：`version` / `encoding` / `standalone` 按 W3C 规定的顺序出现；`encoding` 值走 `[A-Za-z][A-Za-z0-9._-]*` 语法白名单。
+- **元素栈 + 开闭匹配**：开闭标签的词法名必须完全一致；根元素唯一；未闭合元素 EOF 触发 `UnexpectedEof`。
+- **属性聚合**：从 Lexer 的 `AttrName` + `AttrValueStart/Chunk/EntityRef/CharRef/End` 序列里组装 `Attribute`，展开预定义实体 + 字符引用 + `MapEntityResolver` 的用户实体。
+- **命名空间组装**（W3C Namespaces 1.0 / 1.1 严格对齐）：
+  - 元素 / 属性 QName 一次性解析出 `uri`；
+  - 默认命名空间**不**应用于属性（§6.2）；
+  - `xml` 前缀硬绑定到 `http://www.w3.org/XML/1998/namespace`；`xmlns` 前缀硬绑定到 `http://www.w3.org/2000/xmlns/`；
+  - 拒绝 `xmlns:xml=` 绑定到非 XML NS、拒绝 `xmlns:xmlns=...`、拒绝其他前缀绑定 XML / xmlns 命名空间 URI；
+  - 属性唯一性按**扩展名**（URI + localName）去重：允许 `a:x` 与 `b:x` 映射到不同 URI 时共存，相同 URI 时拒绝。
+- **事件合并**：连续 Text / CharRef / 展开后的 EntityRef 合并为单个 `Characters` 事件；CDATA 独立为 `Cdata`（语义保留）。
+- **深度限制 / Billion Laughs 防护**：元素嵌套超 `maxDepth` / 实体展开总字符超 `maxEntityExpansion` → `XmlError.LimitExceeded`。
+- **选项**：
+  - `substituteEntities = false` → 透传 `EntityReference(name)` 事件；
+  - `keepBlanks = false` → 跳过仅空白的 `Characters`；
+  - `nameTable` 配置后，元素 / 属性的 local + prefix 走 intern 池，对大文档降低内存占用；
+  - `entityResolver` 注入自定义实体（预定义 5 个永远优先，用户不得覆盖，W3C §4.6）。
+
+### 存量复盘（按用户要求）
+
+| 模块 | 复用方式 | 结论 |
+| --- | --- | --- |
+| `core.qname.QName` | 元素 / 属性名一次性构造 `(local, prefix, uri)` | 已最优，无需重构 |
+| `core.name_table.NameTable` | `ParserOptions.nameTable` 直接 intern | 已最优 |
+| `core.error.XmlError/Malformed/LimitExceeded/NamespaceError/UnexpectedEof` | 全部错误枚举变体已足够 | 已最优 |
+| `parser.Token` | 粒度刚好适配聚合路径（`AttrValueChunk` / `EntityRef` / `CharRef` 分片） | 已最优，无需改动 |
+| `parser.Lexer` | 直接以 `Iterator<Token>` 喂给 `XmlParser` | 已最优 |
+| `std.collection.ArrayStack` | 元素栈 + NsContext 栈 | 使用 `add/remove/peek` 契约 |
+
+**无需重构存量**。本次仅在 `progress.md` / `README.md` 中把完成度估算从 18% 更新到 26%。
+
+### 测试（新增 57 个用例，`cjpm test` 223/223 全绿）
+
+- `sax_event_test.cj`（6）：`XmlDecl` / `Attribute` / `SaxEvent.toString()` / `position()` / `Standalone` 等值。
+- `ns_context_test.cj`（8）：root / push / shadow / unbind / 不可变性 / bindings / xmlns 硬绑定。
+- `entity_resolver_test.cj`（4）：预定义 / 未知 / 用户扩展 / 预定义优先。
+- `xml_parser_test.cj`（39）：骨架、嵌套、自闭合、属性展开、引号两种、多根元素拒绝、开闭错配、EOF、XML 声明所有约束、命名空间所有规则、连续文本合并、CDATA 独立、Comment / PI / DOCTYPE、`keepBlanks` / `substituteEntities` / `maxDepth` / `maxEntityExpansion` / `nameTable` / 自定义 `EntityResolver`、非空白根外文本、前导 Comment/PI、两前缀同 URI 重复、两前缀异 URI 允许。
+
+
 
 本迭代为适配 `cjpm 1.0.5` 的实际能力，对设计做了以下小幅调整（均以"提升产品质量与可行性"为目标导向）：
 
