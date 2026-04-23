@@ -1,6 +1,6 @@
 # CangjieXML 开发进度
 
-> 相对 [libxml2 v2.15.3](./.libxml2-2.15.3) 全量功能的实现情况。最新更新：迭代 7 结束（代码质量硬化：消除魔鬼数字，集中到 `src/parser/char_codes.cj`）。
+> 相对 [libxml2 v2.15.3](./.libxml2-2.15.3) 全量功能的实现情况。最新更新：迭代 8 结束（Phase 4a —— `tree` 只读 DOM + `DocumentBuilder`）。
 
 ---
 
@@ -12,7 +12,7 @@
 | 1 | `core` 基础设施 | `chvalid`、`xmlstring`、`buf`、`dict`、`hash`、`error`、`uri` | ✅ 已完成 |
 | 2 | `encoding` + `io` | `encoding.c`、`xmlIO.c` | ✅ 已完成 |
 | 3 | `parser` 词法 + 事件流 | `parser.c`、`parserInternals.c` | 🟢 词法 + 语法骨架已完成（Phase 3a+3b），容错模式 + 外部实体留待 Phase 3c |
-| 4 | `tree` + `sax` + `reader` | `tree.c`、`SAX2.c`、`xmlreader.c` | ⬜ 未开始 |
+| 4 | `tree` + `sax` + `reader` | `tree.c`、`SAX2.c`、`xmlreader.c` | 🟢 只读 DOM + DocumentBuilder 完成（Phase 4a），变更 API / XmlReader / 验证器留待 Phase 4b+ |
 | 5 | `writer` + `save` | `xmlwriter.c`、`xmlsave.c` | ⬜ 未开始 |
 | 6 | `xpath` | `xpath.c` | ⬜ 未开始 |
 | 7 | `regexp` + `pattern` + `dtd` | `valid.c`、`xmlregexp.c`、`pattern.c` | ⬜ 未开始 |
@@ -23,7 +23,7 @@
 | 12 | 工具链与发布 | `xmllint.c`、`xmlcatalog.c` | ⬜ 未开始 |
 | 13 | 硬化与优化 | `runtest.c`、`fuzz/` | ⬜ 未开始 |
 
-**粗略完成度**：核心功能 ≈ 26%（Phase 1 基础设施 + Phase 2 字符编解码 / I/O + Phase 3a 词法器 + Phase 3b XmlParser 骨架；不含容错模式 / 外部实体 / DOM / 验证器 / 序列化器 / 工具链）。
+**粗略完成度**：核心功能 ≈ 32%（Phase 1 基础设施 + Phase 2 字符编解码 / I/O + Phase 3a 词法器 + Phase 3b XmlParser 骨架 + Phase 4a 只读 DOM + DocumentBuilder；不含容错模式 / 外部实体 / DOM 变更 API / XmlReader / 验证器 / 序列化器 / 工具链）。
 
 ---
 
@@ -470,3 +470,71 @@
 Phase 3c（`EntityResolver` 加载外部实体 + `recover=true` 容错路径 + W3C `xmltest` 黄金对比）
 仍保留在路线图上，**留给下一迭代**。本迭代专注于项目规范基线，为后续引入更复杂的容错分支
 先把代码风格打磨到位。
+
+---
+
+## 已实现（迭代 8 — Phase 4a：只读 DOM + DocumentBuilder）
+
+### 背景
+
+> Phase 3 交付了 `XmlParser: Iterator<SaxEvent>`；下游若要"就地操作一棵树"
+> 需要先把事件流物化。本迭代按 `ROADMAP.md` Phase 4 的第一块砖交付**只读
+> DOM** 与 `DocumentBuilder`，暂不提供变更 API、`XmlReader`、序列化。
+>
+> 与 libxml2 的 `tree.c` + `SAX2.c` 对齐但做了两处语言级改进：
+>   - 节点根类型 `sealed interface Node` → `match` 分派时编译器强制穷举，
+>     彻底淘汰 libxml2 `if node->type == XML_XXX_NODE` 的手写判别；
+>   - `Attr` 独立于 `Node`（对齐 W3C DOM Level 2），调用方不会错把属性当
+>     成兄弟节点遍历。
+
+### 新增子包：`cangjie_xml.tree`（6 个源文件 + 1 个测试文件）
+
+| 文件 | 行数 | 内容 |
+| --- | --- | --- |
+| `src/tree/node.cj` | 97 | `sealed interface Node` + `NodeKind` 枚举 |
+| `src/tree/attr.cj` | 50 | `Attr`（元素属性，不是 Node；提供 `fromSaxAttribute` 转换） |
+| `src/tree/element.cj` | 162 | `Element` + 只读 `children()` / `attributes()` / `findAttribute` / `findChildren` / `directText` / `allText` 遍历 API + 惰性 `ElementChildrenFilter` 迭代器 |
+| `src/tree/leaf_nodes.cj` | 161 | `TextNode` / `CdataSection` / `CommentNode` / `PiNode` / `DoctypeNode` |
+| `src/tree/document.cj` | 64 | `Document`（`xmlDecl` / `doctype` / `root` / `prolog()` / `epilog()`） |
+| `src/tree/document_builder.cj` | 156 | `DocumentBuilder`：消费 `Iterator<SaxEvent>` 构造 `Document` |
+| `src/tree/document_builder_test.cj` | 274 | 20 条单元测试 |
+
+### 关键设计决策
+
+1. **不变式：类型系统直接表达"非根节点必然有 `Element` 父"**
+   —— `parent()` 统一返回 `?Element`，`Document` 不实现（它没有父）。
+   排除了 libxml2 里"父指针指向 xmlDoc" 导致的 downcast 分支。
+2. **只读视图而非 `ArrayList` 直接暴露** —— `children()` / `attributes()`
+   返回 `Iterator<_>`，防止调用方在构造完成后误作修改。Phase 4b 引入变更
+   API 时再同时开放受控的 mutator。
+3. **`Element.ns` 保留 `NsContext` 快照** —— 下游做 XPath / C14N / 命名空间
+   查询时可直接解析，无需回溯 DOM。对应 libxml2 里挂在 `xmlNode.nsDef` /
+   `xmlNode.ns` 的链表，数据结构等价但语义更显式。
+4. **`EntityReference` 降级为字面文本** —— `substituteEntities=false` 时
+   SAX 流会产生 `EntityReference`；DOM MVP 暂不建模实体引用节点，直接写作
+   `&name;` 的 `TextNode`。Phase 4b 引入专用 `EntityRefNode` 后可无缝升级。
+5. **`DoctypeNode` 存于 `Document.doctype` 而非 `prolog` 列表**
+   —— 与 W3C DOM 对齐（DOCTYPE 属于文档级元数据）；调用方不需要遍历 prolog
+   判别 DOCTYPE。
+
+### 新增测试（20 条，全部位于 `src/tree/document_builder_test.cj`）
+
+- 骨架：`testSelfClosingRoot` / `testEmptyRootWithEndTag` / `testNestedElements` / `testSiblingElements`
+- 属性：`testAttributes` / `testAttributeEntityExpansion` / `testNamespacedAttribute`
+- 文本 / CDATA：`testTextContent` / `testMixedTextAndElements` / `testCdataIndependentNode` / `testAllTextRecursive`
+- Prolog / Epilog / Doctype：`testPrologCommentAndPi` / `testEpilogCommentAfterRoot` / `testDoctypeCaptured`
+- 查找 / 命名空间：`testFindChildrenByLocalName` / `testFindChildrenByNamespace` / `testElementNsContextPreserved`
+- 元数据 / 错误：`testMalformedInputRaises` / `testNodeKindsReportCorrectly` / `testXmlDeclCapturedOrSynthesized`
+
+### 验证
+
+- `cjpm build` 干净，无新的 warning（已修正 `public sealed` 冗余修饰符）。
+- `cjpm test` **243 / 243** 全绿（新增 20 + 迭代 7 的 223 全保留）。
+- 全部新增文件 ≤ 300 行。
+
+### 下一步（Phase 4b / Phase 3c 仍延后）
+
+- Phase 4b：节点变更 API（`appendChild` / `removeChild` / `replaceChild`）与
+  不变量检查（`detached` / 父指针同步 / 跨文档节点拒绝）。
+- Phase 4c：`SaxHandler` 推式接口 + `XmlReader` 拉式接口。
+- Phase 3c：容错模式 + 外部实体 + W3C `xmltest` 黄金对比（继续延后）。
