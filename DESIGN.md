@@ -897,7 +897,7 @@ public class XmlBatchParser {
 | `XMLUnknown` | `XmlUnknown` |
 | `XMLAttribute` | `XmlAttribute` |
 | `XMLVisitor` | `XmlVisitor` |
-| `XMLPrinter` | `XmlWriter`（可选兼容别名：`XmlPrinter`） |
+| `XMLPrinter` | `XmlWriter`（可选兼容别名: `XmlPrinter`） |
 | `XMLError` | `XmlError` |
 | `Whitespace` | `XmlWhitespaceMode` |
 | `XMLHandle` | `Option` + `?.` / `??` |
