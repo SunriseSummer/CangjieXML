@@ -1,6 +1,6 @@
 # CangjieXML 开发进度
 
-> 相对 [libxml2 v2.15.3](./.libxml2-2.15.3) 全量功能的实现情况。最新更新：迭代 5 结束（Phase 3b —— `parser` 语法层：`XmlParser` → `Iterator<SaxEvent>`）。
+> 相对 [libxml2 v2.15.3](./.libxml2-2.15.3) 全量功能的实现情况。最新更新：迭代 7 结束（代码质量硬化：消除魔鬼数字，集中到 `src/parser/char_codes.cj`）。
 
 ---
 
@@ -412,6 +412,8 @@
 - `entity_resolver_test.cj`（4）：预定义 / 未知 / 用户扩展 / 预定义优先。
 - `xml_parser_test.cj`（39）：骨架、嵌套、自闭合、属性展开、引号两种、多根元素拒绝、开闭错配、EOF、XML 声明所有约束、命名空间所有规则、连续文本合并、CDATA 独立、Comment / PI / DOCTYPE、`keepBlanks` / `substituteEntities` / `maxDepth` / `maxEntityExpansion` / `nameTable` / 自定义 `EntityResolver`、非空白根外文本、前导 Comment/PI、两前缀同 URI 重复、两前缀异 URI 允许。
 
+- `xml_parser_test.cj`（39）：骨架、嵌套、自闭合、属性展开、引号两种、多根元素拒绝、开闭错配、EOF、XML 声明所有约束、命名空间所有规则、连续文本合并、CDATA 独立、Comment / PI / DOCTYPE、`keepBlanks` / `substituteEntities` / `maxDepth` / `maxEntityExpansion` / `nameTable` / 自定义 `EntityResolver`、非空白根外文本、前导 Comment/PI、两前缀同 URI 重复、两前缀异 URI 允许。
+
 
 
 本迭代为适配 `cjpm 1.0.5` 的实际能力，对设计做了以下小幅调整（均以"提升产品质量与可行性"为目标导向）：
@@ -419,3 +421,52 @@
 1. **包布局**：`DESIGN.md §4` 原方案是 `cjpm` workspace + `packages/<name>/`；`cjpm 1.0.5` 未提供 workspace 子命令，改为 **单模块 + `src/<name>/` 子包** 布局，各包导入路径变为 `cangjie_xml.<name>.*`。语义等价，后续阶段沿用。
 2. **`Byte` 构造**：`Byte` 作为 `UInt8` 的类型别名在当前 SDK 下不能作为构造函数调用，内部统一写作 `UInt8(...)`。公共 API 签名仍使用 `Byte` 类型别名。
 3. **哈希混合**：Cangjie 的 `*` 默认做溢出检查，散列函数中用位旋转 + XOR 代替 `h * 31 + x`，避免 `OverflowException`。
+
+---
+
+## 已实现（迭代 7 — 代码质量硬化：消除魔鬼数字）
+
+### 背景
+
+> 项目规范要求"如无必要，避免使用魔鬼数字，可定义为含义明确的常量或不可变变量"。
+> 迭代 3–5 在快速推进词法器 / 语法器时散落了大量裸 `0x3C` / `0x26` / `0x10FFFF` 等常量，
+> 虽然每处都带行内注释，但仍违反规范。本迭代作为一次**集中的、零行为变更的硬化**，
+> 在单次提交中把 `parser` 与 `io` 子包内的魔鬼数字全部替换为命名常量。
+
+### 新增：`src/parser/char_codes.cj`（集中的字符码点与数值常量）
+
+- ASCII 语法符号：`CHAR_LT` / `CHAR_GT` / `CHAR_AMP` / `CHAR_HASH` / `CHAR_QUOTE` / `CHAR_APOS` /
+  `CHAR_BANG` / `CHAR_QMARK` / `CHAR_SLASH` / `CHAR_MINUS` / `CHAR_DOT` / `CHAR_EQ` / `CHAR_SEMI` /
+  `CHAR_COLON` / `CHAR_LBRACKET` / `CHAR_RBRACKET` / `CHAR_UNDERSCORE`。
+- ASCII 空白：`CHAR_HT` / `CHAR_LF` / `CHAR_CR` / `CHAR_SPACE`。
+- 数位 / 字母区间：`CHAR_DIGIT_0`/`9`、`CHAR_UPPER_A`/`F`/`Z`、`CHAR_LOWER_A`/`F`/`L`/`M`/`N`/`S`/`X`/`Z`。
+- XML 1.1 专属换行字符：`NEL_CODEPOINT` (U+0085)、`LINE_SEPARATOR_CODEPOINT` (U+2028)。
+- Unicode 界限：`UNICODE_MAX_CODEPOINT` (0x10FFFF)。
+- UTF-8 编码尺寸界限：`UTF8_1BYTE_UPPER` / `UTF8_2BYTE_UPPER` / `UTF8_3BYTE_UPPER`（用于 O(1) 计算一个 rune 的字节长度）。
+- 字符引用数位换算：`DEC_BASE` / `HEX_BASE` / `HEX_DIGIT_OFFSET`。
+- 拼串长度：`XMLNS_COLON_PREFIX_LEN = 6`（`"xmlns:"` 字节数）。
+
+### 改动文件（6 个 `parser` + 2 个 `io`）
+
+- `src/parser/lexer_dispatch.cj`：`0x3C` / `0x26` / `0x5D` / `0x3E` / `0x21` / `0x3F` / `0x2F` 替换为具名常量。
+- `src/parser/lexer_markup.cj`：注释 / CDATA / DOCTYPE / PI 边界的 `0x2D` / `0x3E` / `0x5D` / `0x5B` / `0x22` / `0x27` / `0x3F` 替换为具名常量；`Rune(0x3Eu32)` → `Rune(UInt32(CHAR_GT))`。
+- `src/parser/lexer_attrs.cj`：open-tag 状态机中 `0x3E` / `0x2F` / `0x3F` / `0x3D` / `0x22` / `0x27` / `0x26` / `0x3C` 全部具名化；AttValue 归一化中 `0x09` / `0x0A` / `0x20` 替换为 `CHAR_HT` / `CHAR_LF` / `CHAR_SPACE`。
+- `src/parser/lexer_ref.cj`：字符引用 `#` / `;` / `x` 以及 `A-F`/`a-f`/`0-9` 区间端点、十进制 / 十六进制基数、Unicode 上界 `0x10FFFF` 全部具名化。
+- `src/parser/rune_reader.cj`：换行归一化中的 `0x0A` / `0x0D` / `0x85` / `0x2028` 替换为 `CHAR_LF` / `CHAR_CR` / `NEL_CODEPOINT` / `LINE_SEPARATOR_CODEPOINT`。
+- `src/parser/xml_parser_qname.cj`：`isAllXmlWhitespace` / `isValidEncodingName` / `startsWithXmlnsColon` / `splitQName` / `runeByteLen` 中所有字面码点替换为 `CHAR_*` / `UTF8_*` 常量。
+- `src/io/decoding_source.cj`：把硬编码的 `4096` / BOM 探测 `4` 提升为公开常量 `DecodingSource.READ_BUFFER_SIZE` / `DecodingSource.BOM_PROBE_SIZE`。
+- `src/io/source.cj`：`readAll` 内部的 `4096` 提取为包级 `READ_ALL_BUFFER_SIZE` 常量。
+
+### 验证
+
+- 所有修改为**语义无变化**的字面量提取；未引入新行为、新状态或新错误路径。
+- 原有的行内注释（`/* '<' */` 之类）不再必要，已一并移除 —— 常量名本身即"自文档"。
+- 保持单文件 ≤ 300 行硬约束。
+- `encoding/encoding_sink.cj` 中的 BOM 字节数组（如 `[0xEFu8, 0xBBu8, 0xBFu8]`）按规范定义的字节序列，
+  所处 `case "utf-8" =>` 分支已通过上下文自文档，故保留原字面形式，不再进一步抽象。
+
+### 下一步（Phase 3c 延后）
+
+Phase 3c（`EntityResolver` 加载外部实体 + `recover=true` 容错路径 + W3C `xmltest` 黄金对比）
+仍保留在路线图上，**留给下一迭代**。本迭代专注于项目规范基线，为后续引入更复杂的容错分支
+先把代码风格打磨到位。
