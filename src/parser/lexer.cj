@@ -40,6 +40,8 @@ public class Lexer <: Iterator<Token> {
     private var inAttrValue: ?AttrQuote
     // 当前是否处于 open tag 内（属性列表）：遇到 `>` 或 `/>` 时结束。
     private var inOpenTag: Bool
+    // 区分普通元素开口 vs XML 声明开口：结束符分别是 `>` / `/>` 与 `?>`。
+    private var xmlDeclMode: Bool
     // pending token 队列（少数规则需要一次产生多个 token）。
     private let pending: ArrayDeque<Token>
 
@@ -52,6 +54,7 @@ public class Lexer <: Iterator<Token> {
         this.openDepth = 0
         this.inAttrValue = None
         this.inOpenTag = false
+        this.xmlDeclMode = false
         this.pending = ArrayDeque<Token>()
     }
 
@@ -525,9 +528,6 @@ public class Lexer <: Iterator<Token> {
     }
 
     /* ---------- Open tag 内部（属性列表 / 结束符） ---------- */
-
-    // 区分普通元素开口 vs XML 声明开口：结束符分别是 `>` / `/>` 与 `?>`。
-    private var xmlDeclMode: Bool = false
 
     private func readInsideOpenTag(): Token {
         skipWhitespace0Plus()
