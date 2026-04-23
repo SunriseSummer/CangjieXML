@@ -33,10 +33,10 @@ extend Lexer {
             case None => return Token.Eof(pos)
             case Some(r) =>
                 let c = cp(r)
-                if (c == 0x3C /* '<' */) {
+                if (c == CHAR_LT) {
                     return readTagLike()
                 }
-                if (c == 0x26 /* '&' */) {
+                if (c == CHAR_AMP) {
                     return readReference()
                 }
                 return readText()
@@ -61,11 +61,11 @@ extend Lexer {
     /** 返回 false 表示遇到 text 的分隔符，循环应停止；true 表示该字符已被消费并加入 sb。 */
     private func appendTextRuneOrStop(sb: StringBuilder, r: Rune): Bool {
         let c = cp(r)
-        if (c == 0x3C || c == 0x26) {
+        if (c == CHAR_LT || c == CHAR_AMP) {
             return false
         }
         // "]]>" 不允许出现在文本中（W3C XML §2.4）。
-        if (c == 0x5D /* ']' */ && peekIs3(0x5D, 0x5D, 0x3E)) {
+        if (c == CHAR_RBRACKET && peekIs3(CHAR_RBRACKET, CHAR_RBRACKET, CHAR_GT)) {
             throw XmlException(XmlError.Malformed(
                 reader.currentPosition(),
                 "literal ']]>' must not appear in character data"
@@ -97,13 +97,13 @@ extend Lexer {
                 ))
             case Some(next) =>
                 let c = cp(next)
-                if (c == 0x21 /* '!' */) {
+                if (c == CHAR_BANG) {
                     return readBangConstruct(startPos)
                 }
-                if (c == 0x3F /* '?' */) {
+                if (c == CHAR_QMARK) {
                     return readPiOrXmlDecl(startPos)
                 }
-                if (c == 0x2F /* '/' */) {
+                if (c == CHAR_SLASH) {
                     return readElementClose(startPos)
                 }
                 return readElementOpen(startPos)
@@ -116,7 +116,7 @@ extend Lexer {
         let name = readName()
         skipWhitespace0Plus()
         match (reader.peek()) {
-            case Some(r) where cp(r) == 0x3E =>
+            case Some(r) where cp(r) == CHAR_GT =>
                 let _ = reader.advance()
                 if (openDepth > 0) {
                     openDepth -= 1

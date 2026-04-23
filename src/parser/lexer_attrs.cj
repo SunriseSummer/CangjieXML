@@ -30,7 +30,7 @@ extend Lexer {
 
     private func tryCloseOpenTag(c: Int32, pos: Position): ?Token {
         if (xmlDeclMode) {
-            if (c == 0x3F /* '?' */ && peekIs2(0x3F, 0x3E)) {
+            if (c == CHAR_QMARK && peekIs2(CHAR_QMARK, CHAR_GT)) {
                 let _ = reader.advance()
                 let _ = reader.advance()
                 inOpenTag = false
@@ -39,13 +39,13 @@ extend Lexer {
             }
             return None
         }
-        if (c == 0x3E /* '>' */) {
+        if (c == CHAR_GT) {
             let _ = reader.advance()
             inOpenTag = false
             openDepth += 1
             return Some(Token.ElementOpenEnd(pos))
         }
-        if (c == 0x2F /* '/' */ && peekIs2(0x2F, 0x3E)) {
+        if (c == CHAR_SLASH && peekIs2(CHAR_SLASH, CHAR_GT)) {
             let _ = reader.advance()
             let _ = reader.advance()
             inOpenTag = false
@@ -55,12 +55,12 @@ extend Lexer {
     }
 
     private func readAttrOrPunct(c: Int32, r: Rune, pos: Position): Token {
-        if (c == 0x3D /* '=' */) {
+        if (c == CHAR_EQ) {
             let _ = reader.advance()
             return Token.AttrEq(pos)
         }
-        if (c == 0x22 || c == 0x27) {
-            let q = if (c == 0x22) { AttrQuote.Double } else { AttrQuote.Single }
+        if (c == CHAR_QUOTE || c == CHAR_APOS) {
+            let q = if (c == CHAR_QUOTE) { AttrQuote.Double } else { AttrQuote.Single }
             let _ = reader.advance()
             inAttrValue = Some(q)
             return Token.AttrValueStart(pos, q)
@@ -78,8 +78,8 @@ extend Lexer {
     func readAttrValueFragment(q: AttrQuote): Token {
         let startPos = reader.currentPosition()
         let quoteCp: Int32 = match (q) {
-            case Double => 0x22i32
-            case Single => 0x27i32
+            case Double => CHAR_QUOTE
+            case Single => CHAR_APOS
         }
         // 优先处理结束 / 引用 / 非法 '<'
         let leading = handleAttrValueLeading(q, quoteCp, startPos)
@@ -103,10 +103,10 @@ extend Lexer {
             inAttrValue = None
             return Some(Token.AttrValueEnd(startPos, q))
         }
-        if (c == 0x26 /* '&' */) {
+        if (c == CHAR_AMP) {
             return Some(readReference())
         }
-        if (c == 0x3C /* '<' */) {
+        if (c == CHAR_LT) {
             throw XmlException(XmlError.UnexpectedChar(
                 startPos, r, "literal '<' not allowed in attribute value"
             ))
@@ -121,7 +121,7 @@ extend Lexer {
                 case None => break
                 case Some(r) =>
                     let c = cp(r)
-                    if (c == quoteCp || c == 0x26 || c == 0x3C) {
+                    if (c == quoteCp || c == CHAR_AMP || c == CHAR_LT) {
                         break
                     }
                     appendAttrValueRune(sb, r, c)
@@ -139,8 +139,8 @@ extend Lexer {
         }
         // XML §3.3.3 AttValue normalization：RuneReader 已把换行归一到 #xA，
         // 此处把 #x9 / #xA 再折叠为空格。
-        if (c == 0x09 || c == 0x0A) {
-            sb.append(Rune(0x20u32))
+        if (c == CHAR_HT || c == CHAR_LF) {
+            sb.append(Rune(UInt32(CHAR_SPACE)))
         } else {
             sb.append(r)
         }

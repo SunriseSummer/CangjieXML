@@ -17,7 +17,7 @@ extend Lexer {
                     reader.currentPosition(), "unterminated reference after '&'"
                 ))
             case Some(r) =>
-                if (cp(r) == 0x23 /* '#' */) {
+                if (cp(r) == CHAR_HASH) {
                     let _ = reader.advance()
                     return readCharRef(startPos)
                 }
@@ -27,7 +27,7 @@ extend Lexer {
 
     func readEntityRef(startPos: Position): Token {
         let name = readName()
-        if (!reader.consumeIf(Rune(0x3Bu32))) {
+        if (!reader.consumeIf(Rune(UInt32(CHAR_SEMI)))) {
             throw XmlException(XmlError.Malformed(
                 reader.currentPosition(), "expected ';' at end of entity reference"
             ))
@@ -36,9 +36,9 @@ extend Lexer {
     }
 
     func readCharRef(startPos: Position): Token {
-        let hex = reader.consumeIf(Rune(0x78u32) /* 'x' */)
+        let hex = reader.consumeIf(Rune(UInt32(CHAR_LOWER_X)))
         let value = collectCharRefDigits(hex)
-        if (!reader.consumeIf(Rune(0x3Bu32))) {
+        if (!reader.consumeIf(Rune(UInt32(CHAR_SEMI)))) {
             throw XmlException(XmlError.Malformed(
                 reader.currentPosition(), "expected ';' at end of character reference"
             ))
@@ -55,7 +55,7 @@ extend Lexer {
     private func collectCharRefDigits(hex: Bool): Int64 {
         var value: Int64 = 0
         var seen = false
-        let base: Int64 = if (hex) { 16 } else { 10 }
+        let base: Int64 = if (hex) { HEX_BASE } else { DEC_BASE }
         while (true) {
             match (reader.peek()) {
                 case None => break
@@ -66,7 +66,7 @@ extend Lexer {
                     }
                     seen = true
                     value = value * base + digit
-                    if (value > 0x10FFFF) {
+                    if (value > UNICODE_MAX_CODEPOINT) {
                         throw XmlException(XmlError.Malformed(
                             reader.currentPosition(), "character reference out of Unicode range"
                         ))
@@ -84,17 +84,17 @@ extend Lexer {
 
     /** 将一个字符码解析为 `0..9 | 10..15` 的数位值，非数字返回 -1。 */
     private static func charRefDigit(c: Int32, hex: Bool): Int64 {
-        if (c >= 0x30 && c <= 0x39) {
-            return Int64(c - 0x30)
+        if (c >= CHAR_DIGIT_0 && c <= CHAR_DIGIT_9) {
+            return Int64(c - CHAR_DIGIT_0)
         }
         if (!hex) {
             return -1
         }
-        if (c >= 0x41 && c <= 0x46) {
-            return Int64(c - 0x41) + 10
+        if (c >= CHAR_UPPER_A && c <= CHAR_UPPER_F) {
+            return Int64(c - CHAR_UPPER_A) + HEX_DIGIT_OFFSET
         }
-        if (c >= 0x61 && c <= 0x66) {
-            return Int64(c - 0x61) + 10
+        if (c >= CHAR_LOWER_A && c <= CHAR_LOWER_F) {
+            return Int64(c - CHAR_LOWER_A) + HEX_DIGIT_OFFSET
         }
         return -1
     }

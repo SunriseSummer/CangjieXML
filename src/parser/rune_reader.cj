@@ -243,21 +243,21 @@ public class RuneReader {
         let cp = Int32(UInt32(r))
         if (pendingCrFold) {
             pendingCrFold = false
-            if (cp == 0x0A) {
+            if (cp == CHAR_LF) {
                 return
             }
-            if (isV11() && cp == 0x85) {
+            if (isV11() && cp == NEL_CODEPOINT) {
                 return
             }
             // 不是被折叠的那个字符，继续正常处理
         }
-        if (cp == 0x0D) {
+        if (cp == CHAR_CR) {
             pendingCrFold = true
-            pushRune(Rune(0x0Au32))
+            pushRune(Rune(UInt32(CHAR_LF)))
             return
         }
-        if (isV11() && (cp == 0x85 || cp == 0x2028)) {
-            pushRune(Rune(0x0Au32))
+        if (isV11() && (cp == NEL_CODEPOINT || cp == LINE_SEPARATOR_CODEPOINT)) {
+            pushRune(Rune(UInt32(CHAR_LF)))
             return
         }
         pushRune(r)
@@ -275,7 +275,7 @@ public class RuneReader {
         positions.addLast((nextLine, nextCol))
         lookahead.addLast(r)
         let cp = Int32(UInt32(r))
-        if (cp == 0x0A) {
+        if (cp == CHAR_LF) {
             nextLine += 1
             nextCol = 1
         } else {

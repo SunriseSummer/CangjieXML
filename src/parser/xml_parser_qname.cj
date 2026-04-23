@@ -15,8 +15,8 @@ import cangjie_xml.core.*
 /** 仅 ASCII 空白（SP / TAB / LF / CR），对应 XML 产生式 S。 */
 func isAllXmlWhitespace(s: String): Bool {
     for (r in s.runes()) {
-        let cp = UInt32(r)
-        if (cp != 0x20u32 && cp != 0x09u32 && cp != 0x0Au32 && cp != 0x0Du32) {
+        let cp = Int32(UInt32(r))
+        if (cp != CHAR_SPACE && cp != CHAR_HT && cp != CHAR_LF && cp != CHAR_CR) {
             return false
         }
     }
@@ -30,10 +30,11 @@ func isValidEncodingName(s: String): Bool {
     }
     var first = true
     for (r in s.runes()) {
-        let cp = UInt32(r)
-        let alpha = (cp >= 0x41u32 && cp <= 0x5Au32) || (cp >= 0x61u32 && cp <= 0x7Au32)
-        let digit = cp >= 0x30u32 && cp <= 0x39u32
-        let sym = cp == 0x2Eu32 || cp == 0x5Fu32 || cp == 0x2Du32
+        let cp = Int32(UInt32(r))
+        let alpha = (cp >= CHAR_UPPER_A && cp <= CHAR_UPPER_Z) ||
+            (cp >= CHAR_LOWER_A && cp <= CHAR_LOWER_Z)
+        let digit = cp >= CHAR_DIGIT_0 && cp <= CHAR_DIGIT_9
+        let sym = cp == CHAR_DOT || cp == CHAR_UNDERSCORE || cp == CHAR_MINUS
         if (first) {
             if (!alpha) {
                 return false
@@ -62,7 +63,7 @@ func classifyNsDecl(name: String): NsDeclKind {
     if (name == "xmlns") {
         return NsDeclKind.DefaultNs
     }
-    if (name.size > 6 && startsWithXmlnsColon(name)) {
+    if (name.size > XMLNS_COLON_PREFIX_LEN && startsWithXmlnsColon(name)) {
         return NsDeclKind.PrefixNs
     }
     return NsDeclKind.NotNsDecl
@@ -70,11 +71,12 @@ func classifyNsDecl(name: String): NsDeclKind {
 
 private func startsWithXmlnsColon(name: String): Bool {
     // "xmlns:" 共 6 个 ASCII 字节
-    if (name.size < 6) {
+    if (name.size < XMLNS_COLON_PREFIX_LEN) {
         return false
     }
-    return name[0] == 0x78u8 && name[1] == 0x6Du8 && name[2] == 0x6Cu8 &&
-        name[3] == 0x6Eu8 && name[4] == 0x73u8 && name[5] == 0x3Au8
+    return name[0] == UInt8(CHAR_LOWER_X) && name[1] == UInt8(CHAR_LOWER_M) &&
+        name[2] == UInt8(CHAR_LOWER_L) && name[3] == UInt8(CHAR_LOWER_N) &&
+        name[4] == UInt8(CHAR_LOWER_S) && name[5] == UInt8(CHAR_COLON)
 }
 
 /** 空串 → None，其余保留为 Some。 */
@@ -111,7 +113,7 @@ func splitQName(raw: String, pos: Position): (?String, String) {
     }
     // local 必须是 NCName：不得再含 ':'
     for (r in l.runes()) {
-        if (UInt32(r) == 0x3Au32) {
+        if (Int32(UInt32(r)) == CHAR_COLON) {
             throw XmlException(XmlError.NamespaceError(pos, "qualified name '${raw}' has multiple colons"))
         }
     }
@@ -121,7 +123,7 @@ func splitQName(raw: String, pos: Position): (?String, String) {
 private func findFirstColonByteOffset(raw: String): Int64 {
     var byteOff = 0
     for (r in raw.runes()) {
-        if (UInt32(r) == 0x3Au32) {
+        if (Int32(UInt32(r)) == CHAR_COLON) {
             return byteOff
         }
         byteOff += runeByteLen(r)
@@ -131,13 +133,13 @@ private func findFirstColonByteOffset(raw: String): Int64 {
 
 private func runeByteLen(r: Rune): Int64 {
     let cp = UInt32(r)
-    if (cp < 0x80u32) {
+    if (cp < UTF8_1BYTE_UPPER) {
         return 1
     }
-    if (cp < 0x800u32) {
+    if (cp < UTF8_2BYTE_UPPER) {
         return 2
     }
-    if (cp < 0x10000u32) {
+    if (cp < UTF8_3BYTE_UPPER) {
         return 3
     }
     return 4

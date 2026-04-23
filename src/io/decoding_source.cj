@@ -15,6 +15,11 @@ import cangjie_xml.core.*
 import cangjie_xml.encoding.*
 
 public class DecodingSource <: Resource {
+    /** 读缓冲大小：解码前一次性读入的字节数。4 KiB 取自常见 I/O 页面大小。 */
+    public static const READ_BUFFER_SIZE: Int64 = 4096
+    /** BOM 探测所需最大字节数：UTF-32 BOM 即 4 字节。 */
+    public static const BOM_PROBE_SIZE: Int64 = 4
+
     private let source: IoSource
     private let decoder: Decoder
     private let ownedSource: Bool
@@ -41,13 +46,13 @@ public class DecodingSource <: Resource {
         this.source = source
         this.ownedSource = ownedSource
         this.closed = false
-        this.readBuf = Array<Byte>(4096, repeat: 0u8)
+        this.readBuf = Array<Byte>(READ_BUFFER_SIZE, repeat: 0u8)
         this.eof = false
 
-        // 第一步：先读最多 4 字节用于 BOM / 启发式探测
-        let probe = Array<Byte>(4, repeat: 0u8)
+        // 第一步：先读最多 BOM_PROBE_SIZE 字节用于 BOM / 启发式探测
+        let probe = Array<Byte>(BOM_PROBE_SIZE, repeat: 0u8)
         var probeLen = 0
-        while (probeLen < 4) {
+        while (probeLen < BOM_PROBE_SIZE) {
             let n = source.read(probe[probeLen..])
             if (n <= 0) {
                 this.eof = true

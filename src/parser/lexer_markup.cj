@@ -33,7 +33,7 @@ extend Lexer {
         while (true) {
             let r = requirePeek("unterminated comment")
             let c = cp(r)
-            if (c == 0x2D /* '-' */ && peekIs2(0x2D, 0x2D)) {
+            if (c == CHAR_MINUS && peekIs2(CHAR_MINUS, CHAR_MINUS)) {
                 return finishComment(startPos, sb)
             }
             ensureXmlChar(c, r, "invalid XML character in comment")
@@ -47,7 +47,7 @@ extend Lexer {
         let dashPos = reader.currentPosition()
         let _ = reader.advance() // 消费第一个 '-'
         let _ = reader.advance() // 消费第二个 '-'
-        if (!reader.consumeIf(Rune(0x3Eu32))) {
+        if (!reader.consumeIf(Rune(UInt32(CHAR_GT)))) {
             throw XmlException(XmlError.Malformed(dashPos, "'--' is not allowed inside comment"))
         }
         return Token.Comment(startPos, sb.toString())
@@ -60,7 +60,7 @@ extend Lexer {
         while (true) {
             let r = requirePeek("unterminated CDATA section")
             let c = cp(r)
-            if (c == 0x5D /* ']' */ && peekIs3(0x5D, 0x5D, 0x3E)) {
+            if (c == CHAR_RBRACKET && peekIs3(CHAR_RBRACKET, CHAR_RBRACKET, CHAR_GT)) {
                 let _ = reader.advance()
                 let _ = reader.advance()
                 let _ = reader.advance()
@@ -93,23 +93,23 @@ extend Lexer {
         while (true) {
             let r = requirePeek("unterminated DOCTYPE")
             let c = cp(r)
-            if (!insideBrackets && c == 0x3E /* '>' */) {
+            if (!insideBrackets && c == CHAR_GT) {
                 let endPos = reader.currentPosition()
                 let _ = reader.advance()
                 pending.addLast(Token.DoctypeEnd(endPos))
                 return
             }
-            if (c == 0x5B /* '[' */ && !insideBrackets) {
+            if (c == CHAR_LBRACKET && !insideBrackets) {
                 insideBrackets = true
                 let _ = reader.advance()
                 continue
             }
-            if (c == 0x5D /* ']' */ && insideBrackets) {
+            if (c == CHAR_RBRACKET && insideBrackets) {
                 insideBrackets = false
                 let _ = reader.advance()
                 continue
             }
-            if (c == 0x22 || c == 0x27) {
+            if (c == CHAR_QUOTE || c == CHAR_APOS) {
                 skipQuotedStringInDoctype(c)
                 continue
             }
@@ -170,7 +170,7 @@ extend Lexer {
         while (true) {
             let r = requirePeek("unterminated processing instruction")
             let c = cp(r)
-            if (c == 0x3F /* '?' */ && peekIs2(0x3F, 0x3E)) {
+            if (c == CHAR_QMARK && peekIs2(CHAR_QMARK, CHAR_GT)) {
                 let _ = reader.advance()
                 let _ = reader.advance()
                 return Token.ProcessingInstruction(startPos, target, data.toString())

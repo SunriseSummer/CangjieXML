@@ -263,10 +263,13 @@ public class FileSource <: IoSource {
 
 /* ---------- 便利函数：读尽 ---------- */
 
+/** `readAll` 的一次性读缓冲区大小；与 DecodingSource 的主读缓冲一致（4 KiB 页面）。 */
+const READ_ALL_BUFFER_SIZE: Int64 = 4096
+
 /** 把 `IoSource` 读尽为字节数组。用于小文档 / 测试。 */
 public func readAll(source: IoSource): Array<Byte> {
     let acc = GrowableBuffer()
-    let buf = Array<Byte>(4096, repeat: 0u8)
+    let buf = Array<Byte>(READ_ALL_BUFFER_SIZE, repeat: 0u8)
     while (true) {
         let n = source.read(buf)
         if (n <= 0) {
