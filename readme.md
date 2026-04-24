@@ -6,7 +6,8 @@
 > 而是一次面向仓颉现代语言特性的重构复刻。
 
 设计详情见 [`DESIGN.md`](./DESIGN.md)，迭代节奏见 [`ROADMAP.md`](./ROADMAP.md)，
-开发进度见 [`progress.md`](./progress.md)。
+开发进度见 [`progress.md`](./progress.md)，
+完整 API 文档见 [`doc/`](./doc/README.md)。
 
 ---
 
