@@ -368,9 +368,9 @@ func docBuilderCdata(): Unit {
 // ----------------------------------------------------------------------
 // 08 Visit：walk + XmlVisitor
 // ----------------------------------------------------------------------
-class DocCounter { public var n: Int64 = 0 }
+class BookCounter { public var n: Int64 = 0 }
 
-class DocTitleBag { public let titles: ArrayList<String> = ArrayList<String>() }
+class TitleCollector { public let titles: ArrayList<String> = ArrayList<String>() }
 
 @Test
 func docVisitWalkCountsBooks(): Unit {
@@ -380,7 +380,7 @@ func docVisitWalkCountsBooks(): Unit {
             r.element("book") { b => b.attribute("id", "2").text("TAOCP") }
         }.build()
 
-    let count = DocCounter()
+    let count = BookCounter()
     walk(doc) { kind =>
         match (kind) {
             case Element(e) where e.name == "book" =>
@@ -400,7 +400,7 @@ func docVisitWalkCollectsTitles(): Unit {
             r.element("book") { b => b.text("TAOCP") }
         }.build()
 
-    let bag = DocTitleBag()
+    let bag = TitleCollector()
     walk(doc) { kind =>
         match (kind) {
             case Element(e) where e.name == "book" =>
