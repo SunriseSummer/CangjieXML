@@ -6,3 +6,4 @@ target/
 *.bc
 cjpm.lock
 .DS_Store
+excel/csv_out/

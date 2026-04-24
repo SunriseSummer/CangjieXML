@@ -1,0 +1,13 @@
+[package]
+  cjc-version = "1.0.5"
+  name = "xlsx_to_csv"
+  version = "0.1.0"
+  output-type = "executable"
+  description = "用 CangjieXML 解析 xlsx（OOXML）并把每个 sheet 导出为 CSV——验证 XML 库的真实能力。"
+  src-dir = "src"
+  target-dir = "target"
+
+[dependencies]
+  cangjie_xml = { path = "../.." }
+
+[test-dependencies]
