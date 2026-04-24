@@ -1,0 +1,16 @@
+# Build artifacts
+target/
+*.cjo
+*.cjvis
+*.cjfiles
+cjpm.lock
+
+# Editor / OS noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Stray executables (e.g. from cjpm run)
+/main
+
