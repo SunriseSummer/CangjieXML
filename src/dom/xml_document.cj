@@ -149,7 +149,7 @@ public class XmlDocument <: XmlNode {
      * 在顶层开头插入节点。其他约束同 `appendChild`。
      */
     public func prependChild(node: XmlNode): Unit {
-        checkTopLevelInsertable(node)
+        checkTopLevelInsertable(node, prepending: true)
         node.removeSelf()
         match (headChild) {
             case None => linkAtEnd(node)
@@ -226,7 +226,7 @@ public class XmlDocument <: XmlNode {
         tailChild = Some(node)
     }
 
-    private func checkTopLevelInsertable(node: XmlNode): Unit {
+    private func checkTopLevelInsertable(node: XmlNode, prepending!: Bool = false): Unit {
         match (node.kind()) {
             case Document(_) => throwDom("cannot insert XmlDocument into another XmlDocument")
             case Text(_) => throwDom("XmlText is not allowed at the document top-level")
@@ -253,7 +253,31 @@ public class XmlDocument <: XmlNode {
                     case Some(_) => throwDom("XmlDocument already has an XML declaration")
                     case None => ()
                 }
-            case _ => ()
+                // 位置约束：Declaration 必须是首个顶层节点。
+                // - `appendChild`：要求文档为空，否则 decl 会落在别的节点之后；
+                // - `prependChild`：允许——新 decl 会成为新 head。
+                if (!prepending && headChild.isSome()) {
+                    throwDom("XmlDeclaration must be the first top-level node; " +
+                        "use prependChild or insert the declaration before other nodes")
+                }
+            case _ =>
+                // 反向约束：若首个顶层节点是 Declaration，其他节点不得 prepend
+                // 到它之前——否则 Declaration 会不再是首节点，与 XML 规范冲突。
+                if (prepending && isFirstChildDeclaration()) {
+                    throwDom("cannot prepend a node before the XmlDeclaration; " +
+                        "declaration must remain the first top-level node")
+                }
+        }
+    }
+
+    /** 是否存在首个顶层节点，且它是 `XmlDeclaration`。供位置约束检查使用。 */
+    private func isFirstChildDeclaration(): Bool {
+        match (headChild) {
+            case None => false
+            case Some(h) => match (h.kind()) {
+                case Declaration(_) => true
+                case _ => false
+            }
         }
     }
 }

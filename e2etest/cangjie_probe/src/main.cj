@@ -20,12 +20,16 @@ import std.sort.*
  *   与 `01_bookstore.xml` 等价的文档 → write → 再 parse → 指纹。
  *   与 Python 对 `01_bookstore.xml` 的指纹严格一致才能通过。覆盖 Builder + DOM。
  *
+ * - `bytes`：把每个 fixture 读为字节 → `parseXmlBytes` → 走 `writeXmlToBytes` 再
+ *   `parseXmlBytes` → 指纹。覆盖 `io.parseXmlBytes` + `io.writeXmlToBytes` 的
+ *   字节级往返路径（与 `parse` 模式互补——后者走 `loadXmlFromFile`）。
+ *
  * 用法：`cangjie_probe <mode> <fixtures_dir> <out_path>`
  */
 main(args: Array<String>): Int64 {
     if (args.size < 3) {
         println("usage: cangjie_probe <mode> <fixtures_dir> <out_path>")
-        println("  modes: parse | roundtrip-pretty | roundtrip-compact | builder")
+        println("  modes: parse | roundtrip-pretty | roundtrip-compact | builder | bytes")
         return 2
     }
     let mode = args[0]
@@ -36,6 +40,7 @@ main(args: Array<String>): Int64 {
         case "parse"              => renderAllFixtures(fixturesDir, ModeParse)
         case "roundtrip-pretty"   => renderAllFixtures(fixturesDir, ModeRoundTripPretty)
         case "roundtrip-compact"  => renderAllFixtures(fixturesDir, ModeRoundTripCompact)
+        case "bytes"              => renderAllFixtures(fixturesDir, ModeBytesRoundTrip)
         case "builder"            => renderBuilderFixtures()
         case _ =>
             println("error: unknown mode '${mode}'")

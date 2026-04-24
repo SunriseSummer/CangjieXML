@@ -12,10 +12,19 @@ package cangjie_xml.dom
  * - 属性值一律以原始 `String` 形态保存；类型化访问（`intAttribute` 等）作为
  *   Query 层（M4）的扩展函数提供。
  *
- * `name` 与 `value` 均为 `var`，便于现场修改而无需替换整个属性对象。
+ * `value` 为 `var`，允许就地改值；`name` 为 `let`（见字段注释）。
  */
 public class XmlAttribute {
-    public var name: String
+    /**
+     * 属性名不可就地修改——原因见下方注释块。改名请走"`removeAttribute(oldName)`
+     * + `setAttribute(newName, value)`"，以保持 `XmlElement` 内部的 `attrIndex`
+     * 与 `attrOrder` 两份结构同步。
+     *
+     * 曾经把 `name` 做成 `var`，会引入一个隐蔽 bug：用户在拿到 `XmlAttribute` 引用
+     * 后直接 `attr.name = "x"`，`attrIndex` 的 key 仍是旧名，下一次 `attribute("x")`
+     * 读不到值。没有强制不可变就没有办法在 DOM 层代价可接受地挡住这条路。
+     */
+    public let name: String
     public var value: String
 
     public init(name: String, value: String) {

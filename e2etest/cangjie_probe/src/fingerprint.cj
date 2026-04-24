@@ -8,11 +8,12 @@ import cangjie_xml.io.*
 import cangjie_xml.parser.*
 import cangjie_xml.writer.*
 
-/** Probe 的四种运行模式——影响 `loadForFingerprint` 走哪条库路径。 */
+/** Probe 的五种运行模式——影响 `loadForFingerprint` 走哪条库路径。 */
 enum ProbeMode {
     | ModeParse
     | ModeRoundTripPretty
     | ModeRoundTripCompact
+    | ModeBytesRoundTrip
     | ModeBuilder
 }
 
@@ -48,6 +49,14 @@ func loadDocForMode(path: String, mode: ProbeMode): XmlDocument {
         case ModeParse => loadXmlFromFile(path)
         case ModeRoundTripPretty => roundTrip(loadXmlFromFile(path), XmlWriteOptions.default_())
         case ModeRoundTripCompact => roundTrip(loadXmlFromFile(path), XmlWriteOptions.compactPreset())
+        case ModeBytesRoundTrip =>
+            // 走 bytes 专用 API：parseXmlBytes → writeXmlToBytes → parseXmlBytes。
+            // 和 `roundtrip-*` 的区别在于两端都用字节 API——覆盖 io 包里从
+            // `Array<Byte>` 进出的路径（HTTP / DB / 嵌入资源场景）。
+            let raw = File.readFrom(Path(path))
+            let parsed = parseXmlBytes(raw)
+            let serialized = writeXmlToBytes(parsed, XmlWriteOptions.compactPreset())
+            parseXmlBytes(serialized)
         case ModeBuilder =>
             // `builder` 模式不应通过本函数——由 `renderBuilderFixtures` 直接调用。
             throw Exception("loadDocForMode called with ModeBuilder (internal error)")

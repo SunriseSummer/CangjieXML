@@ -49,10 +49,12 @@ python3 "${SCRIPT_DIR}/python_probe/probe.py" "${FIXTURES_DIR}" "${OUT_DIR}/pyth
 # - roundtrip-pretty   ：parse → write(default pretty) → parse → fingerprint
 # - roundtrip-compact  ：parse → write(compact) → parse → fingerprint
 # - builder            ：XmlDocumentBuilder 构造 01_bookstore → 写 → 解析 → 指纹
-echo "[e2e] (4/5) running cangjie probes (parse / roundtrip-pretty / roundtrip-compact / builder)"
+# - bytes              ：parseXmlBytes → writeXmlToBytes → parseXmlBytes → 指纹
+echo "[e2e] (4/5) running cangjie probes (parse / roundtrip-pretty / roundtrip-compact / bytes / builder)"
 "${PROBE_BIN}" parse              "${FIXTURES_DIR}" "${OUT_DIR}/cangjie.parse.json"
 "${PROBE_BIN}" roundtrip-pretty   "${FIXTURES_DIR}" "${OUT_DIR}/cangjie.roundtrip_pretty.json"
 "${PROBE_BIN}" roundtrip-compact  "${FIXTURES_DIR}" "${OUT_DIR}/cangjie.roundtrip_compact.json"
+"${PROBE_BIN}" bytes              "${FIXTURES_DIR}" "${OUT_DIR}/cangjie.bytes.json"
 "${PROBE_BIN}" builder            "${FIXTURES_DIR}" "${OUT_DIR}/cangjie.builder.json"
 
 # --- 5. diff --------------------------------------------------------------
@@ -61,5 +63,6 @@ echo "[e2e] (5/5) diffing fingerprints"
 python3 "${SCRIPT_DIR}/diff.py" "${OUT_DIR}/python.json" "${OUT_DIR}/cangjie.parse.json"            --label parse
 python3 "${SCRIPT_DIR}/diff.py" "${OUT_DIR}/python.json" "${OUT_DIR}/cangjie.roundtrip_pretty.json"  --label roundtrip-pretty
 python3 "${SCRIPT_DIR}/diff.py" "${OUT_DIR}/python.json" "${OUT_DIR}/cangjie.roundtrip_compact.json" --label roundtrip-compact
+python3 "${SCRIPT_DIR}/diff.py" "${OUT_DIR}/python.json" "${OUT_DIR}/cangjie.bytes.json"             --label bytes
 python3 "${SCRIPT_DIR}/diff.py" "${OUT_DIR}/python.json" "${OUT_DIR}/cangjie.builder.json"           --label builder --subset
 
