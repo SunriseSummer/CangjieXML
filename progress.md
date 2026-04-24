@@ -15,10 +15,10 @@
 | M3 | Parser | ✅ 已完成 | 迭代 3（阶段 B） |
 | M4 | Query + Builder | ✅ 已完成 | 迭代 4 |
 | M5 | Visit | ✅ 已完成 | 迭代 5 |
-| M6 | IO + Error 收口 | ✅ 已完成 | **迭代 6（本次）** |
+| M6 | IO + Error 收口 | ✅ 已完成 | 迭代 6 |
 | M6 | IO + Error + Options 收口 | ✅ 已完成 | 迭代 6 |
-| M7 | Batch / Concurrency | ⏳ 未开始 | |
-| M8 | 回归 / 基准 / 发布 | ⏳ 未开始 | |
+| M7 | Batch / Concurrency | ⛔ 跳过 | 与 DOM 单线程契约冲突，后续大版本再议 |
+| M8 | 回归 / E2E / 发布 | ✅ 已完成 | **迭代 7（本次）** |
 
 ---
 
@@ -493,3 +493,51 @@ public class FileXmlSink <: XmlSink & Resource {
 2. 跨 6 次迭代的 119 个测试积累需要一次整合——基准数据、压力样例、正式 release 流程是"交付"层的最后一公里。
 3. 并发模型（M7）与 DESIGN §4 的"DOM 不承诺线程安全"约定冲突，硬做会膨胀 API 面；更合适的处理是放到后续大版本。
 
+
+### 5.8 M8 回归 + E2E（迭代 7）
+
+#### 5.8.1 新增 `e2etest/` 端到端验收
+
+- `e2etest/fixtures/generate.py` —— Python 用 `xml.etree` 生成 10 份典型 XML（目录/配置/深嵌套/Unicode/实体/混合内容/自闭合/RSS/无声明/CDATA）。
+- `e2etest/python_probe/probe.py` —— Python 侧指纹 extractor，`xml.etree` 解析后规约成结构化 JSON。
+- `e2etest/cangjie_probe/` —— 独立 cjpm 项目，通过 `path = "../.."` 引用本库，`loadXmlFromFile` 解析后导出同一份 JSON 形状。
+- `e2etest/diff.py` —— 两侧 JSON 逐字段 diff，任何差异即 fail。
+- `e2etest/run.sh` —— 一键入口：生成 → 构建仓颉 probe → 跑两端 → diff，任意步骤非 0 立即失败。
+- `e2etest/README.md` —— 指纹设计、覆盖的 10 份 fixture、失败排查。
+
+#### 5.8.2 指纹（fingerprint）
+
+```
+{ file, declaration_present, root, total_elements,
+  elements: [{ path: "root[0]/child[i]/...", depth, name,
+               attrs: <sorted>, text: <normalized direct text> }] }
+```
+
+- `path` 按"同名兄弟序号"编址——两端都算得出、稳定、可读。
+- `attrs` 排序字典序——规避"保源序与否"的平台抖动。
+- `text` 只取直接文本（Python = `text + 各孩子 tail`，仓颉 = 直接 `XmlText` 子节点 `.value` 拼接），空白规范化。
+- CDATA 归一为普通文本——两侧都走文本分支。
+
+#### 5.8.3 迭代中真实捕获到的 bug
+
+**Bug**（**e2etest 自身**的 probe 代码，非主库）：`normalizeWhitespace` / `jsonEscape` 最初按字节遍历、把非特殊字节重造成 `Rune(UInt32(b))`，导致每个 UTF-8 续字节被当成独立码点，`算法导论` 被重写成 Latin-1 伪字符。**修复**：非特殊字节直接复制进 `ArrayList<Byte>`，最后 `String.fromUtf8` 一次性重建——通用规则：**按字节扫描的逻辑不应反向构造 `Rune`**。主库自身通过 10/10 指纹一致证明了 UTF-8 往返正确。
+
+**顺手修**：`src/io/file_xml_sink.cj` 的 `import cangjie_xml.dom.*` 属实未用，移除。
+
+#### 5.8.4 最终质量门禁
+
+| 门禁 | 状态 |
+|---|---|
+| `cjpm build` | ✅ |
+| `cjpm test` | ✅ **119/119**（0 FAILED，0 ERROR） |
+| `bash e2etest/run.sh` | ✅ `[PASS] all 10 fixtures produce identical fingerprints` |
+| 单文件 ≤ 300 行 | ✅（`fingerprint.cj` 196 行为 e2e 最长；主库最长 298） |
+| 无下划线前缀 | ✅ |
+| 常量化 / 无魔鬼数字 | ✅ |
+| 零运行时三方依赖 | ✅（e2etest 脚本仅用 Python 标准库） |
+
+### 5.9 收尾
+
+到此 M0–M6 全链路贯通，M8 的 e2e 验收作为"可用性证明"一次性通过。**M7 并发**与 DESIGN §4 的"DOM 不承诺线程安全"约定冲突，并非 tinyxml2 公共 API 的一部分，按约定跳过——后续若有专门的线程安全子类（`XmlThreadSafeDocument`）需求再另开分支。
+
+CangjieXML 可以作为 **0.1.0** 候选发布版推进——tag 动作由维护方在 PR 合入后触发。

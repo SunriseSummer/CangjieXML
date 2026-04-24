@@ -2,7 +2,6 @@ package cangjie_xml.io
 
 import std.fs.*
 import std.io.*
-import cangjie_xml.dom.*
 import cangjie_xml.error.*
 import cangjie_xml.writer.*
 

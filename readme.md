@@ -21,9 +21,14 @@
 | M4 Query + Builder | ✅ |
 | M5 Visit     | ✅ |
 | M6 IO        | ✅ |
+| M8 E2E       | ✅ 10/10 fixture 与 Python `xml.etree` 指纹一致 |
 | 质量红线（单文件 ≤ 300 行 / 无下划线前缀 / 常量化 / 低圈复杂度） | ✅ |
 
-读写循环已闭合，类型化查询、Builder DSL、访问者/函数式遍历、文件/字节 IO 均已就绪。测试 **119/119 通过**。
+读写循环已闭合，类型化查询、Builder DSL、访问者/函数式遍历、文件/字节 IO、
+以及对照 Python 标准库的端到端验收均已就绪。**单元测试 119/119 通过，
+e2e 10/10 fixture 指纹与 Python `xml.etree` 完全一致。**
+
+> 端到端对照跑法：`bash e2etest/run.sh`。见 [`e2etest/README.md`](./e2etest/README.md)。
 
 ---
 
