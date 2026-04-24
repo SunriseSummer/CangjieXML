@@ -1,6 +1,6 @@
 # CangjieXML 开发进度
 
-> 相对 [libxml2 v2.15.3](./.libxml2-2.15.3) 全量功能的实现情况。最新更新：迭代 10 结束（Phase 5b —— `writer.XmlWriter` 推式 API：面向 `IoSink` + 元素栈不变量）。
+> 相对 [libxml2 v2.15.3](./.libxml2-2.15.3) 全量功能的实现情况。最新更新：迭代 11 结束（Phase 4c —— `reader.XmlReader`：拉式游标 API，基于 `XmlParser` 的 SaxEvent 流）。
 
 ---
 
@@ -12,7 +12,7 @@
 | 1 | `core` 基础设施 | `chvalid`、`xmlstring`、`buf`、`dict`、`hash`、`error`、`uri` | ✅ 已完成 |
 | 2 | `encoding` + `io` | `encoding.c`、`xmlIO.c` | ✅ 已完成 |
 | 3 | `parser` 词法 + 事件流 | `parser.c`、`parserInternals.c` | 🟢 词法 + 语法骨架已完成（Phase 3a+3b），容错模式 + 外部实体留待 Phase 3c |
-| 4 | `tree` + `sax` + `reader` | `tree.c`、`SAX2.c`、`xmlreader.c` | 🟢 只读 DOM + DocumentBuilder 完成（Phase 4a），变更 API / XmlReader / 验证器留待 Phase 4b+ |
+| 4 | `tree` + `sax` + `reader` | `tree.c`、`SAX2.c`、`xmlreader.c` | 🟢 只读 DOM + DocumentBuilder（Phase 4a）+ 拉式 `XmlReader`（Phase 4c）完成；变更 API / `SaxHandler` 留待 Phase 4b / 4d |
 | 5 | `writer` + `save` | `xmlwriter.c`、`xmlsave.c` | 🟢 `DocumentSerializer`（5a）+ `XmlWriter` 推式 API（5b）已完成；黄金对比 / 作用域跟踪留待后续 |
 | 6 | `xpath` | `xpath.c` | ⬜ 未开始 |
 | 7 | `regexp` + `pattern` + `dtd` | `valid.c`、`xmlregexp.c`、`pattern.c` | ⬜ 未开始 |
@@ -23,7 +23,7 @@
 | 12 | 工具链与发布 | `xmllint.c`、`xmlcatalog.c` | ⬜ 未开始 |
 | 13 | 硬化与优化 | `runtest.c`、`fuzz/` | ⬜ 未开始 |
 
-**粗略完成度**：核心功能 ≈ 42%（Phase 1 基础设施 + Phase 2 字符编解码 / I/O + Phase 3a 词法器 + Phase 3b XmlParser 骨架 + Phase 4a 只读 DOM + DocumentBuilder + Phase 5a 基础序列化器 + Phase 5b 推式 XmlWriter；不含容错模式 / 外部实体 / DOM 变更 API / XmlReader / 验证器 / 工具链）。
+**粗略完成度**：核心功能 ≈ 45%（Phase 1 基础设施 + Phase 2 字符编解码 / I/O + Phase 3a 词法器 + Phase 3b XmlParser 骨架 + Phase 4a 只读 DOM + DocumentBuilder + Phase 4c XmlReader + Phase 5a 基础序列化器 + Phase 5b 推式 XmlWriter；不含容错模式 / 外部实体 / DOM 变更 API / SaxHandler / 验证器 / 工具链）。
 
 ---
 
@@ -727,3 +727,114 @@ XmlWriter(sink: IoSink, opts!: WriterOptions = WriterOptions())
 - Phase 4c：`SaxHandler` / `XmlReader`；
 - Phase 5c：`writer.NamespaceScope`（写时作用域跟踪，与 save / 未来 C14N 共用）；
 - Phase 3c：容错 + 外部实体 + W3C `xmltest` 黄金对比。
+
+---
+
+## 已实现（迭代 11 — Phase 4c：拉式 `XmlReader`）
+
+### 背景
+
+> Phase 3b 提供了 `XmlParser: Iterator<SaxEvent>`（推 / 迭代器模式）。
+> Phase 4a 提供了 `DocumentBuilder: Iterator<SaxEvent> → Document`（物化）。
+> 本迭代补上 **"拉式游标"**：.NET `XmlReader` / libxml2 `xmlTextReader` 风格
+> —— 调用方 `read()` 前进一步，用字段查询当前节点。与事件迭代器相比，
+> `XmlReader` 更贴合"按需深入子树 / 跳过子树"的场景（如 RSS/Atom 聚合、
+> 配置文件定点提取），也是"零材料化流式解析"的主接口。
+
+### 新增子包：`cangjie_xml.reader`（3 个源文件 + 1 个测试文件，均 ≤ 300 行）
+
+| 文件 | 行数 | 内容 |
+| --- | --- | --- |
+| `src/reader/reader_types.cj` | 110 | `ReaderNodeType`（13 态）+ `ReaderState`（5 态），`Equatable`/`ToString` |
+| `src/reader/xml_reader.cj` | 230 | `XmlReader` 主类：字段、静态构造、状态查询、名字 / 属性游标 API、包级桥接 |
+| `src/reader/xml_reader_ops.cj` | 240 | `extend XmlReader`：`runRead` / `runSkip` + 深度调整 + 名字 / 值派生 + 异常拦截 |
+| `src/reader/xml_reader_test.cj` | 270 | 25 条单元测试 |
+
+### 公开 API
+
+```cangjie
+// 构造
+XmlReader.fromString(s, opts)
+XmlReader.fromParser(existingParser)
+
+// 前进
+read(): Bool                // true = 还有节点；false = EOF 或错误
+skip(): Bool                // 跳过当前元素的子树，停在配对 EndElement
+
+// 状态
+readerState(): ReaderState
+isClosed(): Bool
+isEof(): Bool
+depth(): Int64              // 当前嵌套深度；根元素 = 0
+isEmptyElement(): Bool      // 当前 Element 是否是 <a/> 形态
+nodeType(): ReaderNodeType
+position(): Position
+
+// 名字 / 值
+localName() / prefix() / namespaceUri() / name()
+value() / hasValue()
+
+// 属性游标（不消费事件，只切换内部 cursor）
+hasAttributes(): Bool
+attributeCount(): Int64
+moveToAttribute(i)
+moveToAttribute(localName, uri?)
+moveToFirstAttribute() / moveToNextAttribute() / moveToElement()
+
+// 生命周期
+close()
+```
+
+### 关键设计决策
+
+1. **单事件预读** — 内部只保留 `peeked: ?SaxEvent` 一个 slot，用于两件事：
+   (a) **空元素检测**：`StartElement` 后窥视一步，若下一事件是 `EndElement`
+   则 `emptyElement = true`，后续 `read()` 会静默消费这个配对 EndElement；
+   (b) **延迟结算深度**：对 `EndElement` 与空 `Element` 的深度在"下一次 read"
+   开始时处理，保证当前节点报告的 `depth` 正确。不做任意回放，内存恒定。
+2. **属性是"虚拟节点"** — `moveToAttribute` 只切换 `attrCursor: Int64`
+   字段，不消费 SaxEvent；这期间 `nodeType` 暂时返回 `Attribute`，
+   `localName` / `value` / `namespaceUri` 从宿主 `StartElement` 的
+   `Array<Attribute>` 中查出。`read()` 会重置 `attrCursor = -1`。
+3. **`Whitespace` 自动识别** — Parser 产出的 `Characters` 若内容全为
+   XML 1.0 §2.3 定义的空白（`#x20 | #x9 | #xD | #xA`），`nodeType`
+   报告为 `Whitespace` 而不是 `Text`。这是 `XmlReader` 的常规行为：
+   便于下游按空白跳过（混合内容解析场景）。
+4. **错误处理** — 两层：(a) 若 parser 抛 `XmlException`（如非良构）
+   在 `pullEvent` 包一层 try-catch，把 `state` 置 `Error` 再上抛；
+   (b) 若 parser 以 `ParseError` 事件透传（recover 模式，本迭代尚未开启），
+   入 `runRead` 立即抛并置 `Error`。`Error`/`Closed`/`EndOfFile`
+   之后的 `read()` 返回 false 且不重入 parser。
+5. **不实现 `readInnerXml` / `readOuterXml`** — 二者需要和序列化器联动
+   （从当前光标位置重新序列化子树）。留待下一迭代（Phase 4c+）补上，
+   可复用 `save.DocumentSerializer`。
+6. **主类 + extend 桥接** — 沿用 parser / save / writer 的约定。
+
+### 新增测试（25 条）
+
+- 基础遍历（9）：初始状态 / 自闭合 / `<a>text</a>` / 三层嵌套深度 / 混合内容 /
+  CDATA / Comment / PI / Whitespace-vs-Text
+- 属性游标（4）：index 顺序 / 按名字 / 越界 / name+prefix+uri 派生
+- skip（3）：子树跳过 / 空元素等价 `read()` / 非 Element 上等价 `read()`
+- 生命周期（2）：close / EOF 重复调用
+- 错误（1）：非良构触发 `XmlException` + state=Error
+- 其它（6）：fromParser / XmlDeclaration / Doctype / position / 属性游标在
+  read 时自动复位 / 实体引用自动展开
+
+### 验证
+
+- `cjpm build` 干净（无错、仅历史 unused-function 警告）；
+- `cjpm test` **322 / 322** 全绿（297 旧 + 25 新）；
+- 所有新文件 ≤ 300 行；
+- 主类 / extend 无字段改写冲突。
+
+### 下一步（候选）
+
+- Phase 4b：DOM 变更 API（`appendChild` / `removeChild` / `replaceChild` +
+  `detached` 不变量）；
+- Phase 4d：`SaxHandler` / `DefaultSaxHandler`（推式回调接口，配合 `XmlReader`
+  或 `DocumentBuilder` 双向转接）；
+- Phase 4c+：`XmlReader.readInnerXml` / `readOuterXml` + `readSubtree`
+  （复用 `DocumentSerializer`）；
+- Phase 5c：共享 NamespaceScope 跟踪器（C14N 预埋）；
+- Phase 3c：容错模式 + 外部实体 + W3C xmltest 黄金对比。
