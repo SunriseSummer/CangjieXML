@@ -1,0 +1,91 @@
+package cangjie_xml.dom
+
+/**
+ * `XmlElement` 属性相关 API。
+ *
+ * 通过 `extend` 植回 `XmlElement`，与主文件解耦以满足"单文件 ≤ 300 行"的
+ * 工程红线。所有方法语义与 DESIGN §6.2 一致，仅作位置迁移。
+ */
+extend XmlElement {
+
+    /** 查找指定名称的属性值；不存在返回 `None`。 */
+    public func attribute(name: String): ?String {
+        match (attrIndex.get(name)) {
+            case Some(a) => Some(a.value)
+            case None => None
+        }
+    }
+
+    /**
+     * 判断属性是否存在；若传入 `value`，则同时比较值。
+     *
+     * - `hasAttribute("id")`：仅检查属性是否存在。
+     * - `hasAttribute("id", value: Some("1"))`：同时要求值等于 `"1"`。
+     */
+    public func hasAttribute(name: String, value!: ?String = None): Bool {
+        match (attrIndex.get(name)) {
+            case None => false
+            case Some(a) => matchValue(a.value, value)
+        }
+    }
+
+    /**
+     * 新增或覆盖属性。同名属性按"后写覆盖"语义处理，不改变属性插入顺序。
+     */
+    public func setAttribute(name: String, value: String): Unit {
+        match (attrIndex.get(name)) {
+            case Some(a) => a.value = value
+            case None =>
+                let attr = XmlAttribute(name, value)
+                attrOrder.add(attr)
+                attrIndex[name] = attr
+        }
+    }
+
+    /**
+     * 删除指定名称的属性。
+     *
+     * - 成功删除返回 `true`；
+     * - 属性不存在返回 `false`。
+     */
+    public func removeAttribute(name: String): Bool {
+        match (attrIndex.remove(name)) {
+            case None => false
+            case Some(_) =>
+                removeFromOrderList(name)
+                true
+        }
+    }
+
+    /** 以插入顺序遍历所有属性。 */
+    public func attributes(): Iterable<XmlAttribute> {
+        attrOrder
+    }
+
+    /** 当前元素的属性数量。 */
+    public func attributeCount(): Int64 {
+        attrOrder.size
+    }
+
+    /** 从顺序数组移除指定名称——抽取独立辅助以降低 `removeAttribute` 圈复杂度。 */
+    private func removeFromOrderList(name: String): Unit {
+        var i = 0
+        while (i < attrOrder.size) {
+            if (attrOrder[i].name == name) {
+                attrOrder.remove(at: i)
+                return
+            }
+            i++
+        }
+    }
+}
+
+/**
+ * 辅助：把 `hasAttribute` 的可选值比较从 match 中提出，避免主路径嵌套。
+ */
+func matchValue(actual: String, expected: ?String): Bool {
+    match (expected) {
+        case None => true
+        case Some(v) => actual == v
+    }
+}

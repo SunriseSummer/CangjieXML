@@ -1,0 +1,13 @@
+[package]
+  cjc-version = "1.0.5"
+  name = "cangjie_probe"
+  version = "0.1.0"
+  output-type = "executable"
+  description = "E2E probe — parse fixtures with cangjie_xml and emit a fingerprint JSON for diff."
+  src-dir = "src"
+  target-dir = "target"
+
+[dependencies]
+  cangjie_xml = { path = "../.." }
+
+[test-dependencies]
