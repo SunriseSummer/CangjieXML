@@ -1,6 +1,6 @@
 # CangjieXML 开发进度
 
-> 相对 [libxml2 v2.15.3](./.libxml2-2.15.3) 全量功能的实现情况。最新更新：迭代 11 结束（Phase 4c —— `reader.XmlReader`：拉式游标 API，基于 `XmlParser` 的 SaxEvent 流）。
+> 相对 [libxml2 v2.15.3](./.libxml2-2.15.3) 全量功能的实现情况。最新更新：迭代 12 结束（Phase 4d —— `parser.SaxHandler` 推式回调接口 + `SaxDriver`）。
 
 ---
 
@@ -12,7 +12,7 @@
 | 1 | `core` 基础设施 | `chvalid`、`xmlstring`、`buf`、`dict`、`hash`、`error`、`uri` | ✅ 已完成 |
 | 2 | `encoding` + `io` | `encoding.c`、`xmlIO.c` | ✅ 已完成 |
 | 3 | `parser` 词法 + 事件流 | `parser.c`、`parserInternals.c` | 🟢 词法 + 语法骨架已完成（Phase 3a+3b），容错模式 + 外部实体留待 Phase 3c |
-| 4 | `tree` + `sax` + `reader` | `tree.c`、`SAX2.c`、`xmlreader.c` | 🟢 只读 DOM + DocumentBuilder（Phase 4a）+ 拉式 `XmlReader`（Phase 4c）完成；变更 API / `SaxHandler` 留待 Phase 4b / 4d |
+| 4 | `tree` + `sax` + `reader` | `tree.c`、`SAX2.c`、`xmlreader.c` | 🟢 只读 DOM + DocumentBuilder（Phase 4a）+ 拉式 `XmlReader`（Phase 4c）+ 推式 `SaxHandler`/`SaxDriver`（Phase 4d）完成；变更 API 留待 Phase 4b |
 | 5 | `writer` + `save` | `xmlwriter.c`、`xmlsave.c` | 🟢 `DocumentSerializer`（5a）+ `XmlWriter` 推式 API（5b）已完成；黄金对比 / 作用域跟踪留待后续 |
 | 6 | `xpath` | `xpath.c` | ⬜ 未开始 |
 | 7 | `regexp` + `pattern` + `dtd` | `valid.c`、`xmlregexp.c`、`pattern.c` | ⬜ 未开始 |
@@ -23,7 +23,7 @@
 | 12 | 工具链与发布 | `xmllint.c`、`xmlcatalog.c` | ⬜ 未开始 |
 | 13 | 硬化与优化 | `runtest.c`、`fuzz/` | ⬜ 未开始 |
 
-**粗略完成度**：核心功能 ≈ 45%（Phase 1 基础设施 + Phase 2 字符编解码 / I/O + Phase 3a 词法器 + Phase 3b XmlParser 骨架 + Phase 4a 只读 DOM + DocumentBuilder + Phase 4c XmlReader + Phase 5a 基础序列化器 + Phase 5b 推式 XmlWriter；不含容错模式 / 外部实体 / DOM 变更 API / SaxHandler / 验证器 / 工具链）。
+**粗略完成度**：核心功能 ≈ 47%（Phase 1 基础设施 + Phase 2 字符编解码 / I/O + Phase 3a 词法器 + Phase 3b XmlParser 骨架 + Phase 4a 只读 DOM + DocumentBuilder + Phase 4c XmlReader + Phase 4d SaxHandler/SaxDriver + Phase 5a 基础序列化器 + Phase 5b 推式 XmlWriter；不含容错模式 / 外部实体 / DOM 变更 API / 验证器 / 工具链）。
 
 ---
 
@@ -837,4 +837,109 @@ close()
 - Phase 4c+：`XmlReader.readInnerXml` / `readOuterXml` + `readSubtree`
   （复用 `DocumentSerializer`）；
 - Phase 5c：共享 NamespaceScope 跟踪器（C14N 预埋）；
+- Phase 3c：容错模式 + 外部实体 + W3C xmltest 黄金对比。
+
+---
+
+## 已实现（迭代 12 — Phase 4d：推式 `SaxHandler` / `SaxDriver`）
+
+### 背景
+
+至此 CangjieXML 已经有两种事件消费方式：
+- `XmlParser: Iterator<SaxEvent>` —— 主动拉 + 模式匹配；
+- `XmlReader` —— 拉式游标 + 字段查询。
+
+但对"一次性走完文档，只处理关心的几类节点"的脚本化场景（SAX filter、
+文档摘要提取、配置扫描），上述两种都需要用户自己写事件循环和 `match`。
+libxml2 的 `xmlSAXHandler` / Java SAX2 `ContentHandler` 提供了第三种更简
+洁的模式 —— **推式回调**。本迭代补上这一块。
+
+### 新增（1 个源文件 + 1 个测试文件）
+
+| 文件 | 行数 | 内容 |
+| --- | --- | --- |
+| `src/parser/sax_handler.cj` | 165 | `interface SaxHandler` + `open class DefaultSaxHandler` + `class SaxDriver` |
+| `src/parser/sax_handler_test.cj` | 240 | 16 条单元测试 |
+
+### 公开 API
+
+```cangjie
+public interface SaxHandler {
+    func startDocument(decl: XmlDecl): Unit
+    func endDocument(pos: Position): Unit
+    func startElement(pos, name, attrs, ns): Unit
+    func endElement(pos, name): Unit
+    func characters(pos, text): Unit
+    func cdata(pos, text): Unit
+    func comment(pos, text): Unit
+    func processingInstruction(pos, target, data): Unit
+    func doctype(pos, name): Unit
+    func entityReference(pos, name): Unit
+    /** 返回 true 继续；false 让 driver 早退。默认实现抛 XmlException。 */
+    func parseError(err: XmlError): Bool
+}
+
+public open class DefaultSaxHandler <: SaxHandler { /* 全部空实现 */ }
+
+public class SaxDriver {
+    public static func drive(events: Iterator<SaxEvent>, handler: SaxHandler): Unit
+    public static func parseString(s: String, handler: SaxHandler, opts!: ParserOptions = ParserOptions()): Unit
+}
+```
+
+### 使用示例
+
+```cangjie
+class CharCollector <: DefaultSaxHandler {
+    let buf = StringBuilder()
+    public override func characters(pos: Position, text: String): Unit {
+        buf.append(text)
+    }
+}
+
+let c = CharCollector()
+SaxDriver.parseString("<a>x<b>y</b>z</a>", c)
+// c.buf.toString() == "xyz"
+```
+
+### 关键设计决策
+
+1. **`interface` + `open class` 组合**：Cangjie 的接口不能给默认方法体，
+   所以把"空实现 + 全 `open`"的缺省放到一个 open class 里。用户只需继承
+   `DefaultSaxHandler` 然后覆写感兴趣的方法，无需实现全部 11 个回调。
+2. **`parseError` 的语义**：返回 `Bool`。`true` 表示继续消费后续事件，
+   `false` 表示 driver 立即停止（相当于中途 return）。`DefaultSaxHandler`
+   的缺省行为是**抛出** `XmlException`，和 parser 非容错模式保持一致：
+   "什么都不写的 handler"遇到错误不会静默吞掉。
+3. **driver 不包 try-catch**：parser 本身抛的 `XmlException` 直接透传给
+   `drive()` 的调用方；handler 抛的异常同样透传。语义上 driver 只是线性
+   分发器，不接管错误处理策略。
+4. **线程/重入**：driver 不缓存状态，无保护；多线程中每线程一个 driver 即可。
+   不支持 handler 内重入同一 driver（handler 要重入解析请自己 `XmlParser`
+   重开）。
+5. **`Position` 来源于 `SaxEvent`**：driver 在 `dispatch` 中把 `SaxEvent` 的
+   各字段拆开传给回调，不额外计算，零拷贝。
+
+### 新增测试（16 条）
+
+- 契约与基本流程（4）：空 handler 可吃完整文档 / 元素序列 / 嵌套顺序 / 外部 parser 驱动
+- 各回调 smoke（5）：Characters / CDATA / Comment / PI / Doctype / 属性透传
+- 文档声明（1）：StartDocument 第一个回调、版本正确
+- 错误路径（2）：默认 parseError 抛出 + 覆写 parseError 仍因 parser 直接抛透传
+- handler 控制流（2）：handler 抛异常透传 / 仅覆写 `characters` 做字符串采集
+- 接口参数（1）：`parseString` 支持 `ParserOptions`
+- 属性计数（1）：`start(a,N)` 的 `N` 是属性数量
+
+### 验证
+
+- `cjpm build` 干净（历史 unused-function 警告不动）；
+- `cjpm test` **338 / 338** 全绿（322 旧 + 16 新）；
+- 所有新文件 ≤ 300 行。
+
+### 下一步（候选）
+
+- Phase 4b：DOM 变更 API（`appendChild` / `removeChild` / `replaceChild`
+  + `detached` 不变量）；
+- Phase 4c+：`XmlReader.readInnerXml` / `readOuterXml` / `readSubtree`；
+- Phase 5c：共享 `NamespaceScope` 跟踪器（C14N 预埋）；
 - Phase 3c：容错模式 + 外部实体 + W3C xmltest 黄金对比。
