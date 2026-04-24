@@ -270,3 +270,169 @@ func testChildElementsFilterByName(): Unit {
     }
     @Expect(n, 2)
 }
+
+// ====================================================================
+// 覆盖率补充：XmlNode equals/notEquals、element children 边界、
+// element firstChild/lastChild、isEmpty、跨文档、类型约束。
+// ====================================================================
+
+@Test
+func testXmlNodeIdentityOperators(): Unit {
+    let doc = XmlDocument()
+    let a = doc.createElement("a")
+    let b = doc.createElement("a")
+    @Expect(a == a, true)
+    @Expect(a != b, true)
+    @Expect(a == b, false)
+    @Expect(a != a, false)
+}
+
+@Test
+func testXmlElementFirstLastChildAndIsEmpty(): Unit {
+    let doc = XmlDocument()
+    let r = doc.createElement("r")
+    doc.appendChild(r)
+    @Expect(r.isEmpty(), true)
+    @Expect(r.firstChild.isNone(), true)
+    @Expect(r.lastChild.isNone(), true)
+
+    let a = doc.createElement("a")
+    let b = doc.createElement("b")
+    r.appendChild(a)
+    r.appendChild(b)
+    @Expect(r.isEmpty(), false)
+    match (r.firstChild) {
+        case Some(n) => @Assert(refEq(n, a))
+        case None => @Fail("firstChild missing")
+    }
+    match (r.lastChild) {
+        case Some(n) => @Assert(refEq(n, b))
+        case None => @Fail("lastChild missing")
+    }
+}
+
+@Test
+func testPrependChildOnEmptyElementEquivalentToAppend(): Unit {
+    // 覆盖 prependChild 的 `headChild == None` 分支。
+    let doc = XmlDocument()
+    let r = doc.createElement("r")
+    doc.appendChild(r)
+    let c = doc.createElement("c")
+    r.prependChild(c)
+    @Expect(r.firstChildElement().getOrThrow().name, "c")
+}
+
+@Test
+func testInsertChildBeforeReferenceMustBeOwned(): Unit {
+    let doc = XmlDocument()
+    let r = doc.createElement("r")
+    doc.appendChild(r)
+    let alien = doc.createElement("alien") // 未挂接
+    let target = doc.createElement("t")
+    r.appendChild(target)
+    // 以非本元素子节点作为 reference 时抛错
+    let newChild = doc.createElement("n")
+    var threw = false
+    try {
+        r.insertChildBefore(alien, newChild)
+    } catch (_: XmlException) { threw = true }
+    @Expect(threw, true)
+}
+
+@Test
+func testRemoveChildReturnsFalseForNonChild(): Unit {
+    let doc = XmlDocument()
+    let r = doc.createElement("r")
+    doc.appendChild(r)
+    let alien = doc.createElement("alien")
+    @Expect(r.removeChild(alien), false)
+}
+
+@Test
+func testSelfInsertionRejected(): Unit {
+    let doc = XmlDocument()
+    let r = doc.createElement("r")
+    doc.appendChild(r)
+    var threw = false
+    try {
+        r.appendChild(r)
+    } catch (_: XmlException) { threw = true }
+    @Expect(threw, true)
+}
+
+@Test
+func testInsertingDocumentAsChildRejected(): Unit {
+    let doc = XmlDocument()
+    let r = doc.createElement("r")
+    doc.appendChild(r)
+    var threw = false
+    try {
+        r.appendChild(doc)
+    } catch (_: XmlException) { threw = true }
+    @Expect(threw, true)
+}
+
+@Test
+func testCrossDocumentAppendAtDocumentLevelRejected(): Unit {
+    let d1 = XmlDocument()
+    let d2 = XmlDocument()
+    // d2 的元素被尝试塞进 d1 的顶层
+    let alien = d2.createElement("a")
+    var threw = false
+    try {
+        d1.appendChild(alien)
+    } catch (_: XmlException) { threw = true }
+    @Expect(threw, true)
+}
+
+@Test
+func testDocumentFirstLastChildAndRemove(): Unit {
+    let doc = XmlDocument()
+    @Expect(doc.firstChild.isNone(), true)
+    @Expect(doc.lastChild.isNone(), true)
+
+    let decl = doc.createDeclaration()
+    let root = doc.createElement("r")
+    doc.appendChild(decl)
+    doc.appendChild(root)
+    match (doc.firstChild) {
+        case Some(n) => @Assert(refEq(n, decl))
+        case None => @Fail("firstChild missing")
+    }
+    match (doc.lastChild) {
+        case Some(n) => @Assert(refEq(n, root))
+        case None => @Fail("lastChild missing")
+    }
+    // removeChild on detached node → false
+    let loose = doc.createComment("loose")
+    @Expect(doc.removeChild(loose), false)
+    // removeChild on actual child → true + removeSelf of the root delegates here
+    @Expect(root.removeSelf(), true)
+    @Expect(doc.rootElement.isNone(), true)
+    // Second removal is a no-op
+    @Expect(doc.removeChild(root), false)
+}
+
+@Test
+func testDocumentRemoveChildRejectsCrossDocumentNode(): Unit {
+    // inDocFlag=true only after owning insert; we simulate by linking in d1 then asking d2.
+    let d1 = XmlDocument()
+    let d2 = XmlDocument()
+    let c = d1.createComment("x")
+    d1.appendChild(c)
+    @Expect(d2.removeChild(c), false)
+}
+
+@Test
+func testTextContentSkipsCommentAndDeclaration(): Unit {
+    // 覆盖 collectTextContent 的 `case _ => ()` 分支：非 Text / 非 Element
+    // 子节点（comment / declaration / unknown）不应计入 textContent。
+    let doc = XmlDocument()
+    let r = doc.createElement("r")
+    doc.appendChild(r)
+    r.appendChild(doc.createText("a"))
+    r.appendChild(doc.createComment("hide"))
+    r.appendChild(doc.createUnknown("also-hide"))
+    r.appendChild(doc.createText("b"))
+    @Expect(r.textContent(), "ab")
+}

@@ -286,3 +286,78 @@ func testEmptyElementHasNoChildrenWalked(): Unit {
     // Document + empty root = 2
     @Expect(c.n, 2)
 }
+
+// ======================================================================
+// 覆盖率补充：Unknown 叶派发、默认 visitor 实现、SkipChildren 在 Document 根上
+// ======================================================================
+
+class DefaultVisitor <: XmlVisitor {}
+
+@Test
+func testDefaultVisitorImplementationAcceptsEverything(): Unit {
+    // 默认实现对所有节点返回 true → 整次 accept 必然成功；
+    // 同时命中 interface 默认函数体以提升覆盖率。
+    let doc = makeTree()
+    let v = DefaultVisitor()
+    @Expect(accept(doc, v), true)
+}
+
+class UnknownCountingVisitor <: XmlVisitor {
+    public var unknowns: Int64 = 0
+    public func visit(unknown: XmlUnknown): Bool {
+        unknowns++
+        true
+    }
+}
+
+@Test
+func testAcceptDispatchesUnknownLeaf(): Unit {
+    // Unknown 节点以 leaf 形式派发给 visitor.visit(unknown)
+    let doc = XmlDocument()
+    doc.appendChild(doc.createUnknown("DOCTYPE note"))
+    doc.appendChild(doc.createElement("r"))
+    let v = UnknownCountingVisitor()
+    @Expect(accept(doc, v), true)
+    @Expect(v.unknowns, 1)
+}
+
+class DocSkipVisitor <: XmlVisitor {
+    public var enteredDoc: Int64 = 0
+    public var enteredEls: Int64 = 0
+    public func visitEnter(document: XmlDocument): Bool {
+        enteredDoc++
+        false  // 剪枝整棵树
+    }
+    public func visitEnter(element: XmlElement): Bool {
+        enteredEls++
+        true
+    }
+}
+
+@Test
+func testAcceptSkipsWholeSubtreeWhenDocumentEnterFalse(): Unit {
+    // visitEnter(document) 返回 false → 跳过子节点，accept 返回 true
+    let doc = makeTree()
+    let v = DocSkipVisitor()
+    @Expect(accept(doc, v), true)
+    @Expect(v.enteredDoc, 1)
+    @Expect(v.enteredEls, 0)
+}
+
+class UnknownStopVisitor <: XmlVisitor {
+    public var seenUnknown: Int64 = 0
+    public func visit(unknown: XmlUnknown): Bool {
+        seenUnknown++
+        false  // 中止遍历
+    }
+}
+
+@Test
+func testAcceptUnknownReturningFalseStopsTraversal(): Unit {
+    let doc = XmlDocument()
+    doc.appendChild(doc.createUnknown("DOCTYPE x"))
+    doc.appendChild(doc.createElement("r"))
+    let v = UnknownStopVisitor()
+    @Expect(accept(doc, v), false)
+    @Expect(v.seenUnknown, 1)
+}

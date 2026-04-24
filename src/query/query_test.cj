@@ -201,3 +201,42 @@ func testChildElementTexts(): Unit {
     @Expect(all[1], "TAOCP")
     @Expect(root.childElementTexts("missing").size, 0)
 }
+
+// ======================================================================
+// 覆盖率补充：Int32 / Float64 codec、int32Attribute、childElementTextAs None 分支
+// ======================================================================
+
+@Test
+func testInt32CodecRoundTrip(): Unit {
+    @Expect(INT32_CODEC.tryParse("42").getOrThrow(), 42i32)
+    @Expect(INT32_CODEC.tryParse("  -7 ").getOrThrow(), -7i32)
+    @Expect(INT32_CODEC.tryParse("").isNone(), true)
+    @Expect(INT32_CODEC.tryParse("abc").isNone(), true)
+    @Expect(INT32_CODEC.format(123i32), "123")
+}
+
+@Test
+func testFloat64CodecRoundTrip(): Unit {
+    @Expect(FLOAT64_CODEC.tryParse("3.14").getOrThrow(), 3.14)
+    @Expect(FLOAT64_CODEC.tryParse("  -2.5 ").getOrThrow(), -2.5)
+    @Expect(FLOAT64_CODEC.tryParse("").isNone(), true)
+    @Expect(FLOAT64_CODEC.tryParse("xyz").isNone(), true)
+    // format 只验证形状——具体小数文本由标准库决定
+    @Expect(FLOAT64_CODEC.format(1.0).contains("1"), true)
+}
+
+@Test
+func testInt32AttributeReadsValue(): Unit {
+    let root = makeTree()
+    let book = root.requiredChildElement("book")
+    book.setAttribute("n", "-128")
+    @Expect(book.int32Attribute("n").getOrThrow(), -128i32)
+    @Expect(book.int32Attribute("missing").isNone(), true)
+}
+
+@Test
+func testChildElementTextAsReturnsNoneWhenMissing(): Unit {
+    // 覆盖 childElementTextAs 中 childElementText 返回 None 的分支。
+    let root = makeTree()
+    @Expect(root.childElementTextAs<Int64>("missing", INT64_CODEC).isNone(), true)
+}

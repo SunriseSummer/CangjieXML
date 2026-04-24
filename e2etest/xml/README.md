@@ -21,7 +21,7 @@ e2etest/
 │       ├── main.cj          # main：驱动扫描
 │       └── fingerprint.cj   # 指纹提取 + 手写 JSON 序列化
 ├── diff.py                  # 两份指纹的 JSON diff
-├── run.sh                   # 入口脚本
+├── run.py                   # 入口脚本（Python）
 ├── out/                     # 运行时产出：python.json / cangjie.json
 └── README.md
 ```
@@ -29,7 +29,7 @@ e2etest/
 ## 跑法
 
 ```bash
-bash e2etest/run.sh
+python3 e2etest/xml/run.py
 ```
 
 脚本会：
@@ -38,7 +38,8 @@ bash e2etest/run.sh
 3. 分别跑 Python probe 与仓颉 probe → 两份 JSON
 4. `diff.py` 对比 → 全绿则 `[PASS] all 10 fixtures produce identical fingerprints`
 
-无需外部 Python 第三方包；脚本只依赖 `python3` 和 `cjc`（通过 `/opt/cangjie/envsetup.sh` 自动加载）。
+无需外部 Python 第三方包；脚本只依赖 `python3` 和 `cjc`（`run.py` 会在 `cjpm`
+不在 PATH 时自动 source `/opt/cangjie/envsetup.sh`）。
 
 ## 指纹（fingerprint）设计
 
