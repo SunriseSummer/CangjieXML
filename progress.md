@@ -13,8 +13,8 @@
 | M2 | Writer | ✅ 已完成 | 迭代 2 |
 | 质量红线 | 单文件≤300行 / 无下划线前缀 / 低圈复杂度 / 无魔鬼数 | ✅ 已落地 | 迭代 3（阶段 A） |
 | M3 | Parser | ✅ 已完成 | 迭代 3（阶段 B） |
-| M4 | Query + Builder | ✅ 已完成 | **迭代 4（本次）** |
-| M5 | Visit | ⏳ 未开始 | |
+| M4 | Query + Builder | ✅ 已完成 | 迭代 4 |
+| M5 | Visit | ✅ 已完成 | **迭代 5（本次）** |
 | M6 | IO + Error + Options 收口 | ⏳ 未开始 | 错误枚举骨架已预落位 |
 | M7 | Batch / Concurrency | ⏳ 未开始 | |
 | M8 | 回归 / 基准 / 发布 | ⏳ 未开始 | |
@@ -31,7 +31,7 @@ tinyxml2 v11.0.0 公共 API 能力清单（按 DESIGN.md §3.2 归纳），以�
 | 2 | 解析：`Parse(const char*)` / `LoadFile` / 流式 / 字节数组 | `XmlDocument.parseString` / `parseBytes` / `loadFile` | 🟡 `parseString` 已完成（M3）；`parseBytes` / `loadFile` 见 M6 |
 | 3 | 序列化：`XMLPrinter` / `Print` / 紧凑 vs 格式化 | `writer.XmlWriter` + `XmlDocument/XmlElement.writeToString` | ✅ 已覆盖（M2） |
 | 4 | 类型化属性：`IntAttribute` / `BoolAttribute` / `QueryXxx` | `query.*` 扩展 + `XmlValueCodec<T>` | ✅ 已完成（M4） |
-| 5 | 访问者：`XMLVisitor` + `Accept` | `visit.XmlVisitor` + `walk()` | ⏳ M5 |
+| 5 | 访问者：`XMLVisitor` + `Accept` | `visit.XmlVisitor` + `walk()` | ✅ 已完成（M5） |
 | 6 | 安全导航：`XMLHandle` / `XMLConstHandle` | 以 `Option<T>` + `?.` / `??` 语言原生替代 | ✅ 已用语言特性替代（M1） |
 | 7 | 错误报告：错误码 + 行号 + 附加文本 | `error.XmlError` 枚举 + `SourcePos` + `XmlParseException` | ✅ 已完成（M3） |
 | 8 | 空白策略：`PRESERVE_WHITESPACE` / `COLLAPSE_WHITESPACE` / `PEDANTIC_WHITESPACE` | `parser.XmlWhitespaceMode` | ✅ `Preserve`/`Collapse` 已完成（M3）；`Pedantic` 按需再补 |
@@ -308,10 +308,117 @@ let doc = XmlDocumentBuilder()
 
 `testRoundTripBuildWriteParseQuery` 连接四条链路：**Builder → Writer → Parser → Query**，验证类型化属性（`Int64` / `Bool`）与子元素查询能完整穿越读写闭环。
 
-### 5.5 下一步候选
+### 5.5 M5 Visit（迭代 5）
 
-建议：**M5 Visit**（`XmlVisitor` + `walk(node, fn)` 函数式遍历）。理由：
-1. Query/Build 已覆盖"按名字定位 + 构造"的最常见诉求；Visit 则补齐"无特定名字、需要遍历整棵树"的场景。
-2. tinyxml2 的 `XMLVisitor` + `Accept` 是其公共 API 的最后一大块，落地后能让 Cangjie 与 tinyxml2 的功能对齐度达到 90%+。
-3. 仓颉的函数式 `walk()` 可与经典 Visitor 并行提供，用最小代码覆盖最多风格。
+#### 5.5.1 新增包结构
+
+```
+src/visit/
+  xml_visitor.cj         (63)  XmlVisitor 接口（含默认 return true 实现）
+  xml_walk_control.cj    (17)  XmlWalkControl 枚举
+  walk.cj                (56)  walk(node, fn)：函数式前序遍历
+  accept.cj              (65)  accept(node, visitor)：OO 访问者派发
+  xml_visitable.cj       (32)  XmlVisitable 接口 + extend XmlNode 方法形式
+  visit_test.cj         (288)  13 个测试用例
+```
+
+#### 5.5.2 `XmlVisitor`：经典 OO 风格
+
+```cangjie
+public interface XmlVisitor {
+    func visitEnter(document: XmlDocument): Bool { true }
+    func visitExit(document: XmlDocument): Bool  { true }
+    func visitEnter(element: XmlElement): Bool   { true }
+    func visitExit(element: XmlElement): Bool    { true }
+    func visit(text: XmlText): Bool              { true }
+    func visit(comment: XmlComment): Bool        { true }
+    func visit(declaration: XmlDeclaration): Bool { true }
+    func visit(unknown: XmlUnknown): Bool        { true }
+}
+```
+
+与 tinyxml2 的差异：
+
+- **不额外传属性链表**。tinyxml2 的 `visitEnter(XMLElement&, XMLAttribute*)`
+  携带内部链表头指针；仓颉侧直接 `element.attributes()` 获取，签名干净。
+- **统一带默认实现**。子类只实现关心的若干方法即可。
+- 返回值语义保持对齐：`visitEnter` 返回 `false` 剪枝（不进入子树，不触发
+  对应 `visitExit`）；叶子 `visit(...)` 返回 `false` 向上传播。
+
+`accept(node, visitor)` 语义摘要：
+
+| 情况 | 行为 |
+|---|---|
+| `visitEnter(容器)` 返回 `true` | 继续处理所有子节点，然后调用 `visitExit(容器)` |
+| `visitEnter(容器)` 返回 `false` | 跳过子树 & **不**调用 `visitExit`，`accept` 返回 `true` 继续兄弟 |
+| 某个子节点 `accept` 返回 `false` | 中止剩余兄弟处理，**仍然**调用 `visitExit`（RAII 对称），`accept` 返回 `false` |
+| 叶子 `visit(...)` 返回 `false` | 本次 `accept` 返回 `false` |
+
+#### 5.5.3 `walk` + `XmlWalkControl`：函数式风格
+
+```cangjie
+public enum XmlWalkControl {
+    | Continue
+    | SkipChildren
+    | Stop
+}
+
+public func walk(node: XmlNode, visit: (XmlNodeKind) -> XmlWalkControl): Unit
+```
+
+相比 `XmlVisitor` 的 `Bool` 返回值（同一个 `false` 同时承担"剪枝"与"停机"两种
+语义，调用方只能靠文档约定区分），`XmlWalkControl` 把两种意图**显式**区分：
+
+- `Continue`：正常前序，下钻子节点。
+- `SkipChildren`：当前节点不下钻，但继续处理兄弟。
+- `Stop`：立即中止整次 `walk`（剩余节点一律不访问）。
+
+#### 5.5.4 `XmlVisitable` 接口 + DOM 方法形式
+
+除顶层 `accept(node, visitor)` / `walk(node, fn)` 外，本次还提供方法形式：
+
+```cangjie
+doc.accept(MyVisitor())
+doc.walk { kind => Continue }
+```
+
+实现方式：`public interface XmlVisitable { func accept(...); func walk(...); }`
++ `extend XmlNode <: XmlVisitable`。这一做法再次套用"M4 踩过的坑"：cjc 1.0.5
+要求跨包扩展的方法必须出现在其实现的接口中，否则对外不可见。
+
+#### 5.5.5 关键实现约束 —— "lambda 捕获 `var`"
+
+cjc 1.0.5 规则：
+
+> 捕获了 `var`（可变变量）的 lambda 只能在定义处直接调用，不能作为值传递给
+> 其它函数。
+
+对 `walk`（接收 lambda 的顶层函数）这条规则几乎就是致命的——测试里没法写
+`var count = 0; walk(doc) { _ => count++ ... }`。处理方式：
+
+- 测试用一个 `class Counter { var n: Int64 = 0 }` 小封装绕过（class 字段不受
+  "lambda 捕获 var"限制）。
+- 文档里**显式**记录这一要点——这对最终用户也有价值，他们写
+  聚合/计数逻辑时会遇到同样的坑。
+
+#### 5.5.6 质量门禁
+
+| 门禁 | 状态 |
+|---|---|
+| `cjpm build` | ✅ 成功 |
+| `cjpm test` | ✅ **107/107 通过**（20 DOM + 21 Writer + 23 Parser + 19 Query + 10 Build + **13 Visit** + 1 根包） |
+| 单文件 ≤ 300 行 | ✅ 最长 298（`xml_writer.cj`） |
+| 无下划线前缀标识符 | ✅ |
+| 无魔鬼字符串 / 数字 | ✅ |
+| 非标准库依赖 | ✅ 零 |
+
+### 5.6 下一步候选
+
+建议：**M6 IO + Error + Options 收口**。理由：
+1. 读/写/查/改/遍历闭环已完整。下一块短板是 **IO**：`parseBytes` / `loadFile` /
+   `writeToFile`——把"字节流 / 文件路径"这个常见输入/输出形态接进来。
+2. `XmlParseOptions` / `XmlWriteOptions` 的一些字段（如 entity 白名单、pretty 字段
+   顺序等）还保留了 "待扩展" 空位，是收口补齐的好时机。
+3. 错误路径目前主要在 parser，writer/query/build 对输入错误的反馈还不统一，
+   把 `XmlException` / `XmlError` 做一次横向梳理。
 

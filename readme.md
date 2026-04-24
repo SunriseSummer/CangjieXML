@@ -19,9 +19,10 @@
 | M2 Writer    | ✅ |
 | M3 Parser    | ✅ |
 | M4 Query + Builder | ✅ |
+| M5 Visit     | ✅ |
 | 质量红线（单文件 ≤ 300 行 / 无下划线前缀 / 常量化 / 低圈复杂度） | ✅ |
 
-读写循环已闭合，类型化查询与 Builder DSL 已就绪。测试 **94/94 通过**。
+读写循环已闭合，类型化查询、Builder DSL 与访问者/函数式遍历均已就绪。测试 **107/107 通过**。
 
 ---
 
@@ -126,6 +127,43 @@ main() {
     0
 }
 ```
+
+### 示例：遍历（函数式 / 访问者两种风格）
+
+```cangjie
+import cangjie_xml.dom.*
+import cangjie_xml.visit.*
+
+main() {
+    let doc = /* ... */
+
+    // 函数式 walk：收集所有 <book> 元素的 id
+    class Acc { public var n: Int64 = 0 }
+    let count = Acc()
+    walk(doc) { kind =>
+        match (kind) {
+            case Element(e) where e.name == "book" =>
+                count.n++
+                SkipChildren           // 不再进入 book 的子树
+            case _ => Continue
+        }
+    }
+    println(count.n)
+
+    // 经典 Visitor：对称的 enter/exit
+    class NamePrinter <: XmlVisitor {
+        public func visitEnter(element: XmlElement): Bool {
+            println("<${element.name}>")
+            true
+        }
+    }
+    doc.accept(NamePrinter())
+    0
+}
+```
+
+> 注意：`walk` / `accept` 的回调是 lambda；cjc 1.0.5 禁止 lambda 捕获
+> 可变 `var`，聚合计数时请把状态封装进 `class`（如示例中的 `Acc`）。
 
 ---
 
