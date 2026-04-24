@@ -1,6 +1,6 @@
 # CangjieXML 开发进度
 
-> 相对 [libxml2 v2.15.3](./.libxml2-2.15.3) 全量功能的实现情况。最新更新：迭代 9 结束（Phase 5a —— 基础 `DocumentSerializer`：DOM → 字符串 + parse → serialize → parse 往返测试）。
+> 相对 [libxml2 v2.15.3](./.libxml2-2.15.3) 全量功能的实现情况。最新更新：迭代 10 结束（Phase 5b —— `writer.XmlWriter` 推式 API：面向 `IoSink` + 元素栈不变量）。
 
 ---
 
@@ -13,7 +13,7 @@
 | 2 | `encoding` + `io` | `encoding.c`、`xmlIO.c` | ✅ 已完成 |
 | 3 | `parser` 词法 + 事件流 | `parser.c`、`parserInternals.c` | 🟢 词法 + 语法骨架已完成（Phase 3a+3b），容错模式 + 外部实体留待 Phase 3c |
 | 4 | `tree` + `sax` + `reader` | `tree.c`、`SAX2.c`、`xmlreader.c` | 🟢 只读 DOM + DocumentBuilder 完成（Phase 4a），变更 API / XmlReader / 验证器留待 Phase 4b+ |
-| 5 | `writer` + `save` | `xmlwriter.c`、`xmlsave.c` | 🟢 `DocumentSerializer` 基础版完成（Phase 5a），`XmlWriter` 推式接口 + 编码转换留待 Phase 5b |
+| 5 | `writer` + `save` | `xmlwriter.c`、`xmlsave.c` | 🟢 `DocumentSerializer`（5a）+ `XmlWriter` 推式 API（5b）已完成；黄金对比 / 作用域跟踪留待后续 |
 | 6 | `xpath` | `xpath.c` | ⬜ 未开始 |
 | 7 | `regexp` + `pattern` + `dtd` | `valid.c`、`xmlregexp.c`、`pattern.c` | ⬜ 未开始 |
 | 8 | `schema` | `xmlschemas.c`、`xmlschemastypes.c` | ⬜ 未开始 |
@@ -23,7 +23,7 @@
 | 12 | 工具链与发布 | `xmllint.c`、`xmlcatalog.c` | ⬜ 未开始 |
 | 13 | 硬化与优化 | `runtest.c`、`fuzz/` | ⬜ 未开始 |
 
-**粗略完成度**：核心功能 ≈ 38%（Phase 1 基础设施 + Phase 2 字符编解码 / I/O + Phase 3a 词法器 + Phase 3b XmlParser 骨架 + Phase 4a 只读 DOM + DocumentBuilder + Phase 5a 基础序列化器；不含容错模式 / 外部实体 / DOM 变更 API / XmlReader / XmlWriter 推式接口 / 验证器 / 工具链）。
+**粗略完成度**：核心功能 ≈ 42%（Phase 1 基础设施 + Phase 2 字符编解码 / I/O + Phase 3a 词法器 + Phase 3b XmlParser 骨架 + Phase 4a 只读 DOM + DocumentBuilder + Phase 5a 基础序列化器 + Phase 5b 推式 XmlWriter；不含容错模式 / 外部实体 / DOM 变更 API / XmlReader / 验证器 / 工具链）。
 
 ---
 
@@ -620,3 +620,110 @@ Prolog / Epilog / 声明 / DOCTYPE（6）：`testCommentAndPiInProlog` /
   不变量检查）。
 - Phase 4c：`SaxHandler` / `XmlReader`。
 - Phase 3c：容错 + 外部实体 + W3C `xmltest` 黄金对比（继续延后）。
+
+---
+
+## 已实现（迭代 10 — Phase 5b：推式 `XmlWriter`）
+
+### 背景
+
+> Phase 5a 交付了"拉"式输出（`DocumentSerializer`：从 DOM 整体拍出字符串）。
+> Phase 5b 补上"推"式输出：**调用方按顺序 `startElement` / `writeAttribute` /
+> `writeText` / `endElement`，直接写到 `IoSink`**。
+>
+> 与 libxml2 `xmlwriter.c` 对齐但做了一个关键改进：**所有状态违规立即抛异常并
+> 置 `faulted`**，之后任何写入都拒绝。libxml2 把很多错误状态静默化（写入失败
+> 却 API 继续返回 0），CangjieXML 明确禁止继续写入被污染的流，防止生成不良构
+> XML 被下游误信任。
+
+### 新增子包：`cangjie_xml.writer`（4 个源文件 + 1 个测试文件，均 ≤ 300 行）
+
+| 文件 | 行数 | 内容 |
+| --- | --- | --- |
+| `src/writer/writer_options.cj` | 44 | `WriterOptions`：`omitXmlDeclaration` / `indent` / `indentString` / `lineSeparator`；`defaults()` / `pretty()` 预设 |
+| `src/writer/xml_writer.cj` | 230 | `XmlWriter` 主类：字段 / 公开入口 / `WriterState` 枚举 / `ElementFrame` 栈帧 / `Standalone3` 三态枚举；包级转发桥接 |
+| `src/writer/element_stack.cj` | 68 | `ElementStack`：push/pop/top + `markNonLeafChild` / `markAnyChild` 辅助 |
+| `src/writer/xml_writer_ops.cj` | 289 | `extend XmlWriter`：状态机 + 全部写入动作 + 缩进 + 错误处理 |
+| `src/writer/xml_writer_test.cj` | 292 | 30 条单元测试 |
+
+### 公开 API
+
+**构造**
+```cangjie
+XmlWriter(sink: IoSink, opts!: WriterOptions = WriterOptions())
+```
+
+**prolog 阶段**
+- `writeXmlDeclaration(version, encoding, standalone)` — 只能在首次写入前，
+  或 `WriterOptions.omitXmlDeclaration=true` 时被显式拒绝；
+- `writeDoctype(name)` — 在 prolog 阶段允许。
+
+**元素**
+- `startElement(QName | String)` — 入栈；进入 `InElementOpen` 状态等待属性；
+- `writeAttribute(QName | String, value)` — 必须紧跟 `startElement`，
+  否则抛错并置 `Faulted`；
+- `writeNamespace(prefix: ?String, uri)` — 便捷属性（`xmlns` / `xmlns:p`）；
+- `endElement()` — 空元素自闭合为 `<a/>`；非空元素写 `</a>`，关闭栈顶。
+
+**内容**
+- `writeText(data)` — 自动转义 `&`/`<`/`>`；自动关闭 pending start-tag；
+- `writeCdata(data)` — 包裹 `<![CDATA[...]]>`；禁止嵌入 `]]>`；
+- `writeComment(data)` — 禁止 `--`；prolog / content / epilog 皆可；
+- `writePi(target, data)` — 校验非空 + 拒绝保留名 `xml`（任意大小写）+ 禁止 `?>`；
+- `writeRawBytes(bytes)` — 直通 sink，调用方自担良构性。
+
+**收尾**
+- `close()` — 要求栈已空；flush sink；设 `Closed`；**不关闭 sink**（所有权
+  保留在调用方，便于 `MemorySink.toBytes()`）；对已 Closed / Faulted 的实例
+  幂等。
+
+### 关键设计决策
+
+1. **显式状态机 `WriterState`** — `Start / Prolog / InElementOpen /
+   InElementContent / Epilog / Closed / Faulted`。每个方法入口 `requireAlive()`
+   拒绝 Closed / Faulted，所有违规走 `fail(msg)` 抛 `XmlException(XmlError.Other)`
+   并设 `Faulted`。
+2. **`Standalone3` 本地化** — 避免 `writer` 反向依赖 `parser`。与
+   `parser.Standalone` 语义同构，未来若需互转可加一个 Phase 5c 的适配函数。
+3. **`ElementFrame` 携带 `leafTextOnly` + `hasAnyChild`** —
+   - `leafTextOnly` 决定缩进模式下 `endElement` 是否换行：纯文本元素保持同行；
+   - `hasAnyChild` 保留未来用于"空元素是否允许自闭合"的策略（当前未用，空元素
+     始终自闭合）。
+4. **良构性最小断言** — writer 不做全量 XML 校验（那是 parser 的活），但对
+   几种"写出来就必然不良构"的 case 主动拦截：`]]>` in CDATA、`--` in comment、
+   `?>` in PI data、PI target = `xml`。
+5. **主类 + extend 桥接** — 沿用 parser / save 子包同款模式，绕开 "Cangjie
+   主类体不能调用自身 extend 成员"限制。
+
+### 新增测试（30 条）
+
+- 基础（10）：自闭合空元素 / 属性 / 属性转义 / 文本转义 / 嵌套 / 混合内容 /
+  CDATA / Comment+PI / 命名空间 / QName 重载
+- Prolog / Epilog（5）：XML 声明 / standalone / DOCTYPE / prolog 注释 PI /
+  epilog 注释
+- 缩进（2）：pretty 结构 / 叶子文本保持同行
+- writeRawBytes（1）：直通
+- 状态机违规（10）：XML 声明错位 / omit 拒绝 / endElement 无 start /
+  属性错位 / 多根 / 未闭合 close / close 后写 / CDATA 终止序列 /
+  comment 双短横线 / PI 保留名
+- 其它（2）：`depth()` / close 幂等
+
+### 基础设施改进
+
+无。写入器完全基于现有 `core.escapeXml` / `QName.lexical()` / `IoSink`
+接口，零破坏性变更。
+
+### 验证
+
+- `cjpm build` 干净；
+- `cjpm test` **297 / 297** 全绿（267 旧 + 30 新）；
+- 所有新文件 ≤ 300 行；
+- 主类函数圈复杂度 ≤ 6。
+
+### 下一步（候选）
+
+- Phase 4b：DOM 变更 API（`appendChild` / `removeChild` / `replaceChild` +
+  不变量检查）；
+- Phase 4c：`SaxHandler` / `XmlReader`；
+- Phase 5c：`writer.NamespaceScope`（写时作用域跟踪，与 save / 未来 C14N 共用）；
+- Phase 3c：容错 + 外部实体 + W3C `xmltest` 黄金对比。
