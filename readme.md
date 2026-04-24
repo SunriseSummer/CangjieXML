@@ -20,9 +20,10 @@
 | M3 Parser    | ✅ |
 | M4 Query + Builder | ✅ |
 | M5 Visit     | ✅ |
+| M6 IO        | ✅ |
 | 质量红线（单文件 ≤ 300 行 / 无下划线前缀 / 常量化 / 低圈复杂度） | ✅ |
 
-读写循环已闭合，类型化查询、Builder DSL 与访问者/函数式遍历均已就绪。测试 **107/107 通过**。
+读写循环已闭合，类型化查询、Builder DSL、访问者/函数式遍历、文件/字节 IO 均已就绪。测试 **119/119 通过**。
 
 ---
 
@@ -164,6 +165,45 @@ main() {
 
 > 注意：`walk` / `accept` 的回调是 lambda；cjc 1.0.5 禁止 lambda 捕获
 > 可变 `var`，聚合计数时请把状态封装进 `class`（如示例中的 `Acc`）。
+
+### 示例：文件 / 字节 IO
+
+```cangjie
+import cangjie_xml.dom.*
+import cangjie_xml.io.*
+import cangjie_xml.error.*
+
+main() {
+    let doc = /* ... build or parse ... */
+
+    // 一次性落盘：先序列化到内存再写文件，语义像事务（失败不留半成品）
+    saveXmlToFile(doc, "/tmp/out.xml")
+
+    // 读回
+    let back = try {
+        loadXmlFromFile("/tmp/out.xml")
+    } catch (e: XmlIoException) {
+        match (e.error) {
+            case FileNotFound(p)        => { println("missing: ${p}"); return 1 }
+            case FileReadFailed(p, msg) => { println("read ${p}: ${msg}"); return 1 }
+            case _ => throw e
+        }
+    }
+
+    // 字节形态：HTTP body、JDBC BLOB …
+    let bytes = writeXmlToBytes(doc)
+    let fromBytes = parseXmlBytes(bytes)
+
+    // 大文档流式落盘：避免先把整个文档放进 StringBuilder
+    try (sink = FileXmlSink("/tmp/big.xml")) {
+        let w = XmlWriter(sink)
+        w.writeDocument(doc)
+    }
+    0
+}
+```
+
+错误分层：`XmlIoException` 只负责 IO 边界（找不到文件 / 磁盘错 / 非法 UTF-8）；落盘之后的语法错误**原样**以 `XmlParseException` 抛出，两者不互相嵌套。
 
 ---
 

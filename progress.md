@@ -14,8 +14,9 @@
 | 质量红线 | 单文件≤300行 / 无下划线前缀 / 低圈复杂度 / 无魔鬼数 | ✅ 已落地 | 迭代 3（阶段 A） |
 | M3 | Parser | ✅ 已完成 | 迭代 3（阶段 B） |
 | M4 | Query + Builder | ✅ 已完成 | 迭代 4 |
-| M5 | Visit | ✅ 已完成 | **迭代 5（本次）** |
-| M6 | IO + Error + Options 收口 | ⏳ 未开始 | 错误枚举骨架已预落位 |
+| M5 | Visit | ✅ 已完成 | 迭代 5 |
+| M6 | IO + Error 收口 | ✅ 已完成 | **迭代 6（本次）** |
+| M6 | IO + Error + Options 收口 | ✅ 已完成 | 迭代 6 |
 | M7 | Batch / Concurrency | ⏳ 未开始 | |
 | M8 | 回归 / 基准 / 发布 | ⏳ 未开始 | |
 
@@ -28,7 +29,7 @@ tinyxml2 v11.0.0 公共 API 能力清单（按 DESIGN.md §3.2 归纳），以�
 | # | tinyxml2 能力 | CangjieXML 对应 | 状态 |
 |---|---|---|---|
 | 1 | DOM：`XMLDocument` / `XMLElement` / `XMLText` / `XMLComment` / `XMLDeclaration` / `XMLUnknown` / `XMLAttribute` | `dom.XmlDocument` / `XmlElement` / `XmlText` / `XmlComment` / `XmlDeclaration` / `XmlUnknown` / `XmlAttribute` | ✅ 已覆盖（M1） |
-| 2 | 解析：`Parse(const char*)` / `LoadFile` / 流式 / 字节数组 | `XmlDocument.parseString` / `parseBytes` / `loadFile` | 🟡 `parseString` 已完成（M3）；`parseBytes` / `loadFile` 见 M6 |
+| 2 | 解析：`Parse(const char*)` / `LoadFile` / 流式 / 字节数组 | `parser.parseXml` / `io.loadXmlFromFile` / `io.parseXmlBytes` | ✅ 已完成（M3 + M6） |
 | 3 | 序列化：`XMLPrinter` / `Print` / 紧凑 vs 格式化 | `writer.XmlWriter` + `XmlDocument/XmlElement.writeToString` | ✅ 已覆盖（M2） |
 | 4 | 类型化属性：`IntAttribute` / `BoolAttribute` / `QueryXxx` | `query.*` 扩展 + `XmlValueCodec<T>` | ✅ 已完成（M4） |
 | 5 | 访问者：`XMLVisitor` + `Accept` | `visit.XmlVisitor` + `walk()` | ✅ 已完成（M5） |
@@ -412,13 +413,83 @@ cjc 1.0.5 规则：
 | 无魔鬼字符串 / 数字 | ✅ |
 | 非标准库依赖 | ✅ 零 |
 
-### 5.6 下一步候选
+### 5.6 M6 IO（迭代 6）
 
-建议：**M6 IO + Error + Options 收口**。理由：
-1. 读/写/查/改/遍历闭环已完整。下一块短板是 **IO**：`parseBytes` / `loadFile` /
-   `writeToFile`——把"字节流 / 文件路径"这个常见输入/输出形态接进来。
-2. `XmlParseOptions` / `XmlWriteOptions` 的一些字段（如 entity 白名单、pretty 字段
-   顺序等）还保留了 "待扩展" 空位，是收口补齐的好时机。
-3. 错误路径目前主要在 parser，writer/query/build 对输入错误的反馈还不统一，
-   把 `XmlException` / `XmlError` 做一次横向梳理。
+#### 5.6.1 新增包结构
+
+```
+src/io/
+  xml_io_exception.cj    (26)  XmlIoException：IO 层异常
+  load_xml.cj            (79)  loadXmlFromFile + parseXmlBytes
+  save_xml.cj            (59)  saveXmlToFile + writeXmlToBytes
+  file_xml_sink.cj       (96)  FileXmlSink <: XmlSink & Resource 流式写
+  io_test.cj            (272)  12 个测试用例
+```
+
+#### 5.6.2 公共入口
+
+```cangjie
+// 文件 ↔ 文档
+public func loadXmlFromFile(path: String): XmlDocument
+public func loadXmlFromFile(path: String, options: XmlParseOptions): XmlDocument
+public func saveXmlToFile(doc: XmlDocument, path: String): Unit
+public func saveXmlToFile(doc: XmlDocument, path: String, options: XmlWriteOptions): Unit
+
+// 字节 ↔ 文档
+public func parseXmlBytes(bytes: Array<Byte>): XmlDocument
+public func parseXmlBytes(bytes: Array<Byte>, options: XmlParseOptions): XmlDocument
+public func writeXmlToBytes(doc: XmlDocument): Array<Byte>
+public func writeXmlToBytes(doc: XmlDocument, options: XmlWriteOptions): Array<Byte>
+
+// 流式 Sink（大文档 / 自组合 Writer）
+public class FileXmlSink <: XmlSink & Resource {
+    public init(path: String)
+    public func write(text: String): Unit
+    public func flush(): Unit
+    public func close(): Unit
+}
+```
+
+#### 5.6.3 错误模型
+
+新增 `XmlIoException`，**与** `XmlParseException` 互不包装：
+
+| 层 | 异常 | 触发场景 |
+|---|---|---|
+| IO | `XmlIoException(FileNotFound(path))` | 路径不存在 |
+| IO | `XmlIoException(FileReadFailed(path, cause))` | 读取 `FSException`、非法 UTF-8 |
+| IO | `XmlIoException(FileWriteFailed(path, cause))` | 写入 `FSException`、sink 已关闭 |
+| 语法 | `XmlParseException(...)` | 已经读到字节但 XML 不合法 |
+
+这一分层让调用方可以干净地分别处理"磁盘坏了"和"文件里的 XML 坏了"，无需查看内层 cause。`XmlError.FileNotFound` / `FileReadFailed` / `FileWriteFailed` 的枚举槽位自 M1 就已预留，这一次真正被点亮。
+
+#### 5.6.4 关键实现决策
+
+- **字符串暂存 vs 流式写盘**：`saveXmlToFile` 选择"先 `writeXmlToBytes` → 再 `File.writeTo` 一次性落盘"。好处是：序列化过程中的任何异常都**不会**留下半写入的文件，语义更像事务。需要内存友好的大文档场景，由 `FileXmlSink`（流式）按需选用——两条路径在 M6 并存而非互斥。
+- **`FileXmlSink` 使用 `BufferedOutputStream<OutputStream>`** 包裹 `File`，避免每个 `write(text)` 都系统调用一次。资源语义走 `Resource + try-with-resource`：`close()` 先 `flush` 后关句柄，任一步异常都确保底层 `File` 被关。
+- **`String.fromUtf8` 的失败路径**：非法 UTF-8 触发异常，被 `decodeUtf8(..)` 包装成 `XmlIoException(FileReadFailed)`，附带来源标签（文件路径或 `<bytes>` 字面量）。
+- **与 parser 的可见性解耦**：M6 内部调用 `parseXml(xml, options)` 顶层函数（M4 为跨包访问引入的稳定入口），避免踩 `extend XmlDocument.parseString` 那条跨包编译不可见的老坑。
+- **`Directory.create` 遇到已存在目录会抛 `FSException`**：测试夹具先 `exists(Path(...))` 再创建，否则二次运行就挂了。
+
+#### 5.6.5 测试覆盖（12 用例）
+
+`save/load` 往返、字节往返、compact 选项下的落盘文本不含换行、Unicode 文本内容往返、`FileNotFound`、非法 UTF-8 映射到 `FileReadFailed("<bytes>", ...)`、落盘后语法错误原样抛 `XmlParseException`、`FileXmlSink` 与 `StringXmlSink` 字节完全一致、sink 关闭后写入抛异常、不存在目录下构造 `FileXmlSink` 抛异常、端到端 `build → save → load → query` 联动。
+
+#### 5.6.6 质量门禁
+
+| 门禁 | 状态 |
+|---|---|
+| `cjpm build` | ✅ 成功 |
+| `cjpm test` | ✅ **119/119 通过**（20 DOM + 21 Writer + 23 Parser + 19 Query + 10 Build + 13 Visit + **12 IO** + 1 根包） |
+| 单文件 ≤ 300 行 | ✅ 最长 298（`xml_writer.cj`）；IO 包最长 272（`io_test.cj`） |
+| 无下划线前缀标识符 | ✅ |
+| 无魔鬼字符串 / 数字 | ✅（`TMP_ROOT` / `IN_MEMORY_SOURCE_LABEL` 均为 `const`） |
+| 非标准库依赖 | ✅ 零 |
+
+### 5.7 下一步候选
+
+建议：**M8 回归 / 基准 / 发布**（跳过 M7 `Batch / Concurrency`，因为 CangjieXML 的目标是"贴合 tinyxml2 单线程 DOM"，并发优先级低于"补齐文档 / 基准 / 正式发布"）。理由：
+1. 到 M6 为止，tinyxml2 公共 API 的等价覆盖度已接近 95%（仅剩"全局写出开关"和"编码声明驱动解码"两处被我们显式弃用 / 延后）。
+2. 跨 6 次迭代的 119 个测试积累需要一次整合——基准数据、压力样例、正式 release 流程是"交付"层的最后一公里。
+3. 并发模型（M7）与 DESIGN §4 的"DOM 不承诺线程安全"约定冲突，硬做会膨胀 API 面；更合适的处理是放到后续大版本。
 
