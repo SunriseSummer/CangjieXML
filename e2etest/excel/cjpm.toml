@@ -3,7 +3,7 @@
   name = "xlsx_to_csv"
   version = "0.1.0"
   output-type = "executable"
-  description = "用 CangjieXML 解析 xlsx（OOXML）并把每个 sheet 导出为 CSV——验证 XML 库的真实能力。"
+  description = "用 CangjieXML 解析 xlsx（OOXML）并把每个 sheet 导出为 CSV，验证 XML 库的能力"
   src-dir = "src"
   target-dir = "target"
 
@@ -13,11 +13,6 @@
 [test-dependencies]
 
 # ------------------------------------------------------------------------------
-# stdx（扩展标准库）动态库依赖——解压 xlsx 里的 Deflate 条目需要
-# `stdx.compress.zlib`。路径按项目根（本 cjpm.toml 所在目录）相对指向
-# `./stdx/dynamic/stdx`，下载并解压对应平台的发行包即可，不绑定任何绝对/沙箱
-# 路径：
-#
 #   Linux   x86_64  : https://github.com/SunriseSummer/CangjieSDK/releases/download/1.0.5/cangjie-stdx-linux-x64-1.0.5.1.zip
 #   Linux   aarch64 : cangjie-stdx-linux-aarch64-*.zip（同发行页）
 #   Windows x86_64  : cangjie-stdx-windows-x64-*.zip（同发行页）

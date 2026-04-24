@@ -8,6 +8,6 @@
   target-dir = "target"
 
 [dependencies]
-  cangjie_xml = { path = "../.." }
+  cangjie_xml = { path = "../../.." }
 
 [test-dependencies]
