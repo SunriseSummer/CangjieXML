@@ -93,7 +93,7 @@ func loadRelationshipMap(path: String): HashMap<String, String> {
  * 把 rels 里 `Target` 字段（相对 `xl/` 根的路径）归一成"相对 xlsx 顶层根"的
  * 路径——我们在 `unzipRoot` 下按"顶层根"寻址。
  *
- * 规则非常朴素：
+ * 规则：
  *
  * - 以 `/` 开头 → 已是绝对内部路径，去掉前导 `/`；
  * - 否则视为相对 `xl/`（workbook.xml 所在目录），补上前缀。
@@ -102,19 +102,19 @@ func loadRelationshipMap(path: String): HashMap<String, String> {
  */
 func normalizeRelTarget(target: String): String {
     if (target.startsWith("/")) {
-        // 去掉前导 `/`：避免依赖 `String.subscript(Range)` 的可用性，用 replace
-        // 只去掉**第一个** `/` 也足以覆盖 OOXML 场景——target 内部不会出现以
-        // `/` 开头的真实层级。
-        let rest = target.split("/", removeEmpty: false)
+        // `split("/", removeEmpty: false)` 会把前导 `/` 产出一个空段，丢掉它
+        // 再用 `/` 重新拼回；String 没有稳定的 `[start..]` 字节切片，这是最干
+        // 净的便携写法。
+        let parts = target.split("/", removeEmpty: false)
         let sb = StringBuilder()
         var first = true
-        var i = 0
-        for (p in rest) {
-            if (i == 0) { i++; continue }         // 跳过前导 `/` 产生的空串
+        var idx = 0
+        for (p in parts) {
+            if (idx == 0) { idx++; continue }         // 跳过前导 `/` 产生的空段
             if (!first) { sb.append("/") }
             first = false
             sb.append(p)
-            i++
+            idx++
         }
         return sb.toString()
     }

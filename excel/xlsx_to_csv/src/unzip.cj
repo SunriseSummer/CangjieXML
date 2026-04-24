@@ -1,6 +1,5 @@
 package xlsx_to_csv
 
-import std.collection.*
 import std.fs.*
 import std.process.*
 
@@ -41,19 +40,4 @@ public func makeTempDir(prefix: String): String {
         throw Exception("mktemp failed with exit code ${code}")
     }
     String.fromUtf8(stdoutBytes).trimEnd()
-}
-
-/**
- * 列出目录下所有**普通文件**名（不递归），按字典序。
- *
- * 本项目多处需要"枚举所有 xml 文件"——例如未来扩展到把整个 xl/worksheets
- * 目录都试解析一遍。单独封装保证排序一致、跳过子目录。
- */
-public func listFiles(dir: String): ArrayList<String> {
-    let names = ArrayList<String>()
-    let infos = Directory.readFrom(Path(dir))
-    for (info in infos) {
-        names.add(info.name)
-    }
-    names
 }
