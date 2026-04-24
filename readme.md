@@ -57,8 +57,6 @@
 读写循环已闭合，类型化查询、Builder DSL、访问者 / 函数式遍历、文件 / 字节 IO、
 以及对照 Python 标准库的端到端验收均已就绪。
 
-> 端到端对照跑法：`bash e2etest/run.sh`，详见 [`e2etest/README.md`](./e2etest/README.md)。
-
 ---
 
 ## 快速上手
@@ -405,32 +403,3 @@ match (node.kind()) {
 | `MemPool` / `StrPair`            | （不提供）                      | GC 语言的职责边界                |
 | 全局静态写出开关                 | `XmlWriteOptions`               | 显式配置，多线程安全             |
 
----
-
-## 路线图
-
-```text
-M0 脚手架 ✅
-  ↓
-M1 DOM 内核 ✅
-  ↓
-M2 Writer ✅
-  ↓
-M3 Parser ✅
-  ↓
-M4 Query + Builder ✅
-  ↓
-M5 Visit ✅
-  ↓
-M6 IO + Error + Options 收口 ✅
-  ↓
-M7 Batch / Concurrency ⛔（跳过，后续大版本再议）
-  ↓
-M8 回归 / E2E / 发布 ✅  ← 当前稳定面
-```
-
----
-
-## 许可证
-
-待定（TBD）。
