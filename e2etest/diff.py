@@ -48,31 +48,52 @@ def diff_file(py: dict, cj: dict) -> list[str]:
 
 
 def main() -> int:
-    if len(sys.argv) != 3:
-        print("usage: diff.py <python.json> <cangjie.json>", file=sys.stderr)
-        return 2
-    py_all = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
-    cj_all = json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
+    import argparse
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("python_json")
+    ap.add_argument("cangjie_json")
+    ap.add_argument(
+        "--label",
+        default="",
+        help="Human-readable mode name for log lines (e.g. 'parse', 'roundtrip-pretty').",
+    )
+    ap.add_argument(
+        "--subset",
+        action="store_true",
+        help="Only diff the fixtures present in the cangjie-side JSON (used by 'builder' mode).",
+    )
+    args = ap.parse_args()
+
+    py_all = json.loads(Path(args.python_json).read_text(encoding="utf-8"))
+    cj_all = json.loads(Path(args.cangjie_json).read_text(encoding="utf-8"))
+    label = f"[{args.label}] " if args.label else ""
 
     py_keys = set(py_all.keys())
     cj_keys = set(cj_all.keys())
-    if py_keys != cj_keys:
-        print("[FAIL] fixture set mismatch:")
+    # 默认要求两侧键完全一致；`--subset` 模式放宽为"只比 cangjie 提到的子集"。
+    compare_keys = cj_keys if args.subset else py_keys
+    if not args.subset and py_keys != cj_keys:
+        print(f"{label}[FAIL] fixture set mismatch:")
         print(f"  only in python: {sorted(py_keys - cj_keys)}")
         print(f"  only in cangjie: {sorted(cj_keys - py_keys)}")
         return 1
+    missing = compare_keys - py_keys
+    if missing:
+        print(f"{label}[FAIL] cangjie references fixtures not present in python side: {sorted(missing)}")
+        return 1
 
     total_errs: list[str] = []
-    for name in sorted(py_keys):
+    for name in sorted(compare_keys):
         total_errs.extend(diff_file(py_all[name], cj_all[name]))
 
     if total_errs:
-        print(f"[FAIL] {len(total_errs)} difference(s):")
+        print(f"{label}[FAIL] {len(total_errs)} difference(s):")
         for e in total_errs:
             print(f"  - {e}")
         return 1
 
-    print(f"[PASS] all {len(py_keys)} fixtures produce identical fingerprints")
+    print(f"{label}[PASS] all {len(compare_keys)} fixtures produce identical fingerprints")
     return 0
 
 

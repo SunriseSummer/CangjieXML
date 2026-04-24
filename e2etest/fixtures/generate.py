@@ -160,6 +160,56 @@ FIXTURES = {
 }
 
 
+# ---- 手写 XML 片段（ET 无法表达的结构） ---------------------------------
+
+def write_cdata_terminator_fixture(path: Path) -> None:
+    """CDATA 内部含 `]]>`——触发 writer 分段路径；Python ET 与我们都应正常读回。"""
+    xml = (
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        '<r><code><![CDATA[foo]]]]><![CDATA[>bar]]></code></r>'
+    )
+    path.write_text(xml, encoding="utf-8")
+
+
+def write_bom_fixture(path: Path) -> None:
+    """UTF-8 BOM 开头——对齐 `acceptBom` 默认路径；Python ET 会自动忽略 BOM。"""
+    xml = '<?xml version="1.0" encoding="utf-8"?>\n<r><x a="1">hi</x></r>'
+    path.write_bytes(b"\xef\xbb\xbf" + xml.encode("utf-8"))
+
+
+def write_doctype_fixture(path: Path) -> None:
+    """DOCTYPE 走 XmlUnknown 路径；ET 会忽略 DOCTYPE，剩余元素对齐即可。"""
+    xml = (
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        '<!DOCTYPE note SYSTEM "note.dtd">\n'
+        '<note><to>Tove</to><from>Jani</from><body>Don\'t forget me!</body></note>'
+    )
+    path.write_text(xml, encoding="utf-8")
+
+
+def write_pi_in_element_fixture(path: Path) -> None:
+    """元素内处理指令——我们存为 XmlUnknown("?...?")；ET 默认忽略 PI。"""
+    xml = (
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        '<doc><?xml-stylesheet href="x.xsl" type="text/xsl"?>'
+        '<p>hello</p></doc>'
+    )
+    path.write_text(xml, encoding="utf-8")
+
+
+def write_entity_refs_fixture(path: Path) -> None:
+    """集中触发命名 / 十进制 / 十六进制实体——与 04_unicode 互补。"""
+    xml = (
+        '<?xml version="1.0" encoding="utf-8"?>\n'
+        '<refs>'
+        '<named>&amp;&lt;&gt;&quot;&apos;</named>'
+        '<decimal>A=&#65; Z=&#90;</decimal>'
+        '<hex>zh=&#x4E2D;&#x6587; emoji=&#x1F600;</hex>'
+        '</refs>'
+    )
+    path.write_text(xml, encoding="utf-8")
+
+
 def main() -> int:
     FIXTURE_DIR.mkdir(parents=True, exist_ok=True)
     for name, factory in FIXTURES.items():
@@ -171,9 +221,19 @@ def main() -> int:
     _write(tree, "09_bookstore_no_decl.xml", declaration=False)
     print("[fixtures] wrote 09_bookstore_no_decl.xml")
     # 真正含 CDATA 区段的文件（手写，ET 不支持写 CDATA）
-    cdata_path = FIXTURE_DIR / "10_cdata.xml"
-    write_cdata_fixture(cdata_path)
+    write_cdata_fixture(FIXTURE_DIR / "10_cdata.xml")
     print("[fixtures] wrote 10_cdata.xml")
+    # 覆盖面扩展：CDATA `]]>` 分段 / BOM / DOCTYPE / 元素内 PI / 实体集合
+    write_cdata_terminator_fixture(FIXTURE_DIR / "11_cdata_terminator.xml")
+    print("[fixtures] wrote 11_cdata_terminator.xml")
+    write_bom_fixture(FIXTURE_DIR / "12_bom.xml")
+    print("[fixtures] wrote 12_bom.xml")
+    write_doctype_fixture(FIXTURE_DIR / "13_doctype.xml")
+    print("[fixtures] wrote 13_doctype.xml")
+    write_pi_in_element_fixture(FIXTURE_DIR / "14_pi_in_element.xml")
+    print("[fixtures] wrote 14_pi_in_element.xml")
+    write_entity_refs_fixture(FIXTURE_DIR / "15_entity_refs.xml")
+    print("[fixtures] wrote 15_entity_refs.xml")
     return 0
 
 

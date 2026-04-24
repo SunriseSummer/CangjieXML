@@ -164,10 +164,27 @@ func testDoctypeUnknownRoundTrip(): Unit {
     let sink = StringXmlSink()
     XmlWriter(sink, options: XmlWriteOptions(writeDeclaration: false, compact: true))
         .writeDocument(doc)
-    let doc2 = XmlDocument.parseString(sink.toString())
+    let out = sink.toString()
+    // 回归："<!" / "!"" 双重包装曾把 <!DOCTYPE ...> 写成 <!!DOCTYPE ...>。
+    // 正确：输出必须与输入一字不差。
+    @Expect(out, xml)
+    let doc2 = XmlDocument.parseString(out)
     var unknownCount = 0
     for (n in doc2.childNodes()) {
         if (let Unknown(_) <- n.kind()) { unknownCount++ }
     }
     @Expect(unknownCount, 1)
+}
+
+@Test
+func testProcessingInstructionInsideElementRoundTrip(): Unit {
+    // 元素内的 <?target data?> 存为 XmlUnknown("?target data?")。
+    // 写回时必须仍是 <?target data?>，不能变成 <!?target data?>。
+    let xml = "<r><?xml-stylesheet href=\"a.xsl\"?><a/></r>"
+    let doc = XmlDocument.parseString(xml)
+    let sink = StringXmlSink()
+    XmlWriter(sink, options: XmlWriteOptions(writeDeclaration: false, compact: true))
+        .writeDocument(doc)
+    let out = sink.toString()
+    @Expect(out, xml)
 }

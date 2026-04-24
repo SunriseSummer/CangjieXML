@@ -274,17 +274,11 @@ func testBomAccepted(): Unit {
 
 @Test
 func testBomPropagatesToDocument(): Unit {
-    // 回归：parser 剥离 BOM 时必须把 doc.hasBom 置为 true，
-    // 否则 parse → write 会丢失 BOM 语义。
-    let withBom = "\u{FEFF}<r/>"
-    let doc = XmlDocument.parseString(withBom)
+    // 回归：parser 剥离 BOM 时必须把 doc.hasBom=true；否则 parse→write 丢 BOM。
+    let doc = XmlDocument.parseString("\u{FEFF}<r/>")
     @Expect(doc.hasBom, true)
-    // 但 writeBom 不应被连带置为 true——调用方仍需显式决定是否写 BOM。
-    @Expect(doc.writeBom, false)
-
-    // 反面：无 BOM 输入解析后 hasBom 保持 false。
-    let plain = XmlDocument.parseString("<r/>")
-    @Expect(plain.hasBom, false)
+    @Expect(doc.writeBom, false)  // writeBom 不应被连带打开
+    @Expect(XmlDocument.parseString("<r/>").hasBom, false)
 }
 
 @Test

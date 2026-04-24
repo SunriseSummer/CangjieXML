@@ -5,15 +5,24 @@ import std.fs.*
 import std.sort.*
 import cangjie_xml.dom.*
 import cangjie_xml.io.*
+import cangjie_xml.parser.*
+import cangjie_xml.writer.*
+
+/** Probe 的四种运行模式——影响 `loadForFingerprint` 走哪条库路径。 */
+enum ProbeMode {
+    | ModeParse
+    | ModeRoundTripPretty
+    | ModeRoundTripCompact
+    | ModeBuilder
+}
 
 /**
- * 把单个 fixture 的指纹写进 `out`，使用与 `python_probe/probe.py` 完全一致的 JSON 形状。
- *
- * 两端必须严格对齐——任何字段顺序、键名、文本规范化规则的偏差都会直接炸 diff。
+ * 把单个 fixture 的指纹写进 `out`。JSON 形状与 `python_probe/probe.py` 完全一致
+ * ——两端任何字段顺序 / 键名 / 文本规范化规则的偏差都会被 diff 立刻炸出。
  */
-func writeFileFingerprint(out: StringBuilder, dir: String, name: String): Unit {
+func writeFileFingerprint(out: StringBuilder, dir: String, name: String, mode: ProbeMode): Unit {
     let path = "${dir}/${name}"
-    let doc = loadXmlFromFile(path)
+    let doc = loadDocForMode(path, mode)
 
     let elements = ArrayList<ElementRecord>()
     match (doc.rootElement) {
@@ -21,12 +30,44 @@ func writeFileFingerprint(out: StringBuilder, dir: String, name: String): Unit {
         case None => ()
     }
 
+    // `declaration_present` 永远按原始字节判定；roundtrip 写出的 XML 即便丢了
+    // declaration（compact + writeDeclaration=true 保留；pretty 默认也保留），
+    // 也不应改变"原文件指纹"的该字段——否则 diff 反而会误报。
     let declPresent = hasXmlDeclaration(path)
     let rootName = match (doc.rootElement) {
         case Some(r) => r.name
         case None => ""
     }
 
+    emitFingerprint(out, name, declPresent, rootName, elements)
+}
+
+/** 根据模式选择库路径：直接 parse / parse→write→parse 的往返。 */
+func loadDocForMode(path: String, mode: ProbeMode): XmlDocument {
+    match (mode) {
+        case ModeParse => loadXmlFromFile(path)
+        case ModeRoundTripPretty => roundTrip(loadXmlFromFile(path), XmlWriteOptions.default_())
+        case ModeRoundTripCompact => roundTrip(loadXmlFromFile(path), XmlWriteOptions.compactPreset())
+        case ModeBuilder =>
+            // `builder` 模式不应通过本函数——由 `renderBuilderFixtures` 直接调用。
+            throw Exception("loadDocForMode called with ModeBuilder (internal error)")
+    }
+}
+
+/** parse → write（以 `opts` 排版）→ parse，返回新 Document。 */
+func roundTrip(doc: XmlDocument, opts: XmlWriteOptions): XmlDocument {
+    let sink = StringXmlSink()
+    let w = XmlWriter(sink, options: opts)
+    w.writeDocument(doc)
+    parseXml(sink.toString())
+}
+
+/** 写出一条 fixture 的指纹 JSON。抽取以便 `renderBuilderFixtures` 复用。 */
+func emitFingerprint(
+    out: StringBuilder, name: String,
+    declPresent: Bool, rootName: String,
+    elements: ArrayList<ElementRecord>
+): Unit {
     out.append("  \"${jsonEscape(name)}\": {\n")
     out.append("    \"file\": \"${jsonEscape(name)}\",\n")
     out.append("    \"declaration_present\": ${declPresent},\n")
@@ -216,3 +257,4 @@ func hexNibble(n: Int64): String {
     if (n < 10) { "${n}" }
     else { String(Rune(UInt32(87 + n))) }  // 'a' = 97 → 97 - 10 = 87
 }
+

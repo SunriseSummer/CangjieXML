@@ -140,7 +140,10 @@ extend XmlParser {
             } else if (r == CH_GT && depth == 0) {
                 let body = cur.sliceString(start, cur.idx)
                 cur.advance()
-                return doc.createUnknown("!${body}")
+                // `value` 语义与 tinyxml2 `XMLUnknown::_value` 对齐：只承载
+                // `<!` 与 `>` 之间的正文，不再带头部的 `!`——这样 writer 仅需
+                // 为"非 PI 形态"的 Unknown 补 `<!...>` 包装即可。
+                return doc.createUnknown(body)
             }
             cur.advance()
         }

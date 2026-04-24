@@ -43,7 +43,7 @@ enum ElementLayout {
  * |---|---|
  * | 无 | 自闭合 `<e/>` |
  * | 含文本 / CDATA | 全内联（保留空白语义） |
- * | 全部为元素 / 注释 / 未知节点 | 块级缩进 |
+ * | 其它 | 块级缩进 |
  */
 public class XmlWriter {
     let sink: XmlSink
@@ -55,7 +55,6 @@ public class XmlWriter {
         this.sink = sink
         this.opts = options
     }
-
 
     public func writeDocument(doc: XmlDocument): Unit {
         writeBomIfNeeded(doc)
@@ -252,9 +251,12 @@ public class XmlWriter {
     }
 
     private func writeUnknownRaw(value: String): Unit {
-        sink.write(UNKNOWN_OPEN)
-        sink.write(value)
-        sink.write(UNKNOWN_CLOSE)
+        // PI 形态（`?...?`）原样，bang markup 包 `<!...>`。
+        if (value.startsWith("?")) {
+            sink.write(TAG_OPEN); sink.write(value); sink.write(TAG_CLOSE)
+        } else {
+            sink.write(UNKNOWN_OPEN); sink.write(value); sink.write(UNKNOWN_CLOSE)
+        }
     }
 
 
