@@ -319,10 +319,25 @@ main() {
 
 `SaxHandler` + `DefaultSaxHandler` + `SaxDriver`（详见 `src/parser/sax_handler.cj`）。
 
-### `reader` —— 拉式游标（Phase 4c）
+### `reader` —— 拉式游标（Phase 4c / 4c+）
 
-`XmlReader.fromString` / `fromParser` + 13 态 `ReaderNodeType` + 5 态
-`ReaderState`（详见 `src/reader/`）。
+- **Phase 4c**：`XmlReader.fromString` / `fromParser` / `fromEvents` + 13 态
+  `ReaderNodeType` + 5 态 `ReaderState`。
+- **Phase 4c+**：子树提取 API —— `readOuterXml()` / `readInnerXml()` /
+  `readSubtree()`。对齐 .NET `XmlReader.ReadOuterXml` / `ReadInnerXml` /
+  `ReadSubtree` 语义：要求当前光标为 Element，否则抛 `XmlException`；
+  `readOuterXml` / `readInnerXml` 返回 UTF-8 字符串（不含声明 / 不缩进）；
+  `readSubtree` 返回独立的 `XmlReader`（事件来自缓冲的 SaxEvent 列表）。
+
+```cangjie
+let r = XmlReader.fromString("<feed><item id=\"1\"><title>a</title></item></feed>")
+while (r.read()) {
+    if (r.nodeType() == ReaderNodeType.Element && r.localName() == "item") {
+        println(r.readOuterXml())   // "<item id=\"1\"><title>a</title></item>"
+        // r 的光标已前进到 item 的配对 EndElement 之后
+    }
+}
+```
 
 ---
 
@@ -331,6 +346,5 @@ main() {
 见 [`progress.md`](./progress.md)。按 `ROADMAP.md` 顺序，后续候选迭代：
 
 - **Phase 3c**：外部实体 + `recover=true` 容错 + W3C `xmltest` 黄金对比；
-- **Phase 4c+**：`XmlReader.readInnerXml` / `readOuterXml` / `readSubtree`；
 - **Phase 5c**：共享 `NamespaceScope` 跟踪器（C14N 预埋）；
 - **Phase 6**：XPath 1.0。

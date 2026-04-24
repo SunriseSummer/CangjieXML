@@ -1,6 +1,6 @@
 # CangjieXML 开发进度
 
-> 相对 [libxml2 v2.15.3](./.libxml2-2.15.3) 全量功能的实现情况。最新更新：迭代 13 结束（Phase 4b —— `tree.Element` 变更 API + 节点 `detach()`）。
+> 相对 [libxml2 v2.15.3](./.libxml2-2.15.3) 全量功能的实现情况。最新更新：迭代 14 结束（Phase 4c+ —— `XmlReader.readOuterXml` / `readInnerXml` / `readSubtree` 子树提取 API）。
 
 ---
 
@@ -12,7 +12,7 @@
 | 1 | `core` 基础设施 | `chvalid`、`xmlstring`、`buf`、`dict`、`hash`、`error`、`uri` | ✅ 已完成 |
 | 2 | `encoding` + `io` | `encoding.c`、`xmlIO.c` | ✅ 已完成 |
 | 3 | `parser` 词法 + 事件流 | `parser.c`、`parserInternals.c` | 🟢 词法 + 语法骨架已完成（Phase 3a+3b），容错模式 + 外部实体留待 Phase 3c |
-| 4 | `tree` + `sax` + `reader` | `tree.c`、`SAX2.c`、`xmlreader.c` | 🟢 只读 DOM + DocumentBuilder（4a）+ 拉式 `XmlReader`（4c）+ 推式 `SaxHandler`/`SaxDriver`（4d）+ DOM 变更 API（4b）完成 |
+| 4 | `tree` + `sax` + `reader` | `tree.c`、`SAX2.c`、`xmlreader.c` | 🟢 只读 DOM + DocumentBuilder（4a）+ 拉式 `XmlReader`（4c）+ `readOuterXml`/`readInnerXml`/`readSubtree`（4c+）+ 推式 `SaxHandler`/`SaxDriver`（4d）+ DOM 变更 API（4b）完成 |
 | 5 | `writer` + `save` | `xmlwriter.c`、`xmlsave.c` | 🟢 `DocumentSerializer`（5a）+ `XmlWriter` 推式 API（5b）已完成；黄金对比 / 作用域跟踪留待后续 |
 | 6 | `xpath` | `xpath.c` | ⬜ 未开始 |
 | 7 | `regexp` + `pattern` + `dtd` | `valid.c`、`xmlregexp.c`、`pattern.c` | ⬜ 未开始 |
@@ -23,7 +23,7 @@
 | 12 | 工具链与发布 | `xmllint.c`、`xmlcatalog.c` | ⬜ 未开始 |
 | 13 | 硬化与优化 | `runtest.c`、`fuzz/` | ⬜ 未开始 |
 
-**粗略完成度**：核心功能 ≈ 50%（Phase 1 基础设施 + Phase 2 字符编解码 / I/O + Phase 3a 词法器 + Phase 3b XmlParser 骨架 + Phase 4a 只读 DOM + DocumentBuilder + Phase 4b DOM 变更 API + Phase 4c XmlReader + Phase 4d SaxHandler/SaxDriver + Phase 5a 基础序列化器 + Phase 5b 推式 XmlWriter；不含容错模式 / 外部实体 / 验证器 / XPath / 工具链）。
+**粗略完成度**：核心功能 ≈ 52%（Phase 1 基础设施 + Phase 2 字符编解码 / I/O + Phase 3a 词法器 + Phase 3b XmlParser 骨架 + Phase 4a 只读 DOM + DocumentBuilder + Phase 4b DOM 变更 API + Phase 4c XmlReader + Phase 4c+ 子树提取 + Phase 4d SaxHandler/SaxDriver + Phase 5a 基础序列化器 + Phase 5b 推式 XmlWriter；不含容错模式 / 外部实体 / 验证器 / XPath / 工具链）。
 
 ---
 
@@ -1055,4 +1055,87 @@ element.clearAttributes()
   （复用 `DocumentSerializer`）；
 - Phase 5c：共享 `NamespaceScope` 跟踪器（C14N 预埋）；
 - Phase 3c：容错模式 + 外部实体 + W3C xmltest 黄金对比；
+- Phase 6：XPath 1.0 前置设计（为 DOM 节点编入 `docOrderId`）。
+
+## 已实现（迭代 14 — Phase 4c+：XmlReader 子树提取 API）
+
+### 背景
+
+> Phase 4c 的 `XmlReader` 只提供"逐节点游走"，要用它实现 RSS-style 的"遇到
+> `<item>` 就把整个元素取出处理"这类常见流式模式，调用方得手动栈跟踪子树
+> 边界 + 重新序列化。.NET `XmlReader.ReadOuterXml` / `ReadInnerXml` /
+> `ReadSubtree` 正是为这类场景而设；libxml2 在 2.12 也补齐了
+> `xmlTextReaderReadOuterXml`。本迭代对齐这一行为。
+
+### 新增（3 个源文件 + 1 个测试文件，均 ≤ 300 行）
+
+| 文件 | 行数 | 内容 |
+| --- | --- | --- |
+| `src/reader/subtree_builder.cj` | 137 | `buildElementFromEvents` + `collectSubtreeEvents` —— 从 SaxEvent 窗口重建 Element / 收集事件列表 |
+| `src/reader/xml_reader_subtree.cj` | 176 | `extend XmlReader`：`readOuterXml` / `readInnerXml` / `readSubtree` + `BufferedEventsIterator` + `SaxEvent.startElementQName()` |
+| `src/reader/xml_reader_subtree_test.cj` | 253 | 22 条单元测试 |
+
+另外修改：
+- `src/reader/xml_reader.cj`：`parser: XmlParser` 字段抽象为 `events: Iterator<SaxEvent>`；新增 `fromEvents` 入口；`fromString` / `fromParser` 接口不变。
+- `src/reader/xml_reader_ops.cj`：内部 `parser.next()` → `events.next()`。
+- `src/save/document_serializer.cj` + `document_serializer_nodes.cj`：新增 `DocumentSerializer.nodeToString(n)` / `writeNodeOnly` / `runSerializeNodeOnly`（支撑 `readInnerXml` 的子节点按序列化）。
+- `src/tree/leaf_nodes.cj` + `src/tree/element.cj`：所有节点 `init` 改 `public`（从外部包构造 DOM 节点的必需，`subtree_builder` 就在 reader 包里）。
+
+### 公开 API
+
+```cangjie
+// 要求当前光标为 Element；否则抛 XmlException。
+reader.readOuterXml(): String       // <el ...>children</el>
+reader.readInnerXml(): String       // children（无 <el> 壳）
+reader.readSubtree(): XmlReader     // 独立 sub-reader，事件来自缓冲 SaxEvent 列表
+
+// 新增通用入口
+XmlReader.fromEvents(Iterator<SaxEvent>): XmlReader
+
+// save 新增
+DocumentSerializer.nodeToString(Node, opts!: SerializeOptions = ...): String
+```
+
+### 关键设计决策
+
+1. **不直接复用 `tree.DocumentBuilder`** —— DocumentBuilder 要求以
+   StartDocument / EndDocument 为边界，而子树调用发生在"某元素内部"，
+   这俩事件不会出现。故新建一个轻量 `buildElementFromEvents`：以深度
+   计数 + 显式 `ArrayStack<Element>` 展开事件序列（防极深嵌套爆栈）。
+2. **`readSubtree` 的事件源是缓冲拷贝** —— 不是在原事件流上"划定窗口"。
+   原因：`XmlReader` 的 `events: Iterator<SaxEvent>` 只能单向前进，两个游标
+   共享同一迭代器会互相干扰。缓冲拷贝简单可靠，代价是 O(子树大小) 空间。
+3. **`XmlReader` 解耦到 `Iterator<SaxEvent>`** —— 原字段 `parser: XmlParser`
+   改为 `events: Iterator<SaxEvent>`。由于 `XmlParser` 实现了 `Iterator`，
+   原 `fromParser` 仍兼容；新入口 `fromEvents` 为 `readSubtree` 让路。
+4. **游标推进到"配对 EndElement"** —— `readOuterXml` / `readInnerXml` /
+   `readSubtree` 消费完事件后，不是直接进入"下一个兄弟"，而是把 `current`
+   合成为一个 `EndElement(unknown, qname)`。下次 `read()` 走正常 depth-1
+   路径，语义与用户显式调 `skip()` 后再 `read()` 完全一致。
+5. **`readInnerXml` 走子节点循环 + `DocumentSerializer.nodeToString`**，
+   而不是"`elementToString` 后去壳"。后者需要字符串剪裁，不鲁棒；前者
+   直接用 save 包的既有按节点序列化路径，天然正确。
+6. **不支持属性游标上的调用** —— `attrCursor >= 0` 时抛异常；与 .NET 规定
+   的"must be on Element"一致。
+
+### 新增测试（22 条）
+
+- `readOuterXml`（9）：自闭合 / 文本子 / 嵌套 / 属性 / 混合 / CDATA / 注释 /
+  游标推进正确 / 兄弟独立
+- `readInnerXml`（5）：空 / 文本 / 嵌套 / 混合 / 游标推进正确
+- `readSubtree`（5）：基础 / 走到 EOF / 外 reader 正确前进 /
+  `isEmptyElement` 兼容 / 属性保留
+- 前置条件（2）：Text 节点上 `readOuterXml` / `readSubtree` 抛异常
+- 端到端（1）：`readOuterXml` 输出可被再次 `DocumentBuilder.parseString`
+
+### 验证
+
+- `cjpm build` 干净（仅既有两条 unused-function 警告未动）；
+- `cjpm test` **389 / 389** 全绿（367 旧 + 22 新）；
+- 所有新增 / 修改文件 ≤ 300 行。
+
+### 下一步（候选）
+
+- Phase 3c：容错模式 + 外部实体 + W3C xmltest 黄金对比；
+- Phase 5c：共享 `NamespaceScope` 跟踪器（C14N 预埋）；
 - Phase 6：XPath 1.0 前置设计（为 DOM 节点编入 `docOrderId`）。

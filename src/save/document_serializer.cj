@@ -47,6 +47,21 @@ public class DocumentSerializer {
         return DocumentSerializer(opts: opts).writeElementOnly(el)
     }
 
+    /**
+     * 仅序列化单个节点。对应 .NET `XmlReader.ReadInnerXml` 下游常用的"把任意
+     * Node 还原成 XML 文本"需求。
+     *
+     * - `Element`：等价 `elementToString`；
+     * - `TextNode`：返回 XML 转义后的字符数据；
+     * - `CdataSection`：原样包裹为 `<![CDATA[...]]>`（除非 `cdataAsText = true`）；
+     * - `CommentNode` / `PiNode`：输出 `<!--...-->` / `<?target data?>`；
+     * - `Document` / `DoctypeNode`：抛 `IllegalArgumentException`（这两种不是
+     *   "内联节点"，应走 `toString(doc)`）。
+     */
+    public static func nodeToString(n: Node, opts!: SerializeOptions = SerializeOptions()): String {
+        return DocumentSerializer(opts: opts).writeNodeOnly(n)
+    }
+
     /* ---------- 主入口（委派到 extend 实现） ---------- */
 
     public func write(doc: Document): String {
@@ -57,14 +72,23 @@ public class DocumentSerializer {
     public func writeElementOnly(el: Element): String {
         return serializeElementOnly(this, el)
     }
+
+    /** 内部入口：仅序列化单个节点。extend 负责实现。 */
+    public func writeNodeOnly(n: Node): String {
+        return serializeNodeOnly(this, n)
+    }
 }
 
 /* 包级转发函数：主类体内不能直接调用 extend 的成员；我们用
-   `serializeDocument` / `serializeElementOnly` 作为桥接。 */
+   `serializeDocument` / `serializeElementOnly` / `serializeNodeOnly` 作为桥接。 */
 func serializeDocument(s: DocumentSerializer, doc: Document): String {
     return s.runSerializeDocument(doc)
 }
 
 func serializeElementOnly(s: DocumentSerializer, el: Element): String {
     return s.runSerializeElementOnly(el)
+}
+
+func serializeNodeOnly(s: DocumentSerializer, n: Node): String {
+    return s.runSerializeNodeOnly(n)
 }

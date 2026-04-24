@@ -20,7 +20,7 @@ public class TextNode <: Node {
     let pos: Position
     var parentImpl: ?Element = None
 
-    init(data: String, position!: Position = Position.unknown()) {
+    public init(data: String, position!: Position = Position.unknown()) {
         this.data = data
         this.pos = position
     }
@@ -49,7 +49,7 @@ public class CdataSection <: Node {
     let pos: Position
     var parentImpl: ?Element = None
 
-    init(data: String, position!: Position = Position.unknown()) {
+    public init(data: String, position!: Position = Position.unknown()) {
         this.data = data
         this.pos = position
     }
@@ -78,7 +78,7 @@ public class CommentNode <: Node {
     let pos: Position
     var parentImpl: ?Element = None
 
-    init(data: String, position!: Position = Position.unknown()) {
+    public init(data: String, position!: Position = Position.unknown()) {
         this.data = data
         this.pos = position
     }
@@ -108,7 +108,7 @@ public class PiNode <: Node {
     let pos: Position
     var parentImpl: ?Element = None
 
-    init(target: String, data: String, position!: Position = Position.unknown()) {
+    public init(target: String, data: String, position!: Position = Position.unknown()) {
         this.target = target
         this.data = data
         this.pos = position
@@ -138,7 +138,7 @@ public class DoctypeNode <: Node {
     let pos: Position
     var parentImpl: ?Element = None
 
-    init(name: String, position!: Position = Position.unknown()) {
+    public init(name: String, position!: Position = Position.unknown()) {
         this.name = name
         this.pos = position
     }

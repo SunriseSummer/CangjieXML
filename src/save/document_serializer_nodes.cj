@@ -32,6 +32,26 @@ extend DocumentSerializer {
         return sb.toString()
     }
 
+    /**
+     * 序列化单个节点（Element / 叶子）。对 Document / DoctypeNode 抛异常
+     * （它们不是可内联节点；序列化 Document 请用 `runSerializeDocument`）。
+     */
+    func runSerializeNodeOnly(n: Node): String {
+        match (n) {
+            case e: Element => writeElementTree(e, 0)
+            case t: TextNode => sb.append(escapeXml(t.data))
+            case c: CdataSection => writeCdata(c)
+            case cm: CommentNode => writeComment(cm)
+            case pi: PiNode => writePi(pi)
+            case _: Document =>
+                throw IllegalArgumentException("DocumentSerializer.nodeToString: use toString(doc) for Document")
+            case _: DoctypeNode =>
+                throw IllegalArgumentException("DocumentSerializer.nodeToString: Doctype cannot be serialized standalone")
+            case _ => ()
+        }
+        return sb.toString()
+    }
+
     /* ---------- Prolog / Epilog / XML 声明 / DOCTYPE ---------- */
 
     func writeXmlDeclarationIfAny(decl: XmlDecl): Unit {

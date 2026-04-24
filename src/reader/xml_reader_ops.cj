@@ -23,7 +23,7 @@ extend XmlReader {
             return Some(p)
         }
         try {
-            return parser.next()
+            return events.next()
         } catch (e: XmlException) {
             state = ReaderState.Error
             throw e
@@ -35,7 +35,7 @@ extend XmlReader {
             return peeked
         }
         try {
-            peeked = parser.next()
+            peeked = events.next()
         } catch (e: XmlException) {
             state = ReaderState.Error
             throw e

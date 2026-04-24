@@ -35,7 +35,7 @@ import cangjie_xml.core.*
 import cangjie_xml.parser.*
 
 public class XmlReader {
-    let parser: XmlParser
+    let events: Iterator<SaxEvent>
     var state: ReaderState
     /** 当前光标对应的事件；Initial 时为 None。 */
     var current: ?SaxEvent
@@ -49,8 +49,8 @@ public class XmlReader {
     /** 光标停在 Attribute 时的属性索引；-1 表示停在宿主 Element 本身。 */
     var attrCursor: Int64
 
-    init(parser: XmlParser) {
-        this.parser = parser
+    init(events: Iterator<SaxEvent>) {
+        this.events = events
         this.state = ReaderState.Initial
         this.current = None
         this.peeked = None
@@ -67,6 +67,11 @@ public class XmlReader {
 
     public static func fromParser(p: XmlParser): XmlReader {
         return XmlReader(p)
+    }
+
+    /** 从任意 SaxEvent 迭代器构造 reader。`readSubtree` 使用此入口返回独立游标。 */
+    public static func fromEvents(events: Iterator<SaxEvent>): XmlReader {
+        return XmlReader(events)
     }
 
     /* ---------- 状态查询 ---------- */

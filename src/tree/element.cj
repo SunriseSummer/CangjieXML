@@ -28,7 +28,7 @@ public class Element <: Node {
     let pos: Position
     var parentImpl: ?Element = None
 
-    init(qname: QName, ns: NsContext, position!: Position = Position.unknown()) {
+    public init(qname: QName, ns: NsContext, position!: Position = Position.unknown()) {
         this.qname = qname
         this.ns = ns
         this.pos = position
@@ -139,7 +139,7 @@ class ElementChildrenFilter <: Iterator<Element> {
     let localName: String
     let uri: ?String
 
-    init(children: ArrayList<Node>, localName: String, uri: ?String) {
+    public init(children: ArrayList<Node>, localName: String, uri: ?String) {
         this.src = children.iterator()
         this.localName = localName
         this.uri = uri
