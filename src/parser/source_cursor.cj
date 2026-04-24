@@ -36,12 +36,17 @@ class SourceCursor {
     var line: Int64 = 1
     var column: Int64 = 1
 
+    // 解析前输入是否以 UTF-8 BOM 起首——由 parser 在构造文档后回写到
+    // `XmlDocument.hasBom`，以便 parse→write 的往返保留 BOM 语义。
+    let sawBom: Bool
+
     init(input: String, acceptBom: Bool) {
         let tmp = ArrayList<Rune>()
         for (r in input.runes()) {
             tmp.add(r)
         }
         // 剥离 BOM（仅当起首出现 U+FEFF 时）
+        var sawBomLocal = false
         if (tmp.size > 0 && tmp[0] == RUNE_BOM) {
             if (!acceptBom) {
                 throw XmlParseException(
@@ -49,7 +54,9 @@ class SourceCursor {
                         "unexpected UTF-8 BOM (acceptBom = false)"))
             }
             tmp.remove(at: 0)
+            sawBomLocal = true
         }
+        this.sawBom = sawBomLocal
         this.runes = tmp.toArray()
     }
 

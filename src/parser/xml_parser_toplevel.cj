@@ -11,8 +11,17 @@ import cangjie_xml.error.*
  */
 extend XmlParser {
 
-    /** 公共入口：解析整个文档到 `doc`。 */
+    /**
+     * 公共入口：解析整个文档到 `doc`。
+     *
+     * 副作用：如果输入以 UTF-8 BOM 起首（且 `acceptBom` 为真），
+     * 会把 `doc.hasBom` 置为 `true`，保证 parse→write 的往返可保留 BOM。
+     * `writeBom`（写出时是否发 BOM）保持不变——调用方按需显式开启。
+     */
     public func parseDocument(): Unit {
+        if (cur.sawBom) {
+            doc.hasBom = true
+        }
         cur.skipWhitespace()
         if (cur.eof()) {
             throw XmlParseException(EmptyDocument)
