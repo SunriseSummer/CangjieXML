@@ -59,7 +59,8 @@ main(args: Array<String>): Int64 {
 /**
  * 核心调度：解压 → 读取 workbook / 共享字符串 → 逐 sheet parse 并写 CSV。
  *
- * 为了让失败不留半成品，临时目录用 `mktemp -d` 在专属位置生成；本函数不主动
+ * 为了让失败不留半成品，临时目录经 `env.getTempDirectory()` + `Directory.createTemp`
+ * 在系统临时目录下生成唯一子目录（跨 Linux / Windows）；本函数不主动
  * 清理——留到进程退出由系统 tmpfs 清理即可，也方便用户在出错时手工检查
  * 解压产物。
  */

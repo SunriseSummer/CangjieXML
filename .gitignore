@@ -7,3 +7,4 @@ target/
 cjpm.lock
 .DS_Store
 excel/csv_out/
+excel/xlsx_to_csv/stdx/
