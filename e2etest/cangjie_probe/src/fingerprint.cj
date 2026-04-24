@@ -63,12 +63,15 @@ func loadDocForMode(path: String, mode: ProbeMode): XmlDocument {
     }
 }
 
-/** parse → write（以 `opts` 排版）→ parse，返回新 Document。 */
+/**
+ * parse → write（以 `opts` 排版）→ parse，返回新 Document。
+ *
+ * 用 `doc.writeToString(opts)` 而非手动构造 `XmlWriter`——这条路径走的是
+ * `writer.XmlWritable` 接口的跨包扩展方法，顺带作为"跨包可见性"的回归
+ * 保障：如果 `writeToString` 又被写成脱离接口的扩展，e2e 立刻挂。
+ */
 func roundTrip(doc: XmlDocument, opts: XmlWriteOptions): XmlDocument {
-    let sink = StringXmlSink()
-    let w = XmlWriter(sink, options: opts)
-    w.writeDocument(doc)
-    parseXml(sink.toString())
+    parseXml(doc.writeToString(opts))
 }
 
 /** 写出一条 fixture 的指纹 JSON。抽取以便 `renderBuilderFixtures` 复用。 */
