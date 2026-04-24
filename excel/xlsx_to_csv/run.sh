@@ -33,9 +33,20 @@ fi
 
 # --- 1. 确保 stdx 已就位 ---------------------------------------------------
 # cjpm.toml 把 `./stdx/dynamic/stdx` 作为 bin-dependencies 路径，下面的脚本
-# 只在该目录缺失时才触发下载，其它环境（比如离线）可以事先手工解压到同样
-# 位置。
+# 只在该目录缺失时才触发下载，其它环境（比如离线 / 非 Linux-x64 架构）可以
+# 事先手工解压到同样位置。
 if [ ! -d "${STDX_DIR}/dynamic/stdx" ]; then
+  # 默认下载包只覆盖 Linux x86_64；其它架构引导用户手工放置，避免拉到不匹配
+  # 的动态库造成链接失败。
+  sys="$(uname -s 2>/dev/null || echo unknown)"
+  arch="$(uname -m 2>/dev/null || echo unknown)"
+  if [ -z "${CANGJIE_STDX_URL:-}" ] && { [ "${sys}" != "Linux" ] || { [ "${arch}" != "x86_64" ] && [ "${arch}" != "amd64" ]; }; }; then
+    echo "error: default stdx zip targets Linux x86_64, but host is ${sys}/${arch}." >&2
+    echo "       set CANGJIE_STDX_URL=<url> to override, or manually extract the" >&2
+    echo "       matching stdx release into ${STDX_DIR}/ (see excel/xlsx_to_csv/README.md)." >&2
+    exit 2
+  fi
+
   echo "[xlsx_to_csv] stdx not found at ${STDX_DIR}, downloading from ${STDX_URL}"
   mkdir -p "${STDX_DIR}"
   tmp_zip="$(mktemp -t cangjie-stdx.XXXXXX.zip)"
