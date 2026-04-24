@@ -275,3 +275,205 @@ extend XmlWriteOptions {
         )
     }
 }
+
+// ======================================================================
+// 以下为原 `writer_extra_test.cj`（已合并）—— "容易被改坏又难以肉眼发现" 的
+// 边界：CDATA 拆分 / compact 预设 / 元素 writeToString 不带声明 / BOM 传递 /
+// 自闭合 / 属性值转义 / XmlWritable 公共接口可见性。
+// ======================================================================
+
+@Test
+func testWriteCdataTerminatorIsSplit(): Unit {
+    // CDATA 内容含 `]]>` 必须被拆成两段，否则写出的 XML 非法。
+    let doc = XmlDocument()
+    let root = doc.createElement("r")
+    doc.appendChild(root)
+    root.appendChild(doc.createText("foo]]>bar", cdata: true))
+
+    let opts = XmlWriteOptions(writeDeclaration: false, compact: true)
+    let out = doc.writeToString(opts)
+    @Expect(out, "<r><![CDATA[foo]]]]><![CDATA[>bar]]></r>")
+}
+
+@Test
+func testWriteCompactPresetNoIndentFromHand(): Unit {
+    // 不走 parser：完全用 DOM API 手动构造。
+    let doc = XmlDocument()
+    let a = doc.createElement("a")
+    doc.appendChild(a)
+    a.appendChild(doc.createElement("b"))
+    let c = doc.createElement("c")
+    c.setTextContent("x")
+    a.appendChild(c)
+    let out = doc.writeToString(XmlWriteOptions.compactPreset())
+    @Expect(out, "<?xml version=\"1.0\" encoding=\"UTF-8\"?><a><b/><c>x</c></a>")
+}
+
+@Test
+func testWriteElementOnlyOmitsDeclaration(): Unit {
+    // XmlElement.writeToString 只吐元素子树，不应带 <?xml ...?>
+    let doc = XmlDocument()
+    let r = doc.createElement("r")
+    r.appendChild(doc.createElement("a"))
+    doc.appendChild(r)
+    let s = r.writeToString(XmlWriteOptions.compactPreset())
+    @Expect(s.contains("<?xml"), false)
+    @Expect(s.startsWith("<r>"), true)
+}
+
+@Test
+func testWriteBomPropagatedFromDocument(): Unit {
+    // doc.writeBom = true 且 options.writeBom = false → 仍应写 BOM。
+    let doc = XmlDocument()
+    doc.appendChild(doc.createElement("r"))
+    doc.writeBom = true
+    let out = doc.writeToString(XmlWriteOptions(writeDeclaration: false))
+    let bytes = out.toArray()
+    @Expect(bytes.size >= 3, true)
+    @Expect(bytes[0], 0xEFu8)
+    @Expect(bytes[1], 0xBBu8)
+    @Expect(bytes[2], 0xBFu8)
+}
+
+@Test
+func testWriteEmptyElementSelfClosing(): Unit {
+    let doc = XmlDocument()
+    doc.appendChild(doc.createElement("x"))
+    let out = doc.writeToString(XmlWriteOptions(writeDeclaration: false, compact: true))
+    @Expect(out, "<x/>")
+}
+
+@Test
+func testWriteAttributeValueEscapesQuote(): Unit {
+    let doc = XmlDocument()
+    let r = doc.createElement("r")
+    r.setAttribute("msg", "she said \"hi\" & <3")
+    doc.appendChild(r)
+    let out = doc.writeToString(XmlWriteOptions(writeDeclaration: false, compact: true))
+    @Expect(out, "<r msg=\"she said &quot;hi&quot; &amp; &lt;3\"/>")
+}
+
+@Test
+func testXmlWritableIsAPublicInterface(): Unit {
+    // 回归测试：`writeToString` 必须经由 `XmlWritable` 接口声明，才能被跨包
+    // 调用方通过 `import cangjie_xml.writer.*` 看见——否则属于 cjc 1.0.5 的
+    // "extension 方法跨包不可见"坑（同 `query.XmlQueryable` 的历史教训）。
+    let doc = XmlDocument()
+    let el = doc.createElement("r")
+    doc.appendChild(el)
+
+    let dw: XmlWritable = doc
+    let ew: XmlWritable = el
+    let docStr = dw.writeToString(XmlWriteOptions(writeDeclaration: false, compact: true))
+    let elStr  = ew.writeToString(XmlWriteOptions.compactPreset())
+    @Expect(docStr, "<r/>")
+    @Expect(elStr, "<r/>")
+}
+
+// ======================================================================
+// 覆盖率补充：writeNode 分派 / inline 其他节点类型 / StringXmlSink 容量构造
+// ======================================================================
+
+@Test
+func testStringXmlSinkInitialCapacityConstructor(): Unit {
+    // 仅为构造兼容——内部不存储 capacity，但入参必须被接受。
+    let sink = StringXmlSink(1024)
+    sink.write("hello")
+    sink.write(" world")
+    @Expect(sink.toString(), "hello world")
+    sink.flush() // no-op
+}
+
+@Test
+func testWriterWriteNodeDispatchesDocument(): Unit {
+    // writeNode(doc) 应走 writeDocument 路径（带默认声明）
+    let doc = XmlDocument()
+    doc.appendChild(doc.createElement("r"))
+    let sink = StringXmlSink()
+    XmlWriter(sink).writeNode(doc)
+    @Expect(sink.toString().contains("<?xml"), true)
+    @Expect(sink.toString().contains("<r/>"), true)
+}
+
+@Test
+func testWriterWriteNodeOnElement(): Unit {
+    let doc = XmlDocument()
+    let el = doc.createElement("x")
+    doc.appendChild(el)
+    let sink = StringXmlSink()
+    XmlWriter(sink, options: XmlWriteOptions(writeDeclaration: false, compact: true))
+        .writeNode(el)
+    @Expect(sink.toString(), "<x/>")
+}
+
+@Test
+func testWriterWriteNodeOnText(): Unit {
+    let doc = XmlDocument()
+    let t = doc.createText("hi&there")
+    let sink = StringXmlSink()
+    XmlWriter(sink, options: XmlWriteOptions(writeDeclaration: false, compact: true))
+        .writeNode(t)
+    @Expect(sink.toString(), "hi&amp;there")
+}
+
+@Test
+func testWriterWriteNodeOnComment(): Unit {
+    let doc = XmlDocument()
+    let c = doc.createComment(" lone ")
+    let sink = StringXmlSink()
+    XmlWriter(sink, options: XmlWriteOptions(writeDeclaration: false, compact: true))
+        .writeNode(c)
+    @Expect(sink.toString(), "<!-- lone -->")
+}
+
+@Test
+func testWriterWriteNodeOnUnknown(): Unit {
+    let doc = XmlDocument()
+    let u = doc.createUnknown("DOCTYPE html")
+    let sink = StringXmlSink()
+    XmlWriter(sink, options: XmlWriteOptions(writeDeclaration: false, compact: true))
+        .writeNode(u)
+    @Expect(sink.toString(), "<!DOCTYPE html>")
+}
+
+@Test
+func testWriterWriteNodeOnDeclaration(): Unit {
+    let doc = XmlDocument()
+    let d = doc.createDeclaration(value: Some("xml version=\"1.1\""))
+    let sink = StringXmlSink()
+    XmlWriter(sink, options: XmlWriteOptions(writeDeclaration: false, compact: true))
+        .writeNode(d)
+    @Expect(sink.toString(), "<?xml version=\"1.1\"?>")
+}
+
+@Test
+func testWriterInlineRendersAllChildKinds(): Unit {
+    // 覆盖 writeNodeInline 的 Comment / Declaration / Unknown 三支——
+    // 当外层元素被判为 Inline（含 Text 子节点）时，这些兄弟节点走 inline 分支。
+    let doc = XmlDocument()
+    let r = doc.createElement("r")
+    doc.appendChild(r)
+    r.appendChild(doc.createText("a "))
+    r.appendChild(doc.createComment("c"))
+    r.appendChild(doc.createText(" b "))
+    r.appendChild(doc.createUnknown("DOCTYPE x"))
+    r.appendChild(doc.createText(" end"))
+    let s = doc.writeToString(XmlWriteOptions(writeDeclaration: false, compact: true))
+    @Expect(s.contains("<!--c-->"), true)
+    @Expect(s.contains("<!DOCTYPE x>"), true)
+    @Expect(s.startsWith("<r>a "), true)
+    @Expect(s.endsWith(" end</r>"), true)
+}
+
+@Test
+func testWriterInlineEmptyChildElementSelfCloses(): Unit {
+    // 外层元素含文本+空子元素，触发 writeElementInline 的 "None" 分支（自闭合）
+    let doc = XmlDocument()
+    let r = doc.createElement("r")
+    doc.appendChild(r)
+    r.appendChild(doc.createText("x"))
+    r.appendChild(doc.createElement("e")) // 空元素
+    r.appendChild(doc.createText("y"))
+    let s = doc.writeToString(XmlWriteOptions(writeDeclaration: false, compact: true))
+    @Expect(s, "<r>x<e/>y</r>")
+}

@@ -270,3 +270,205 @@ func testEndToEndBuildSaveLoadQuery(): Unit {
         tmp.cleanup()
     }
 }
+
+// ======================================================================
+// 以下为原 `io_extra_test.cj`（已合并）：close 幂等 / 空字节解析 /
+// saveXmlToFile 失败不留半写入文件。单元测试文件允许超过 300 行。
+// ======================================================================
+
+@Test
+func testFileXmlSinkCloseIsIdempotent(): Unit {
+    let tmp = TempFile("close_idempotent.xml")
+    try {
+        let sink = FileXmlSink(tmp.path)
+        sink.write("<r/>")
+        sink.close()
+        @Expect(sink.isClosed(), true)
+        // 第二次 close 不应抛，也不应复活句柄。
+        sink.close()
+        @Expect(sink.isClosed(), true)
+        // 文件内容仍然只有一次写入的结果。
+        let content = String.fromUtf8(File.readFrom(Path(tmp.path)))
+        @Expect(content, "<r/>")
+    } finally {
+        tmp.cleanup()
+    }
+}
+
+@Test
+func testParseEmptyBytesThrowsParseException(): Unit {
+    // 走 io 层解码 + parser 层"空输入"一条链。空 UTF-8 字节不是 IO 错误，
+    // 因此我们期望抛出 `XmlParseException`（由 parser 判定），而不是
+    // `XmlIoException`。
+    var threw = false
+    try {
+        parseXmlBytes([])
+    } catch (_: XmlParseException) {
+        threw = true
+    }
+    @Expect(threw, true)
+}
+
+@Test
+func testSaveXmlToFileAtomicOnSerializationFailureAvoidsPartialFile(): Unit {
+    // `saveXmlToFile` 通过"先序列化到内存字节，再一次性写盘"的设计天然
+    // 规避了"部分写入"。此测试钉死这条设计：对一份合法 doc，若目标路径
+    // 所在目录不存在，我们应当抛 `XmlIoException`，并且不会创建任何副作用。
+    let bogusDir = "/nonexistent_cangjie_xml_dir_e7a3c/out.xml"
+    let doc = XmlDocument()
+    doc.appendChild(doc.createElement("r"))
+    var threw = false
+    try {
+        saveXmlToFile(doc, bogusDir)
+    } catch (_: XmlIoException) {
+        threw = true
+    }
+    @Expect(threw, true)
+    @Expect(exists(Path(bogusDir)), false)
+}
+
+// ======================================================================
+// 覆盖率补充：XmlIoException.getClassName / FileXmlSink 边界状态
+// ======================================================================
+
+@Test
+func testXmlIoExceptionGetClassName(): Unit {
+    let e = XmlIoException(FileReadFailed("x", "boom"))
+    @Expect(e.getClassName(), "XmlIoException")
+    // message 透传自 XmlError.toString()
+    @Expect(e.message.contains("x"), true)
+}
+
+@Test
+func testXmlIoExceptionWrapsErrorField(): Unit {
+    let e = XmlIoException(FileNotFound("/nope"))
+    match (e.error) {
+        case FileNotFound(p) => @Expect(p, "/nope")
+        case _ => @Fail("expected FileNotFound")
+    }
+}
+
+@Test
+func testFileXmlSinkFlushAfterCloseIsNoOp(): Unit {
+    // close 之后再 flush 应为 no-op——不抛、不改状态。
+    let tmp = TempFile("flush_after_close.xml")
+    try {
+        let sink = FileXmlSink(tmp.path)
+        sink.write("<x/>")
+        sink.close()
+        sink.flush()  // 不应抛
+        @Expect(sink.isClosed(), true)
+    } finally {
+        tmp.cleanup()
+    }
+}
+
+@Test
+func testFileXmlSinkExplicitFlushBeforeClose(): Unit {
+    // 覆盖 flush() 的"未关闭"分支——主动调用时内容应进磁盘。
+    let tmp = TempFile("flush_before_close.xml")
+    try {
+        let sink = FileXmlSink(tmp.path)
+        sink.write("<y/>")
+        sink.flush()
+        sink.close()
+        @Expect(String.fromUtf8(File.readFrom(Path(tmp.path))), "<y/>")
+    } finally {
+        tmp.cleanup()
+    }
+}
+
+@Test
+func testFileXmlSinkWriteAfterCloseRejected(): Unit {
+    // 覆盖 write() 的 `closed` 分支：关闭后再写必须抛 XmlIoException。
+    let tmp = TempFile("write_after_close.xml")
+    try {
+        let sink = FileXmlSink(tmp.path)
+        sink.write("<r/>")
+        sink.close()
+        var threw = false
+        try {
+            sink.write("<after/>")
+        } catch (e: XmlIoException) {
+            if (let FileWriteFailed(_, _) <- e.error) { threw = true }
+        }
+        @Expect(threw, true)
+    } finally {
+        tmp.cleanup()
+    }
+}
+
+@Test
+func testFileXmlSinkConstructorFailureOnBadPath(): Unit {
+    // 目标目录不存在 → 构造期捕获 FSException 映射为 XmlIoException
+    var threw = false
+    try {
+        FileXmlSink("/nonexistent_cangjie_xml_dir_9beef/out.xml")
+    } catch (e: XmlIoException) {
+        if (let FileWriteFailed(_, _) <- e.error) { threw = true }
+    }
+    @Expect(threw, true)
+}
+
+@Test
+func testFileXmlSinkStreamsLargeDocument(): Unit {
+    // 覆盖 flush() 的正常路径与 BufferedOutputStream 的真实写入分支。
+    let tmp = TempFile("large.xml")
+    try {
+        try (sink = FileXmlSink(tmp.path)) {
+            let w = XmlWriter(sink, options: XmlWriteOptions(writeDeclaration: false, compact: true))
+            let doc = XmlDocument()
+            let r = doc.createElement("root")
+            doc.appendChild(r)
+            var i = 0
+            while (i < 50) {
+                let e = doc.createElement("item")
+                e.setAttribute("i", i.toString())
+                r.appendChild(e)
+                i++
+            }
+            w.writeDocument(doc)
+        }
+        let content = String.fromUtf8(File.readFrom(Path(tmp.path)))
+        @Expect(content.contains("<item i=\"0\"/>"), true)
+        @Expect(content.contains("<item i=\"49\"/>"), true)
+    } finally {
+        tmp.cleanup()
+    }
+}
+
+@Test
+func testParseXmlBytesInvalidUtf8(): Unit {
+    // 覆盖 decodeUtf8 的异常分支：0xFF 单字节不是合法 UTF-8 起始序列。
+    let bogus: Array<Byte> = [0xFFu8, 0xFEu8, 0x00u8]
+    var threw = false
+    try {
+        parseXmlBytes(bogus)
+    } catch (e: XmlIoException) {
+        if (let FileReadFailed(source, _) <- e.error) {
+            threw = (source == "<bytes>")
+        }
+    }
+    @Expect(threw, true)
+}
+
+@Test
+func testLoadXmlFromFileInvalidUtf8(): Unit {
+    // 文件中含非法 UTF-8 字节——应映射为 XmlIoException(FileReadFailed(path, ...))
+    let tmp = TempFile("bad_utf8.xml")
+    try {
+        let sink = FileXmlSink(tmp.path)
+        sink.close()
+        // 直接用 std.fs 覆写为非法字节
+        File.writeTo(Path(tmp.path), [0xC3u8, 0x28u8])
+        var threw = false
+        try {
+            loadXmlFromFile(tmp.path)
+        } catch (e: XmlIoException) {
+            if (let FileReadFailed(_, _) <- e.error) { threw = true }
+        }
+        @Expect(threw, true)
+    } finally {
+        tmp.cleanup()
+    }
+}
