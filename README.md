@@ -286,6 +286,51 @@ ParserOptions(
 
 ---
 
+### `tree` —— DOM 数据模型（Phase 4a + 4b + 4c + 4d）
+
+- **Phase 4a**：`Document` / `Element` / `Attr` / `TextNode` / `CdataSection` /
+  `CommentNode` / `PiNode` / `DoctypeNode`（`sealed interface Node`）+ `DocumentBuilder`（SAX 事件流 → DOM）。
+- **Phase 4b**：DOM 变更 API —— `Element.appendChild` / `prependChild` /
+  `insertBefore` / `insertAfter` / `removeChild` / `removeChildAt` /
+  `replaceChild` / `clearChildren` / `indexOfChild` / `hasChild` +
+  `setAttribute` / `removeAttribute` / `clearAttributes` + 各节点类型的
+  `detach()`。语义对齐 W3C DOM：移动节点自动 detach 旧父，成环 / 自插入 /
+  `Document`-as-child / `Doctype`-as-child 一律抛 `XmlException`。
+
+```cangjie
+import cangjie_xml.tree.*
+import cangjie_xml.core.*
+
+main() {
+    let doc = DocumentBuilder.parseString("<root><a/><c/></root>")
+    // 在 <a/> 与 <c/> 之间插入 <b/>，并给 <c/> 加属性
+    let children = ArrayList<Element>()
+    for (n in doc.root.children()) {
+        match (n) { case e: Element => children.add(e); case _ => () }
+    }
+    let b = Element(QName("b"), doc.root.ns)
+    doc.root.insertBefore(b, children[1])
+    children[1].setAttribute(QName("k"), "v")
+    // doc 现在等价于 <root><a/><b/><c k="v"/></root>
+}
+```
+
+### `sax` —— 推式回调接口（Phase 4d）
+
+`SaxHandler` + `DefaultSaxHandler` + `SaxDriver`（详见 `src/parser/sax_handler.cj`）。
+
+### `reader` —— 拉式游标（Phase 4c）
+
+`XmlReader.fromString` / `fromParser` + 13 态 `ReaderNodeType` + 5 态
+`ReaderState`（详见 `src/reader/`）。
+
+---
+
 ## 仍未实现
 
-见 [`progress.md`](./progress.md)。按 `ROADMAP.md` 顺序，下一迭代进入 **Phase 3c —— 解析器补完**：外部实体 + `recover=true` 容错 + W3C `xmltest` 黄金对比；之后进入 **Phase 4**（`tree` / `sax` / `reader`）。
+见 [`progress.md`](./progress.md)。按 `ROADMAP.md` 顺序，后续候选迭代：
+
+- **Phase 3c**：外部实体 + `recover=true` 容错 + W3C `xmltest` 黄金对比；
+- **Phase 4c+**：`XmlReader.readInnerXml` / `readOuterXml` / `readSubtree`；
+- **Phase 5c**：共享 `NamespaceScope` 跟踪器（C14N 预埋）；
+- **Phase 6**：XPath 1.0。

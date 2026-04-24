@@ -1,6 +1,6 @@
 # CangjieXML 开发进度
 
-> 相对 [libxml2 v2.15.3](./.libxml2-2.15.3) 全量功能的实现情况。最新更新：迭代 12 结束（Phase 4d —— `parser.SaxHandler` 推式回调接口 + `SaxDriver`）。
+> 相对 [libxml2 v2.15.3](./.libxml2-2.15.3) 全量功能的实现情况。最新更新：迭代 13 结束（Phase 4b —— `tree.Element` 变更 API + 节点 `detach()`）。
 
 ---
 
@@ -12,7 +12,7 @@
 | 1 | `core` 基础设施 | `chvalid`、`xmlstring`、`buf`、`dict`、`hash`、`error`、`uri` | ✅ 已完成 |
 | 2 | `encoding` + `io` | `encoding.c`、`xmlIO.c` | ✅ 已完成 |
 | 3 | `parser` 词法 + 事件流 | `parser.c`、`parserInternals.c` | 🟢 词法 + 语法骨架已完成（Phase 3a+3b），容错模式 + 外部实体留待 Phase 3c |
-| 4 | `tree` + `sax` + `reader` | `tree.c`、`SAX2.c`、`xmlreader.c` | 🟢 只读 DOM + DocumentBuilder（Phase 4a）+ 拉式 `XmlReader`（Phase 4c）+ 推式 `SaxHandler`/`SaxDriver`（Phase 4d）完成；变更 API 留待 Phase 4b |
+| 4 | `tree` + `sax` + `reader` | `tree.c`、`SAX2.c`、`xmlreader.c` | 🟢 只读 DOM + DocumentBuilder（4a）+ 拉式 `XmlReader`（4c）+ 推式 `SaxHandler`/`SaxDriver`（4d）+ DOM 变更 API（4b）完成 |
 | 5 | `writer` + `save` | `xmlwriter.c`、`xmlsave.c` | 🟢 `DocumentSerializer`（5a）+ `XmlWriter` 推式 API（5b）已完成；黄金对比 / 作用域跟踪留待后续 |
 | 6 | `xpath` | `xpath.c` | ⬜ 未开始 |
 | 7 | `regexp` + `pattern` + `dtd` | `valid.c`、`xmlregexp.c`、`pattern.c` | ⬜ 未开始 |
@@ -23,7 +23,7 @@
 | 12 | 工具链与发布 | `xmllint.c`、`xmlcatalog.c` | ⬜ 未开始 |
 | 13 | 硬化与优化 | `runtest.c`、`fuzz/` | ⬜ 未开始 |
 
-**粗略完成度**：核心功能 ≈ 47%（Phase 1 基础设施 + Phase 2 字符编解码 / I/O + Phase 3a 词法器 + Phase 3b XmlParser 骨架 + Phase 4a 只读 DOM + DocumentBuilder + Phase 4c XmlReader + Phase 4d SaxHandler/SaxDriver + Phase 5a 基础序列化器 + Phase 5b 推式 XmlWriter；不含容错模式 / 外部实体 / DOM 变更 API / 验证器 / 工具链）。
+**粗略完成度**：核心功能 ≈ 50%（Phase 1 基础设施 + Phase 2 字符编解码 / I/O + Phase 3a 词法器 + Phase 3b XmlParser 骨架 + Phase 4a 只读 DOM + DocumentBuilder + Phase 4b DOM 变更 API + Phase 4c XmlReader + Phase 4d SaxHandler/SaxDriver + Phase 5a 基础序列化器 + Phase 5b 推式 XmlWriter；不含容错模式 / 外部实体 / 验证器 / XPath / 工具链）。
 
 ---
 
@@ -943,3 +943,116 @@ SaxDriver.parseString("<a>x<b>y</b>z</a>", c)
 - Phase 4c+：`XmlReader.readInnerXml` / `readOuterXml` / `readSubtree`；
 - Phase 5c：共享 `NamespaceScope` 跟踪器（C14N 预埋）；
 - Phase 3c：容错模式 + 外部实体 + W3C xmltest 黄金对比。
+
+## 已实现（迭代 13 — Phase 4b：DOM 变更 API）
+
+### 背景
+
+> Phase 4a 把 SAX 事件流物化为**只读** DOM；Phase 4d 补上推式回调。但"解析 →
+> 修改 → 再序列化"仍缺一环：调用方拿到 `Document` 后无法增删子节点 / 属性。
+> libxml2 以 `xmlAddChild` / `xmlReplaceNode` / `xmlUnlinkNode` / `xmlSetProp`
+> 提供这套语义。本迭代对齐并补齐为第一等公民 API。
+
+### 新增（2 个源文件 + 1 个测试文件，均 ≤ 300 行）
+
+| 文件 | 行数 | 内容 |
+| --- | --- | --- |
+| `src/tree/node_detach.cj` | 162 | 包级 `nodeRefEq` / `parentOf` / `clearParent` / `setParent` / `removeFromParent` + `Element` / `TextNode` / `CdataSection` / `CommentNode` / `PiNode` 的 `detach()` extend |
+| `src/tree/element_mutation.cj` | 268 | `extend Element`：子节点 / 属性全部变更 API + 不变量校验 |
+| `src/tree/element_mutation_test.cj` | 253 | 17 条：子节点 API、插入 / 移除 / 替换、hasChild |
+| `src/tree/element_mutation_attrs_test.cj` | 208 | 12 条：属性、detach、不变量、端到端、跨树移动 |
+
+### 公开 API
+
+**子节点变更**
+```cangjie
+element.appendChild(node)
+element.prependChild(node)
+element.insertBefore(newNode, reference)
+element.insertAfter(newNode, reference)
+element.removeChild(node): Bool         // false 表示不是子节点，不抛
+element.removeChildAt(index): Node
+element.replaceChild(oldNode, newNode)
+element.clearChildren()
+element.indexOfChild(node): Int64        // 按引用身份，未命中返回 -1
+element.hasChild(node): Bool
+```
+
+**节点自 detach**
+```cangjie
+element.detach()
+textNode.detach()
+cdataSection.detach()
+commentNode.detach()
+piNode.detach()
+```
+
+**属性变更**
+```cangjie
+element.setAttribute(attr)               // 按 (localName, uri) 匹配替换
+element.setAttribute(qname, value)       // 便捷重载
+element.removeAttribute(localName, uri!: None): Bool
+element.clearAttributes()
+```
+
+### 关键设计决策
+
+1. **自动 detach**（移动语义）—— 插入一个已有父的节点时，**自动先把它从原父
+   移除**，再挂到新父。与 W3C DOM、浏览器 DOM 以及 libxml2 `xmlAddChild` 的
+   行为一致，避免用户忘记调 `detach()` 导致的"同一节点两个父"不自洽。
+2. **引用身份（`refEq`）作为子节点定位依据** —— 不走 `==` / `Equatable`。
+   原因：同一元素下可以合法共存两段数据相同的 `TextNode`，用内容相等会错杀
+   "本不是它"的节点。实现上封装为 `nodeRefEq(a: Node, b: Node)`，通过类型
+   模式把 `sealed interface Node` 落到具体 class 再调 `refEq`。
+3. **不变量严格**：
+   - `Document` 不能作为 Element 子（保持根容器唯一性）；
+   - `DoctypeNode` 不能作为 Element 子（通过 `Document.doctype` 专属位挂载）；
+   - 自插入（`a.appendChild(a)`）→ 抛异常；
+   - 祖先插入（`child.appendChild(root)` 其中 `root` 是 `child` 的祖先）→ 抛异常。
+   所有不变量违反都抛 `XmlException(XmlError.Other)`，且**原有结构不被破坏**
+   （校验前置、未改动 `childrenImpl`）。
+4. **索引重定位** —— `insertBefore` / `insertAfter` / `replaceChild` 在
+   `removeFromParent(newNode)` 后**重新查找 reference 索引**，保证当
+   `newNode` 与 `reference` 是同父兄弟时索引不会错位。
+5. **`removeChild` 返回 Bool 而非抛** —— 与 libxml2 `xmlUnlinkNode` 的"无副
+   作用"语义一致；抛异常版本用 `requireChildIndex` 辅助函数内部实现
+   `insertBefore` / `replaceChild`（它们必须要求 reference 确属子节点）。
+6. **属性匹配忽略前缀** —— `setAttribute` / `removeAttribute` 按
+   `(localName, uri)` 配对，符合 XML Namespaces 规范（前缀仅是词法别名）。
+
+### 新增测试（29 条）
+
+- appendChild / prependChild（4）：基础 / 文本节点 / 顺序 / 自动 detach 旧父
+- insertBefore / insertAfter（5）：基础插入 / 同子移位 / 自引用 no-op /
+  非子 reference 抛异常 / after 末尾
+- removeChild 族（4）：基础 / 按索引 / clearChildren / 非子返回 false
+- replaceChild（3）：基础替换 / 同节点 no-op / 非子抛异常
+- 属性（5）：新增 / 替换 / 不同前缀同 (local,uri) 视为同一 / removeAttribute /
+  clearAttributes
+- detach（2）：Element detach / 全部叶子类型 detach
+- 不变量（3）：自插入 / 祖先成环 / Doctype 作 child
+- 端到端（2）：parse → 修改 → 结构校验 / 跨 Document 移动子树
+- 身份查询（1）：hasChild + indexOfChild
+
+### 顺带的基础设施改进
+
+- `tree` 包新增两个包级辅助 `nodeRefEq` / `removeFromParent` / `parentOf` /
+  `setParent` / `clearParent`，其它 tree 代码（未来的 `Document.adoptNode`
+  等）可复用。
+- `DocumentBuilder` **未改动**：它继续走 `parentImpl = Some(...)` 直写
+  package-private 字段的路径；Phase 4b 的新 API 只在运行期（post-build）
+  使用，构造阶段走 fast-path 避免重复校验开销。
+
+### 验证
+
+- `cjpm build` 干净（仅既有两条 unused-function 警告未动）；
+- `cjpm test` **367 / 367** 全绿（338 旧 + 29 新）；
+- 所有新增文件 ≤ 300 行。
+
+### 下一步（候选）
+
+- Phase 4c+：`XmlReader.readInnerXml` / `readOuterXml` / `readSubtree`
+  （复用 `DocumentSerializer`）；
+- Phase 5c：共享 `NamespaceScope` 跟踪器（C14N 预埋）；
+- Phase 3c：容错模式 + 外部实体 + W3C xmltest 黄金对比；
+- Phase 6：XPath 1.0 前置设计（为 DOM 节点编入 `docOrderId`）。
