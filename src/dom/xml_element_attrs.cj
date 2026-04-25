@@ -85,6 +85,20 @@ extend XmlElement {
         attrOrder.size
     }
 
+    /**
+     * 按插入顺序索引访问属性（0 ≤ i < attributeCount()）。
+     *
+     * 提供索引访问的目的是给热路径（writer 序列化、批量诊断）一条不分配
+     * `Iterator` 对象的遍历方式：`for i in 0..el.attributeCount() { el.attributeAt(i) }`
+     * 比 `for a in el.attributes()` 在 N 万元素 × M 属性的场景上少分配
+     * N 个 iterator 对象。
+     *
+     * 越界时抛 `IndexOutOfBoundsException`（直接走 ArrayList 的语义）。
+     */
+    public func attributeAt(i: Int64): XmlAttribute {
+        attrOrder[i]
+    }
+
     /** 从顺序数组移除指定名称——抽取独立辅助以降低 `removeAttribute` 圈复杂度。 */
     private func removeFromOrderList(name: String): Unit {
         var i = 0

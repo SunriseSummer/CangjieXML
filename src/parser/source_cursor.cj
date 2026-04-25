@@ -56,7 +56,11 @@ class SourceCursor {
     let sawBom: Bool
 
     init(input: String, acceptBom: Bool) {
-        let tmp = ArrayList<Rune>()
+        // 容量预估：UTF-8 中 byte 数 ≥ rune 数（ASCII 时相等），用 `input.size`
+        // 作为上界初始化 `ArrayList` 可彻底消除增长副本——对 5 MB ASCII fixture
+        // 而言，旧版从 16 → 5_000_000 要做 ~19 次 doubling，本身的字节拷贝量
+        // 与最终数组同数量级。
+        let tmp = ArrayList<Rune>(input.size)
         for (r in input.runes()) {
             tmp.add(r)
         }
@@ -133,6 +137,13 @@ class SourceCursor {
      * 省掉 `peek()` 的 `Option<Rune>` 与 `advance()` 重复的 eof 检查，
      * 是 `readName` / `parseTextBody` / `readQuotedAttrValue` 等所有
      * 内层"扫描到指定字符为止"循环的统一基础设施。
+     *
+     * 注意：传 `pred` 闭包每次调用都会触发一次堆分配（捕获 self 或本地变
+     * 量）。性能关键路径上请优先使用下列已经特化的扫描方法：
+     *
+     * - [skipNameChars]：`isNameChar` 谓词内联展开；
+     * - [skipUntilLt]：扫描到下一个 `<`（`parseTextBody` 主循环）；
+     * - [skipUntilQuoteOrLt]：扫描到下一个 `"` / `'` / `<`（属性值）。
      */
     func skipWhile(pred: (Rune) -> Bool): Unit {
         let n = runes.size
@@ -147,6 +158,76 @@ class SourceCursor {
                 column++
             }
         }
+    }
+
+    /**
+     * 特化版：跳过所有 `isNameChar(r)` 字符。
+     *
+     * `readName` 在 parser 上几乎每个状态切换都要调用，旧版 `skipWhile(isNameChar)`
+     * 把函数引用作为参数传入，每次调用产生一次 callable 闭包对象——对
+     * config_large 这种属性密集的 fixture，单次 parse 上百万次循环，
+     * 闭包分配是真正可观的 GC 压力源。这里把 `isNameChar` 的判定直接内联。
+     */
+    func skipNameChars(): Unit {
+        let n = runes.size
+        while (idx < n) {
+            let r = runes[idx]
+            // 内联展开 isNameChar 判定（ASCII letter / digit / '_' / ':' / '-' / '.'）
+            // Name 字符不允许是 LF，所以不必维护行号。
+            if ((r >= r'a' && r <= r'z')
+                || (r >= r'A' && r <= r'Z')
+                || (r >= r'0' && r <= r'9')
+                || r == r'_' || r == r':' || r == r'-' || r == r'.') {
+                idx++
+                column++
+            } else {
+                return
+            }
+        }
+    }
+
+    /**
+     * 特化版：扫描到下一个 `<` 或 EOF。`parseTextBody` 主循环。
+     *
+     * 同 [skipNameChars] 的理由——避开闭包；同时把"是否 LF 增行号"这条
+     * 仅在文本节点里才有意义的分支保留下来。
+     */
+    func skipUntilLt(): Unit {
+        let n = runes.size
+        while (idx < n) {
+            let r = runes[idx]
+            if (r == CH_LT) { return }
+            idx++
+            if (r == CH_LF) {
+                line++
+                column = 1
+            } else {
+                column++
+            }
+        }
+    }
+
+    /**
+     * 特化版：扫描到下一个 `quote`（`"` 或 `'`）、或 `<`（属性值不允许）、或 EOF。
+     *
+     * 返回值告知调用方"为何停下"：`true` 表示遇到了引号；`false` 表示
+     * 遇到 `<` 或 EOF（由调用方区分并报错）。
+     */
+    func skipAttrValueChars(quoteCh: Rune): Bool {
+        let n = runes.size
+        while (idx < n) {
+            let r = runes[idx]
+            if (r == quoteCh) { return true }
+            if (r == CH_LT) { return false }
+            idx++
+            if (r == CH_LF) {
+                line++
+                column = 1
+            } else {
+                column++
+            }
+        }
+        false
     }
 
     /**

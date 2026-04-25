@@ -317,9 +317,13 @@ match (node.kind()) {
   - `attribute(name): ?String`
   - `hasAttribute(name, value: ?String)`
   - `setAttribute(name, value)` —— 同名后写覆盖，保留首次插入顺序
+  - `tryAddAttribute(name, value): Bool` —— 仅在不存在同名属性时新增，返回是否成功；
+    单次哈希查询路径，适合 parser 等"重复名应报错"的高频场景
   - `removeAttribute(name): Bool`
   - `attributes(): Iterable<XmlAttribute>`（按插入顺序）
   - `attributeCount(): Int64`
+  - `attributeAt(i): XmlAttribute` —— 按插入顺序索引访问，
+    供热路径以 `for i in 0..el.attributeCount()` 形式遍历，避免迭代器对象分配
 - **子节点 API**
   - `appendChild` / `prependChild` / `insertChildBefore(reference, node)` / `removeChild`
   - `childNodes()` / `childElements(name:)` / `firstChildElement(name:)`

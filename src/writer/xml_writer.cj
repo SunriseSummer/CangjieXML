@@ -104,10 +104,12 @@ public class XmlWriter {
     }
 
     private func writeTopLevelBody(doc: XmlDocument): Unit {
-        for (n in doc.childNodes()) {
+        var cur = doc.firstChild
+        while (let Some(n) <- cur) {
             if (!isDeclaration(n)) {
                 writeNodeDispatch(n)
             }
+            cur = n.nextSibling
         }
     }
 
@@ -172,8 +174,11 @@ public class XmlWriter {
 
     private func finishAsInline(el: XmlElement): Unit {
         sink.write(TAG_CLOSE)
-        for (child in el.childNodes()) {
+        // 直接走链表，避免每次都构造 `XmlChildIter` / `XmlChildIterator`。
+        var cur = el.firstChild
+        while (let Some(child) <- cur) {
             writeNodeInline(child)
+            cur = child.nextSibling
         }
         writeCloseTag(el.name)
         maybeNewline()
@@ -183,8 +188,10 @@ public class XmlWriter {
         sink.write(TAG_CLOSE)
         maybeNewline()
         depth++
-        for (child in el.childNodes()) {
+        var cur = el.firstChild
+        while (let Some(child) <- cur) {
             writeNodeDispatch(child)
+            cur = child.nextSibling
         }
         depth--
         indentIfNeeded()
@@ -195,12 +202,19 @@ public class XmlWriter {
     private func writeOpenTagWithAttrs(el: XmlElement): Unit {
         sink.write(TAG_OPEN)
         sink.write(el.name)
-        for (a in el.attributes()) {
+        // 改为索引迭代——`for a in el.attributes()` 每个元素都会构造一个
+        // `ArrayList.Iterator` 对象；config_large 上 ~50K 元素 × 多次序列化
+        // 时这是真实 GC 压力。
+        let n = el.attributeCount()
+        var i = 0
+        while (i < n) {
+            let a = el.attributeAt(i)
             sink.write(ATTR_SPACE)
             sink.write(a.name)
             sink.write(ATTR_EQUALS_QUOTE)
             sink.write(escapeAttribute(a.value))
             sink.write(ATTR_CLOSE_QUOTE)
+            i++
         }
     }
 
@@ -231,8 +245,10 @@ public class XmlWriter {
             case Some(_) => ()
         }
         sink.write(TAG_CLOSE)
-        for (child in el.childNodes()) {
+        var cur = el.firstChild
+        while (let Some(child) <- cur) {
             writeNodeInline(child)
+            cur = child.nextSibling
         }
         writeCloseTag(el.name)
     }

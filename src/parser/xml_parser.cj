@@ -60,8 +60,8 @@ class XmlParser {
     /**
      * 读取一个 XML Name（起始 `isNameStart`，后续 `isNameChar`）。
      *
-     * 起始字符校验之后的尾随扫描走 `cur.skipWhile(isNameChar)` 直接索引，
-     * 比 peek/advance 循环少两层 Option 装箱，是 parser 最热的子例程。
+     * 起始字符校验后的尾随扫描走特化的 `cur.skipNameChars()`，避免传函数
+     * 引用作 `pred` 时的闭包分配——是 parser 最热的子例程。
      */
     func readName(): String {
         let start = cur.idx
@@ -75,7 +75,7 @@ class XmlParser {
                 throw XmlParseException(
                     InvalidText(cur.pos(), "unexpected EOF where name expected"))
         }
-        cur.skipWhile(isNameChar)
+        cur.skipNameChars()
         cur.sliceString(start, cur.idx)
     }
 }

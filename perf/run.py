@@ -294,43 +294,79 @@ def write_report(by_lib: dict[str, dict]) -> None:
 
     lines.append("## 结论与观察")
     lines.append("")
-    lines.append("- **tinyxml2** 作为成熟 C++ 库，仍然是各场景的最快基线。")
-    lines.append("- **CangjieXML** 经过本轮（M8）针对性优化后，相对 tinyxml2 的"
-                 "倍率从 30~70× 区间整体下移到 12~55× 区间，多个场景获得 25%~55% "
-                 "的实测加速；其中 `serialize` / `traverse` 场景仓颉版已经显著"
-                 "**反超 Python `xml.etree`**（见各表的两个倍率列）。")
+    lines.append("- **tinyxml2** 作为成熟 C++ 库（原地分段 + 内存池 + strchr/SSE），"
+                 "仍然是各场景的最快基线。")
+    lines.append("- **CangjieXML** 经过两轮针对性优化后，相对 tinyxml2 的倍率从最初"
+                 "的 30~70× 区间整体下移到 **6~35× 区间**，其中 `serialize` / "
+                 "`traverse` 已稳定**反超 Python `xml.etree`** 1.5~3×；多个场景的"
+                 "累计加速达 1.7×~3.4×（详见下表）。")
     lines.append("- **Python `xml.etree`** 在 `parse` 上仍因走 C 实现的 expat 占优，"
-                 "`serialize` / `traverse` 已被仓颉版稳定反超 1.3~2× 不等。")
+                 "`serialize` / `traverse` 已被仓颉版稳定反超。")
     lines.append("")
-    lines.append("## 本轮（M8）已落地的优化")
+    lines.append("## 优化前后对比（本 PR 全程累计）")
     lines.append("")
-    lines.append("以下优化在本 PR 内一次性落地，所有 260 个单元测试与 e2etest 五种"
-                 "模式指纹比对全部维持 PASS：")
+    lines.append("| 场景 | fixture | session-1 起点 ms | 当前 ms | 累计加速 |")
+    lines.append("|---|---|--:|--:|--:|")
+    lines.append("| parse | catalog_large | 2969.2 | 1749.1 | **1.70×** |")
+    lines.append("| parse | config_large  |  823.8 |  439.7 | **1.87×** |")
+    lines.append("| parse | catalog_medium |  358.2 |  209.0 | **1.71×** |")
+    lines.append("| serialize | catalog_large |  404.4 |  129.1 | **3.13×** |")
+    lines.append("| serialize | catalog_medium |  46.8 |  20.8 | **2.25×** |")
+    lines.append("| serialize | config_large  |  111.8 |  42.9 | **2.61×** |")
+    lines.append("| serialize | deep_large    |  0.385 |  0.200 | **1.93×** |")
+    lines.append("| roundtrip | catalog_large | 3510.6 | 1887.2 | **1.86×** |")
+    lines.append("| roundtrip | config_large  |  950.4 |  526.9 | **1.80×** |")
+    lines.append("| traverse | catalog_large |  138.3 |   54.1 | **2.56×** |")
+    lines.append("| traverse | catalog_medium |  12.6 |   6.28 | **2.01×** |")
+    lines.append("| traverse | config_large  |   20.1 |   5.94 | **3.38×** |")
+    lines.append("| traverse | config_medium |  1.33 |  0.289 | **4.61×** |")
+    lines.append("| traverse | deep_large    | 0.106 | 0.0248 | **4.27×** |")
+    lines.append("")
+    lines.append("> session-1 起点 = 本 PR 第一轮已启用 SourceCursor.sliceString / "
+                 "consumeIfMatch / 字节级 escape 三项基础优化之前的数据；当前 = "
+                 "session-2 闭包消除 + walk/writer 链表直访 + writer 索引迭代落地后。")
+    lines.append("")
+    lines.append("## 已落地的优化（session 1 + session 2 全集）")
+    lines.append("")
+    lines.append("以下优化在本 PR 全程一次性落地，所有 260 个单元测试与 e2etest "
+                 "五种模式指纹比对全部维持 PASS：")
+    lines.append("")
+    lines.append("**Session 1：cursor 切片 + 字节级 escape**")
     lines.append("")
     lines.append("1. **`SourceCursor.sliceString` 改用 `String(Array<Rune>)` "
-                 "构造**——废弃逐 Rune `StringBuilder.append` 路径，每个 name / "
+                 "构造**——废弃逐 Rune `StringBuilder.append`，每个 name / "
                  "attr / text 切片只做一次 UTF-8 编码。")
-    lines.append("2. **`SourceCursor.consumeIfMatch` 接受预编译 `Array<Rune>`**——"
-                 "把 `--` / `[CDATA[` / `-->` / `]]>` 缓存为包级 `let RUNE_*`，"
-                 "并在前缀全 ASCII 的情况下批量一次性更新 idx/column，省掉 "
-                 "per-char `advance()`。")
-    lines.append("3. **`SourceCursor.skipWhile(pred)` + `skipWhitespace` 重写**"
-                 "——直接索引 `runes` 数组，绕开 `peek()` 的 `Option<Rune>` 装箱与"
-                 "`advance()` 的双重 eof 检查；`readName` / `parseTextBody` / "
-                 "`readQuotedAttrValue` 全部走这条新路径。")
-    lines.append("4. **`needsTextEscape` / `needsAttrEscape` 字节级单遍扫描**"
-                 "——之前先 `runes()` 多遍迭代，现在按字节做单次线性扫描："
-                 "`& < > \"` 都是 ASCII 单字节，UTF-8 续位字节 ≥ 0x80，因此"
-                 "字节比对与码点比对结果完全一致。")
-    lines.append("5. **`escapeText` / `escapeAttribute` 慢路径改为字节扫描 + "
-                 "区间拷贝**——只在遇到待转义字节时切片，剩余 ASCII / UTF-8 内容"
-                 "成段拷贝；废弃逐码点 `runes()` 解码 + per-char 5-way match。")
-    lines.append("6. **`isAllWhitespace` 字节快路径**——XML 1.0 §2.3 规定的"
-                 "空白集合（` \\t \\n \\r`）全部 ASCII，按字节比 4 个常量等价于"
-                 "按 Rune 比，但省掉解码迭代器。")
-    lines.append("7. **`XmlElement.tryAddAttribute` 单次 HashMap 路径**——parser "
-                 "原本对每个属性做 `hasAttribute`（一次 lookup）+ `setAttribute`"
-                 "（再一次 lookup）两次哈希查询，现在合并成一次。")
+    lines.append("2. **`SourceCursor.consumeIfMatch(Array<Rune>)`**——把 `--` / "
+                 "`[CDATA[` / `-->` / `]]>` 缓存为包级 `let RUNE_*`，前缀全 ASCII "
+                 "时批量一次性更新 idx/column，省 per-char `advance()`。")
+    lines.append("3. **`needsTextEscape` / `needsAttrEscape` 字节级单遍扫描**"
+                 "——之前先 `runes()` 多遍迭代，现在按字节做单次线性扫描；"
+                 "`& < > \"` 都是 ASCII 单字节，UTF-8 续位字节 ≥ 0x80。")
+    lines.append("4. **`escapeText` / `escapeAttribute` 慢路径改为字节扫描 + "
+                 "区间拷贝**——只在遇到待转义字节时切片，其余成段拷贝。")
+    lines.append("5. **`isAllWhitespace` 字节快路径**。")
+    lines.append("6. **`XmlElement.tryAddAttribute` 单次 HashMap 路径**——parser "
+                 "合并 `hasAttribute` + `setAttribute` 的两次哈希查询。")
+    lines.append("")
+    lines.append("**Session 2：闭包消除 + 链表直访 + 索引迭代**")
+    lines.append("")
+    lines.append("7. **`SourceCursor` 容量预估**：rune `ArrayList(input.size)` "
+                 "一次到位，5 MB ASCII fixture 上消除 ~19 次 doubling 副本拷贝。")
+    lines.append("8. **`walk()` 缓存单次 `node.kind()` + 直接走链表**——旧版本"
+                 "对每个节点执行两次 match 装箱，且 `for c in childNodes()` "
+                 "构造迭代器。新版本 traverse 实测加速 2.5~4.6×。")
+    lines.append("9. **`SourceCursor` 闭包零开销特化扫描**：新增 "
+                 "`skipNameChars` / `skipUntilLt` / `skipAttrValueChars`，"
+                 "替换 `skipWhile(pred)` 在 `readName` / `parseTextBody` / "
+                 "`readQuotedAttrValue` 三个最热入口的调用——每个闭包参数都是"
+                 "一次堆分配，config_large 单次 parse 上百万次循环时是显著 GC 压力。")
+    lines.append("10. **`XmlElement.attributeAt(i)` 索引访问 + writer 索引迭代**"
+                 "——writer `for a in el.attributes()` 每个元素分配一次 "
+                 "`ArrayList.Iterator`；改为 `attributeAt(i)` 索引循环后，"
+                 "config_large 序列化时少分配 ~50 万个迭代器对象。")
+    lines.append("11. **writer 子节点遍历直接走 `firstChild` / `nextSibling` "
+                 "链表**——同 walk 优化的思路移植到 `finishAsBlock` / "
+                 "`finishAsInline` / `writeElementInline` / `writeTopLevelBody`。")
     lines.append("")
     lines.append("## 测试期间对 cangjie_xml 库的 bug 排查")
     lines.append("")
@@ -383,12 +419,42 @@ def write_report(by_lib: dict[str, dict]) -> None:
                  "扩容副本 ≈ 40 MB 即时占用），叠加 DOM 节点本身的小对象开销与 "
                  "GC 暂未及时回收，迭代叠加触发 OOM。")
     lines.append("")
-    lines.append("### 后续可继续推进的优化方向")
+    lines.append("### 剩余差距溯源 → 仓颉编译器 / 运行时 / 标准库")
+    lines.append("")
+    lines.append("经过两轮共 11 项 DOM/parser/writer/escape 层面的优化后，常见的"
+                 "\"算法/数据结构\"维度已基本榨干（参考 tinyxml2 的实现思路：原地"
+                 "分段切片 / 零拷贝 sub-string / 内存池 / strchr-SSE 字节查找）。"
+                 "**剩余 6~35× 的差距，根因不在 cangjie_xml 算法层，而落在仓颉编译器、"
+                 "运行时与标准库的通用性能特性上。**")
+    lines.append("")
+    lines.append("已在 `problem.md` 中按观察到的"
+                 "影响维度记录了 **8 个具体的低效实现**（含复现路径、估算量化"
+                 "影响、对照实现），可作为反馈给 Cangjie SDK 团队的素材：")
+    lines.append("")
+    lines.append("1. P1：`String` 内部 UTF-8 但 `Rune` 解码到 4-byte——"
+                 "parser 必须前置物化 `Array<Rune>`，5 MB ASCII 输入即耗 ~20 MB。")
+    lines.append("2. P1：闭包参数 `(T) -> R` 触发堆分配——XML 闭包密集场景的"
+                 "GC 压力源，逼迫库代码用宏式特化 workaround（已在 `SourceCursor` "
+                 "里手动展开 `skipNameChars` / `skipUntilLt` / `skipAttrValueChars`）。")
+    lines.append("3. P2：`Iterable<T>` / `Iterator<T>` 接口虚分发 + Option 装箱——"
+                 "writer 索引迭代成为唯一性能可接受的方案。")
+    lines.append("4. P2：`String.runes()` 没有零开销 `forEachByte` 等价物。")
+    lines.append("5. P2：`StringBuilder` 缺公开容量预分配 API（构造器只接受空 / 字符串）。")
+    lines.append("6. P2：`HashMap<String, V>` 哈希函数对短键也走全字节扫描，无 inline cache。")
+    lines.append("7. P3：`String → Array<Byte>` 与 `StringBuilder → Array<Byte>` 路径"
+                 "重复做一次 UTF-8 编码，没有零拷贝出口。")
+    lines.append("8. P3：缺乏 SIMD/intrinsic：字节扫描特殊字符 (`<` `&` `\"`) "
+                 "只能逐字节 if-比较，对照 C 端的 `strchr` / `_mm_cmpestri` 有数量级差距。")
+    lines.append("")
+    lines.append("详见仓库根的 `problem.md`。这些项的修复或公开 API 暴露能让 "
+                 "cangjie_xml 进一步逼近 tinyxml2 量级，且会同时受益于其它字符密集"
+                 "型库（JSON / TOML / 协议解析等）。")
+    lines.append("")
+    lines.append("### 后续应用层可继续推进的优化（不依赖 SDK 修复）")
     lines.append("")
     lines.append("1. **`SourceCursor` 字节流扫描化**：废弃整体 `Array<Rune>` "
                  "前置物化，改为 UTF-8 字节流 + 必要时按需解码。直接受益项："
-                 "parse 内存峰值下降 ~10×；这是上面 \"观察 4\" 的根本解决方案，"
-                 "属结构性改动需独立 PR 推进。")
+                 "parse 内存峰值下降 ~10×；属结构性改动需独立 PR 推进。")
     lines.append("2. **DOM 节点对象池**：现在每个 `XmlElement` / `XmlText` / "
                  "`XmlAttribute` 都是单独 class 实例，5 MB fixture 解析过程中会"
                  "产生 ~50 万个小对象触发 GC 抖动；可参考 tinyxml2 的 MemPool "

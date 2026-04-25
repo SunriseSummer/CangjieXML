@@ -77,21 +77,19 @@ extend XmlParser {
                 InvalidAttribute(attrName, attrPos, "unexpected EOF inside attribute value"))
         }
         let start = cur.idx
-        // 直接索引扫描——属性值内出现 `<` 仍须校验为非法字符，所以不能完全
-        // 走 `skipWhile(_ != quoteCh)`；保留逐字符判定，但通过直接读 runes
-        // 数组绕开 peek() 的 Option 与 advance() 的多余 eof 检查。
-        cur.skipWhile { r =>
-            if (r == quoteCh) { return false }
-            if (r == CH_LT) {
-                throw XmlParseException(
-                    InvalidAttribute(attrName, cur.pos(),
-                        "'<' is not allowed inside an attribute value"))
+        // 特化扫描——闭包零开销路径。
+        let foundQuote = cur.skipAttrValueChars(quoteCh)
+        if (!foundQuote) {
+            // 区分两种失败：遇到 `<` vs EOF
+            match (cur.peek()) {
+                case Some(r) where r == CH_LT =>
+                    throw XmlParseException(
+                        InvalidAttribute(attrName, cur.pos(),
+                            "'<' is not allowed inside an attribute value"))
+                case _ =>
+                    throw XmlParseException(
+                        InvalidAttribute(attrName, attrPos, "unterminated attribute value"))
             }
-            true
-        }
-        if (!matchesChar(quoteCh)) {
-            throw XmlParseException(
-                InvalidAttribute(attrName, attrPos, "unterminated attribute value"))
         }
         let value = cur.sliceString(start, cur.idx)
         cur.advance()
@@ -165,9 +163,8 @@ extend XmlParser {
     public func parseTextBody(): XmlText {
         let textPos = cur.pos()
         let start = cur.idx
-        // 直接索引扫描到 `<`——比 peek/advance 循环少 Option 装箱与 LF 跟踪
-        // 之外的多余 eof 检查。
-        cur.skipWhile { r => r != CH_LT }
+        // 特化扫描——闭包零开销路径。
+        cur.skipUntilLt()
         let raw = cur.sliceString(start, cur.idx)
         let decoded = decodeEntities(raw, textPos)
         let finalText = match (opts.whitespace) {

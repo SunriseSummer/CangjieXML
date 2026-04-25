@@ -168,13 +168,24 @@ public var name: String
 public func attribute(name: String): ?String
 public func hasAttribute(name: String, value!: ?String = None): Bool
 public func setAttribute(name: String, value: String): Unit
+public func tryAddAttribute(name: String, value: String): Bool
 public func removeAttribute(name: String): Bool
 public func attributes(): Iterable<XmlAttribute>
 public func attributeCount(): Int64
+public func attributeAt(i: Int64): XmlAttribute
 ```
 
 - **顺序保留**：`attributes()` 按插入顺序返回，与序列化输出顺序一致。
 - **同名覆盖**：`setAttribute` 对已存在属性覆盖值，**不**改变其顺序。
+- **同名不覆盖**：`tryAddAttribute` 仅在不存在同名属性时新增；返回 `false`
+  即"重复属性"，调用方决定如何处理。相比 `hasAttribute(...) + setAttribute(...)`
+  的两次哈希查询路径，单次 `tryAddAttribute` 只做一次 lookup，是
+  parser 等"已知属性必须唯一"的高频路径首选入口。
+- **索引访问**：`attributeAt(i)` 按插入顺序索引访问（0 ≤ `i` < `attributeCount()`）；
+  越界抛 `IndexOutOfBoundsException`。提供索引访问的目的是给热路径（writer 序列化、
+  批量诊断）一条不分配 `Iterator` 对象的遍历方式：
+  `for i in 0..el.attributeCount() { let a = el.attributeAt(i); ... }`
+  比 `for a in el.attributes()` 在 N 万元素 × M 属性的场景上少分配 N 个迭代器对象。
 - `hasAttribute(name, value: Some(v))`：同时检查存在性 + 值相等。
 
 ### 子节点 API
@@ -229,6 +240,18 @@ println(e.attributeCount())             // 2
 println(e.hasAttribute("lang"))         // true
 println(e.hasAttribute("id", value: Some("1"))) // true
 println(e.hasAttribute("id", value: Some("9"))) // false
+
+// 索引访问（性能敏感场景，避免迭代器分配）
+var i = 0
+while (i < e.attributeCount()) {
+    let a = e.attributeAt(i)
+    println("${a.name}=${a.value}")     // id=1, lang=en
+    i++
+}
+
+// 不覆盖式新增（适合 parser、批量导入等"重复名应报错"路径）
+println(e.tryAddAttribute("genre", "fiction")) // true
+println(e.tryAddAttribute("id", "9"))          // false（已存在）
 ```
 
 ---
