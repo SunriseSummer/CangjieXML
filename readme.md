@@ -2,7 +2,7 @@
 
 > 纯仓颉语言实现的 XML 库，基于 [tinyxml2](https://github.com/leethomason/tinyxml2) 做重构优化式复刻，充分发挥仓颉现代语言特性，在对齐 tinyxml2 功能基础上，提供更优雅便捷的使用体验。
 
-完整 API 文档请参阅 [`doc/`](./doc/README.md)
+完整 API 文档请参阅 [doc/](./doc/README.md)，性能数据请参阅 [perf/](./perf/report.md)
 
 ---
 
