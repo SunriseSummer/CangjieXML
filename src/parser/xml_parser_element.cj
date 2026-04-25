@@ -10,11 +10,9 @@ import cangjie_xml.error.*
  * 的成员分布到多个文件以满足单文件 ≤ 300 行的工程红线。
  */
 extend XmlParser {
-
     public func parseElement(startPos: SourcePos, depth: Int64): XmlElement {
         if (depth > opts.maxElementDepth) {
-            throw XmlParseException(
-                ElementDepthExceeded(opts.maxElementDepth, startPos))
+            throw XmlParseException(ElementDepthExceeded(opts.maxElementDepth, startPos))
         }
         let name = readName()
         let el = doc.createElement(name)
@@ -33,13 +31,14 @@ extend XmlParser {
     public func parseAttributes(el: XmlElement): Unit {
         while (true) {
             cur.skipWhitespace()
-            match (cur.peek()) {
-                case None => throw XmlParseException(
-                    InvalidAttribute("(?)", cur.pos(), "unexpected EOF inside start tag"))
-                case Some(r) =>
-                    if (r == CH_GT || r == CH_SLASH) { return }
-                    parseOneAttribute(el)
+            if (cur.eof()) {
+                throw XmlParseException(InvalidAttribute("(?)", cur.pos(), "unexpected EOF inside start tag"))
             }
+            let r = cur.runes[cur.idx]
+            if (r == CH_GT || r == CH_SLASH) {
+                return
+            }
+            parseOneAttribute(el)
         }
     }
 
@@ -48,8 +47,7 @@ extend XmlParser {
         let attrName = readName()
         cur.skipWhitespace()
         if (!matchesChar(CH_EQUALS)) {
-            throw XmlParseException(
-                InvalidAttribute(attrName, attrPos, "expected '=' after attribute name"))
+            throw XmlParseException(InvalidAttribute(attrName, attrPos, "expected '=' after attribute name"))
         }
         cur.advance()
         cur.skipWhitespace()
@@ -58,58 +56,48 @@ extend XmlParser {
         // 一次查询完成 dup-check + 插入；旧版本 `hasAttribute` + `setAttribute`
         // 在解析超大配置（每元素 5+ 属性）时是 HashMap 路径上 ~50% 的开销。
         if (!el.tryAddAttribute(attrName, decoded)) {
-            throw XmlParseException(
-                InvalidAttribute(attrName, attrPos, "duplicate attribute"))
+            throw XmlParseException(InvalidAttribute(attrName, attrPos, "duplicate attribute"))
         }
-    }
-
-    public func readQuotedAttrValue(attrName: String, attrPos: SourcePos): String {
-        let quoteCh = match (cur.peek()) {
-            case Some(r) =>
-                if (r == CH_QUOT || r == CH_APOS) {
-                    cur.advance()
-                    r
-                } else {
-                    throw XmlParseException(
-                        InvalidAttribute(attrName, attrPos, "attribute value must be quoted"))
-                }
-            case None => throw XmlParseException(
-                InvalidAttribute(attrName, attrPos, "unexpected EOF inside attribute value"))
-        }
-        let start = cur.idx
-        // 特化扫描——闭包零开销路径。
-        let foundQuote = cur.skipAttrValueChars(quoteCh)
-        if (!foundQuote) {
-            // 区分两种失败：遇到 `<` vs EOF
-            match (cur.peek()) {
-                case Some(r) where r == CH_LT =>
-                    throw XmlParseException(
-                        InvalidAttribute(attrName, cur.pos(),
-                            "'<' is not allowed inside an attribute value"))
-                case _ =>
-                    throw XmlParseException(
-                        InvalidAttribute(attrName, attrPos, "unterminated attribute value"))
-            }
-        }
-        let value = cur.sliceString(start, cur.idx)
-        cur.advance()
-        value
     }
 
     public func decodeEntitiesOrRethrowAttr(raw: String, attrName: String, attrPos: SourcePos): String {
         try {
             decodeEntities(raw, attrPos)
         } catch (e: XmlParseException) {
-            throw XmlParseException(
-                InvalidAttribute(attrName, attrPos, e.error.toString()))
+            throw XmlParseException(InvalidAttribute(attrName, attrPos, e.error.toString()))
         }
+    }
+
+    public func readQuotedAttrValue(attrName: String, attrPos: SourcePos): String {
+        if (cur.eof()) {
+            throw XmlParseException(InvalidAttribute(attrName, attrPos, "unexpected EOF inside attribute value"))
+        }
+        let quoteCh = cur.runes[cur.idx]
+        if (quoteCh == CH_QUOT || quoteCh == CH_APOS) {
+            cur.advance()
+        } else {
+            throw XmlParseException(InvalidAttribute(attrName, attrPos, "attribute value must be quoted"))
+        }
+        let start = cur.idx
+        // 特化扫描——闭包零开销路径。
+        let foundQuote = cur.skipAttrValueChars(quoteCh)
+        if (!foundQuote) {
+            // 区分两种失败：遇到 `<` vs EOF
+            if (cur.matches(CH_LT)) {
+                throw XmlParseException(
+                    InvalidAttribute(attrName, cur.pos(), "'<' is not allowed inside an attribute value"))
+            }
+            throw XmlParseException(InvalidAttribute(attrName, attrPos, "unterminated attribute value"))
+        }
+        let value = cur.sliceString(start, cur.idx)
+        cur.advance()
+        value
     }
 
     public func parseElementChildren(el: XmlElement, openPos: SourcePos, openName: String, depth: Int64): Unit {
         while (true) {
             if (cur.eof()) {
-                throw XmlParseException(
-                    MismatchedElement(openName, "(EOF)", openPos))
+                throw XmlParseException(MismatchedElement(openName, "(EOF)", openPos))
             }
             if (!matchesChar(CH_LT)) {
                 let text = parseTextBody()
@@ -118,7 +106,7 @@ extend XmlParser {
                 }
                 continue
             }
-            if (cur.peekAt(1) == Some(CH_SLASH)) {
+            if (cur.matchesAt(1, CH_SLASH)) {
                 consumeEndTag(openPos, openName)
                 return
             }
@@ -129,26 +117,24 @@ extend XmlParser {
     public func parseElementLevelMarkup(depth: Int64): XmlNode {
         let startPos = cur.pos()
         consumeExpected(CH_LT)
-        match (cur.peek()) {
-            case Some(r) =>
-                if (r == CH_QUESTION) {
-                    consumeExpected(CH_QUESTION)
-                    return parsePiInsideElement(startPos)
-                }
-                if (r == CH_BANG) {
-                    return parseBangMarkup(startPos, atTop: false)
-                }
-                return parseElement(startPos, depth + 1)
-            case None =>
-                throw XmlParseException(
-                    InvalidText(startPos, "unexpected EOF after '<'"))
+        if (cur.eof()) {
+            throw XmlParseException(InvalidText(startPos, "unexpected EOF after '<'"))
         }
+        let r = cur.runes[cur.idx]
+        if (r == CH_QUESTION) {
+            consumeExpected(CH_QUESTION)
+            return parsePiInsideElement(startPos)
+        }
+        if (r == CH_BANG) {
+            return parseBangMarkup(startPos, atTop: false)
+        }
+        parseElement(startPos, depth + 1)
     }
 
     public func parsePiInsideElement(startPos: SourcePos): XmlNode {
         let payloadStart = cur.idx
         while (!cur.eof()) {
-            if (matchesChar(CH_QUESTION) && cur.peekAt(1) == Some(CH_GT)) {
+            if (cur.matches(CH_QUESTION) && cur.matchesAt(1, CH_GT)) {
                 let payload = cur.sliceString(payloadStart, cur.idx)
                 cur.advance()
                 cur.advance()
@@ -156,8 +142,7 @@ extend XmlParser {
             }
             cur.advance()
         }
-        throw XmlParseException(
-            InvalidUnknownNode(startPos, "unterminated processing instruction inside element"))
+        throw XmlParseException(InvalidUnknownNode(startPos, "unterminated processing instruction inside element"))
     }
 
     public func parseTextBody(): XmlText {
@@ -188,8 +173,7 @@ extend XmlParser {
         cur.skipWhitespace()
         consumeExpected(CH_GT)
         if (closeName != openName) {
-            throw XmlParseException(
-                MismatchedElement(openName, closeName, openPos))
+            throw XmlParseException(MismatchedElement(openName, closeName, openPos))
         }
     }
 }

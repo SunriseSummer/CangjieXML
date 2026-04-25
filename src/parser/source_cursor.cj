@@ -16,6 +16,7 @@ const CH_EQUALS: Rune = r'='
 const CH_LF: Rune = r'\n'
 /** BOM 的 Rune（码点）形式，区别于 `text_escape.cj` 中字节级的 `BOM_BYTE_*`。 */
 const RUNE_BOM: Rune = '\u{FEFF}'
+const ASCII_LIMIT_BYTE: Byte = 0x80u8
 
 /**
  * Parser 反复使用的常量前缀，预先编译成 `Array<Rune>`。
@@ -56,6 +57,11 @@ class SourceCursor {
     let sawBom: Bool
 
     init(input: String, acceptBom: Bool) {
+        if (isAsciiInput(input)) {
+            this.sawBom = false
+            this.runes = Array<Rune>(input.size, {i => Rune(UInt32(input[i]))})
+            return
+        }
         // 容量预估：UTF-8 中 byte 数 ≥ rune 数（ASCII 时相等），用 `input.size`
         // 作为上界初始化 `ArrayList` 可彻底消除增长副本——对 5 MB ASCII fixture
         // 而言，旧版从 16 → 5_000_000 要做 ~19 次 doubling，本身的字节拷贝量
@@ -68,15 +74,25 @@ class SourceCursor {
         var sawBomLocal = false
         if (tmp.size > 0 && tmp[0] == RUNE_BOM) {
             if (!acceptBom) {
-                throw XmlParseException(
-                    InvalidEncoding(SourcePos(0, 1, 1),
-                        "unexpected UTF-8 BOM (acceptBom = false)"))
+                throw XmlParseException(InvalidEncoding(SourcePos(0, 1, 1), "unexpected UTF-8 BOM (acceptBom = false)"))
             }
             tmp.remove(at: 0)
             sawBomLocal = true
         }
         this.sawBom = sawBomLocal
         this.runes = tmp.toArray()
+    }
+
+    private static func isAsciiInput(input: String): Bool {
+        let n = input.size
+        var i = 0
+        while (i < n) {
+            if (input[i] >= ASCII_LIMIT_BYTE) {
+                return false
+            }
+            i++
+        }
+        true
     }
 
     /** 是否已到末尾。 */
@@ -86,18 +102,29 @@ class SourceCursor {
 
     /** 当前字符；EOF 时返回 None。 */
     func peek(): ?Rune {
-        if (eof()) { None } else { Some(runes[idx]) }
+        if (eof()) {
+            None
+        } else {
+            Some(runes[idx])
+        }
     }
 
-    /** 偏移 k 位处的字符；越界返回 None。 */
-    func peekAt(k: Int64): ?Rune {
+    /** 当前字符是否等于 `ch`，EOF 时直接返回 false，供 parser 热路径绕开 Option */
+    func matches(ch: Rune): Bool {
+        idx < runes.size && runes[idx] == ch
+    }
+
+    /** 偏移 k 位处字符是否等于 `ch`，越界时直接返回 false */
+    func matchesAt(k: Int64, ch: Rune): Bool {
         let p = idx + k
-        if (p < 0 || p >= runes.size) { None } else { Some(runes[p]) }
+        p >= 0 && p < runes.size && runes[p] == ch
     }
 
     /** 消费一个字符并返回；到达 EOF 返回 None。 */
     func advance(): ?Rune {
-        if (eof()) { return None }
+        if (eof()) {
+            return None
+        }
         let r = runes[idx]
         idx++
         if (r == CH_LF) {
@@ -131,36 +158,6 @@ class SourceCursor {
     }
 
     /**
-     * 跳过所有满足 `pred(r)` 的字符。
-     *
-     * 与"`peek` → 判定 → `advance`"循环等价，但直接索引 `runes` 数组：
-     * 省掉 `peek()` 的 `Option<Rune>` 与 `advance()` 重复的 eof 检查，
-     * 是 `readName` / `parseTextBody` / `readQuotedAttrValue` 等所有
-     * 内层"扫描到指定字符为止"循环的统一基础设施。
-     *
-     * 注意：传 `pred` 闭包每次调用都会触发一次堆分配（捕获 self 或本地变
-     * 量）。性能关键路径上请优先使用下列已经特化的扫描方法：
-     *
-     * - [skipNameChars]：`isNameChar` 谓词内联展开；
-     * - [skipUntilLt]：扫描到下一个 `<`（`parseTextBody` 主循环）；
-     * - [skipUntilQuoteOrLt]：扫描到下一个 `"` / `'` / `<`（属性值）。
-     */
-    func skipWhile(pred: (Rune) -> Bool): Unit {
-        let n = runes.size
-        while (idx < n) {
-            let r = runes[idx]
-            if (!pred(r)) { return }
-            idx++
-            if (r == CH_LF) {
-                line++
-                column = 1
-            } else {
-                column++
-            }
-        }
-    }
-
-    /**
      * 特化版：跳过所有 `isNameChar(r)` 字符。
      *
      * `readName` 在 parser 上几乎每个状态切换都要调用，旧版 `skipWhile(isNameChar)`
@@ -174,10 +171,17 @@ class SourceCursor {
             let r = runes[idx]
             // 内联展开 isNameChar 判定（ASCII letter / digit / '_' / ':' / '-' / '.'）
             // Name 字符不允许是 LF，所以不必维护行号。
-            if ((r >= r'a' && r <= r'z')
-                || (r >= r'A' && r <= r'Z')
-                || (r >= r'0' && r <= r'9')
-                || r == r'_' || r == r':' || r == r'-' || r == r'.') {
+            var isName = false
+            if (r >= r'a' && r <= r'z') {
+                isName = true
+            } else if (r >= r'A' && r <= r'Z') {
+                isName = true
+            } else if (r >= r'0' && r <= r'9') {
+                isName = true
+            } else if (r == r'_' || r == r':' || r == r'-' || r == r'.') {
+                isName = true
+            }
+            if (isName) {
                 idx++
                 column++
             } else {
@@ -196,7 +200,9 @@ class SourceCursor {
         let n = runes.size
         while (idx < n) {
             let r = runes[idx]
-            if (r == CH_LT) { return }
+            if (r == CH_LT) {
+                return
+            }
             idx++
             if (r == CH_LF) {
                 line++
@@ -217,8 +223,12 @@ class SourceCursor {
         let n = runes.size
         while (idx < n) {
             let r = runes[idx]
-            if (r == quoteCh) { return true }
-            if (r == CH_LT) { return false }
+            if (r == quoteCh) {
+                return true
+            }
+            if (r == CH_LT) {
+                return false
+            }
             idx++
             if (r == CH_LF) {
                 line++
@@ -239,10 +249,14 @@ class SourceCursor {
     func consumeIfMatch(prefix: Array<Rune>): Bool {
         let m = prefix.size
         // 越界快速失败：剩余字符不足时直接返回，省掉 peekAt 的 Option 装箱。
-        if (idx + m > runes.size) { return false }
+        if (idx + m > runes.size) {
+            return false
+        }
         var i = 0
         while (i < m) {
-            if (runes[idx + i] != prefix[i]) { return false }
+            if (runes[idx + i] != prefix[i]) {
+                return false
+            }
             i++
         }
         // 全部匹配——批量消费。前缀都是 ASCII（`-` / `[` / `]` / `>` / `C` ...），
@@ -266,7 +280,9 @@ class SourceCursor {
      * 命中，是 parse 热路径上最大的常量倍率优化点之一。
      */
     func sliceString(start: Int64, end: Int64): String {
-        if (end <= start) { return String.empty }
+        if (end <= start) {
+            return String.empty
+        }
         String(runes[start..end])
     }
 }

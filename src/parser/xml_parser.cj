@@ -46,13 +46,12 @@ class XmlParser {
     // 也让 extend 文件专注于节点级语法。
 
     func matchesChar(ch: Rune): Bool {
-        cur.peek() == Some(ch)
+        cur.matches(ch)
     }
 
     func consumeExpected(ch: Rune): Unit {
-        if (!matchesChar(ch)) {
-            throw XmlParseException(
-                InvalidText(cur.pos(), "expected '${ch}'"))
+        if (!cur.matches(ch)) {
+            throw XmlParseException(InvalidText(cur.pos(), "expected '${ch}'"))
         }
         cur.advance()
     }
@@ -65,15 +64,12 @@ class XmlParser {
      */
     func readName(): String {
         let start = cur.idx
-        match (cur.peek()) {
-            case Some(r) =>
-                if (!isNameStart(r)) {
-                    throw XmlParseException(
-                        InvalidText(cur.pos(), "expected name-start character"))
-                }
-            case None =>
-                throw XmlParseException(
-                    InvalidText(cur.pos(), "unexpected EOF where name expected"))
+        if (start >= cur.runes.size) {
+            throw XmlParseException(InvalidText(cur.pos(), "unexpected EOF where name expected"))
+        }
+        let r = cur.runes[start]
+        if (!isNameStart(r)) {
+            throw XmlParseException(InvalidText(cur.pos(), "expected name-start character"))
         }
         cur.skipNameChars()
         cur.sliceString(start, cur.idx)
@@ -101,8 +97,12 @@ func trimLeft(s: String): String {
 /** 若 payload 以 "xml" 起始，且后接空白 / 结束，则视为 XML 声明而非普通 PI。 */
 func isDeclarationPayload(trimmed: String): Bool {
     let rr = toRuneArray(trimmed)
-    if (rr.size < 3) { return false }
-    if (rr[0] != r'x' || rr[1] != r'm' || rr[2] != r'l') { return false }
+    if (rr.size < 3) {
+        return false
+    }
+    if (rr[0] != r'x' || rr[1] != r'm' || rr[2] != r'l') {
+        return false
+    }
     rr.size == 3 || isXmlWhitespace(rr[3])
 }
 
@@ -113,7 +113,9 @@ func collapseWhitespace(s: String): String {
     var emitted = false
     for (r in s.runes()) {
         if (isXmlWhitespace(r)) {
-            if (emitted) { lastWasWs = true }
+            if (emitted) {
+                lastWasWs = true
+            }
         } else {
             if (lastWasWs) {
                 sb.append(r' ')

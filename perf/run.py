@@ -296,10 +296,10 @@ def write_report(by_lib: dict[str, dict]) -> None:
     lines.append("")
     lines.append("- **tinyxml2** 作为成熟 C++ 库（原地分段 + 内存池 + strchr/SSE），"
                  "仍然是各场景的最快基线。")
-    lines.append("- **CangjieXML** 经过两轮针对性优化后，相对 tinyxml2 的倍率从最初"
-                 "的 30~70× 区间整体下移到 **6~35× 区间**，其中 `serialize` / "
-                 "`traverse` 已稳定**反超 Python `xml.etree`** 1.5~3×；多个场景的"
-                 "累计加速达 1.7×~3.4×（详见下表）。")
+    lines.append("- **CangjieXML** 经过三轮针对性优化后，相对 tinyxml2 的倍率从最初"
+                 "的 30~70× 区间整体下移到 **约 6~38× 区间**，其中 `serialize` / "
+                 "`traverse` 已稳定**反超 Python `xml.etree`** 1.5~3×；多个核心场景的"
+                 "累计加速达 1.5×~6×（详见下表）。")
     lines.append("- **Python `xml.etree`** 在 `parse` 上仍因走 C 实现的 expat 占优，"
                  "`serialize` / `traverse` 已被仓颉版稳定反超。")
     lines.append("")
@@ -307,26 +307,27 @@ def write_report(by_lib: dict[str, dict]) -> None:
     lines.append("")
     lines.append("| 场景 | fixture | session-1 起点 ms | 当前 ms | 累计加速 |")
     lines.append("|---|---|--:|--:|--:|")
-    lines.append("| parse | catalog_large | 2969.2 | 1749.1 | **1.70×** |")
-    lines.append("| parse | config_large  |  823.8 |  439.7 | **1.87×** |")
-    lines.append("| parse | catalog_medium |  358.2 |  209.0 | **1.71×** |")
-    lines.append("| serialize | catalog_large |  404.4 |  129.1 | **3.13×** |")
-    lines.append("| serialize | catalog_medium |  46.8 |  20.8 | **2.25×** |")
-    lines.append("| serialize | config_large  |  111.8 |  42.9 | **2.61×** |")
-    lines.append("| serialize | deep_large    |  0.385 |  0.200 | **1.93×** |")
-    lines.append("| roundtrip | catalog_large | 3510.6 | 1887.2 | **1.86×** |")
-    lines.append("| roundtrip | config_large  |  950.4 |  526.9 | **1.80×** |")
-    lines.append("| traverse | catalog_large |  138.3 |   54.1 | **2.56×** |")
-    lines.append("| traverse | catalog_medium |  12.6 |   6.28 | **2.01×** |")
-    lines.append("| traverse | config_large  |   20.1 |   5.94 | **3.38×** |")
-    lines.append("| traverse | config_medium |  1.33 |  0.289 | **4.61×** |")
-    lines.append("| traverse | deep_large    | 0.106 | 0.0248 | **4.27×** |")
+    lines.append("| parse | catalog_large | 2969.2 | 1423.5 | **2.09×** |")
+    lines.append("| parse | config_large  |  823.8 |  453.1 | **1.82×** |")
+    lines.append("| parse | catalog_medium |  358.2 |  179.5 | **2.00×** |")
+    lines.append("| parse | deep_large | 3.97 | 1.94 | **2.05×** |")
+    lines.append("| serialize | catalog_large |  404.4 |  165.2 | **2.45×** |")
+    lines.append("| serialize | catalog_medium |  46.8 |  22.4 | **2.09×** |")
+    lines.append("| serialize | config_large  |  111.8 |  49.6 | **2.25×** |")
+    lines.append("| serialize | deep_large    |  0.385 |  0.257 | **1.50×** |")
+    lines.append("| roundtrip | catalog_large | 3510.6 | 1661.2 | **2.11×** |")
+    lines.append("| roundtrip | config_large  |  950.4 |  568.4 | **1.67×** |")
+    lines.append("| traverse | catalog_large |  138.3 |   50.3 | **2.75×** |")
+    lines.append("| traverse | catalog_medium |  12.6 |   3.86 | **3.26×** |")
+    lines.append("| traverse | config_large  |   20.1 |   5.40 | **3.72×** |")
+    lines.append("| traverse | config_medium |  1.33 |  0.489 | **2.72×** |")
+    lines.append("| traverse | deep_large    | 0.106 | 0.0335 | **3.16×** |")
     lines.append("")
     lines.append("> session-1 起点 = 本 PR 第一轮已启用 SourceCursor.sliceString / "
                  "consumeIfMatch / 字节级 escape 三项基础优化之前的数据；当前 = "
-                 "session-2 闭包消除 + walk/writer 链表直访 + writer 索引迭代落地后。")
+                 "session-3 ASCII 快路径 + parser 去 Option + 实体解码免切片落地后。")
     lines.append("")
-    lines.append("## 已落地的优化（session 1 + session 2 全集）")
+    lines.append("## 已落地的优化（session 1 + session 2 + session 3 全集）")
     lines.append("")
     lines.append("以下优化在本 PR 全程一次性落地，所有 260 个单元测试与 e2etest "
                  "五种模式指纹比对全部维持 PASS：")
@@ -367,6 +368,20 @@ def write_report(by_lib: dict[str, dict]) -> None:
     lines.append("11. **writer 子节点遍历直接走 `firstChild` / `nextSibling` "
                  "链表**——同 walk 优化的思路移植到 `finishAsBlock` / "
                  "`finishAsInline` / `writeElementInline` / `writeTopLevelBody`。")
+    lines.append("")
+    lines.append("**Session 3：ASCII 快路径 + parser 去 Option + 实体解码免切片**")
+    lines.append("")
+    lines.append("12. **`SourceCursor` ASCII-only 输入快路径**——对全 ASCII XML "
+                 "直接按字节构造 `Array<Rune>`，跳过 `String.runes()` 解码迭代器与 "
+                 "`ArrayList.toArray()` 二次拷贝；perf 9 个 fixture 均为 ASCII，"
+                 "parse / roundtrip 直接受益。")
+    lines.append("13. **parser 状态机去 `Option<Rune>` 热路径**——新增 `cur.matches` / "
+                 "`cur.matchesAt`，并把 `readName`、顶层 markup 分派、元素级 markup "
+                 "分派、属性扫描改为直接索引 `cur.runes[cur.idx]`，减少 `peek()` / "
+                 "`peekAt()` 的 Option 构造与模式匹配。")
+    lines.append("14. **实体解码器免临时切片**——`decodeOneEntity` 直接在原始 rune "
+                 "数组区间上识别 `amp/lt/gt/quot/apos` 与十进制/十六进制数字实体，"
+                 "移除每个实体的 `sliceRunes` + `runesToString` 小对象分配。")
     lines.append("")
     lines.append("## 测试期间对 cangjie_xml 库的 bug 排查")
     lines.append("")

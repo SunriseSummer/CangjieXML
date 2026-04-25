@@ -36,7 +36,9 @@ extend XmlParser {
         var sawRoot = false
         while (!cur.eof()) {
             cur.skipWhitespace()
-            if (cur.eof()) { return }
+            if (cur.eof()) {
+                return
+            }
             if (!matchesChar(CH_LT)) {
                 throw XmlParseException(
                     InvalidText(cur.pos(),
@@ -53,30 +55,30 @@ extend XmlParser {
     public func parseMarkupAtTop(rootSeenAlready: Bool): XmlNode {
         let startPos = cur.pos()
         consumeExpected(CH_LT)
-        match (cur.peek()) {
-            case Some(r) =>
-                if (r == CH_QUESTION) { return parsePiOrDeclarationTop(startPos) }
-                if (r == CH_BANG)     { return parseBangMarkup(startPos, atTop: true) }
-                if (r == CH_SLASH) {
-                    throw XmlParseException(
-                        MismatchedElement("(none)", peekSkippedName(), startPos))
-                }
-                if (rootSeenAlready) {
-                    throw XmlParseException(
-                        InvalidText(startPos, "only one root element is allowed"))
-                }
-                return parseElement(startPos, 1)
-            case None =>
-                throw XmlParseException(
-                    InvalidText(startPos, "unexpected EOF after '<'"))
+        if (cur.eof()) {
+            throw XmlParseException(InvalidText(startPos, "unexpected EOF after '<'"))
         }
+        let r = cur.runes[cur.idx]
+        if (r == CH_QUESTION) {
+            return parsePiOrDeclarationTop(startPos)
+        }
+        if (r == CH_BANG) {
+            return parseBangMarkup(startPos, atTop: true)
+        }
+        if (r == CH_SLASH) {
+            throw XmlParseException(MismatchedElement("(none)", peekSkippedName(), startPos))
+        }
+        if (rootSeenAlready) {
+            throw XmlParseException(InvalidText(startPos, "only one root element is allowed"))
+        }
+        parseElement(startPos, 1)
     }
 
     public func parsePiOrDeclarationTop(startPos: SourcePos): XmlNode {
         consumeExpected(CH_QUESTION)
         let payloadStart = cur.idx
         while (!cur.eof()) {
-            if (matchesChar(CH_QUESTION) && cur.peekAt(1) == Some(CH_GT)) {
+            if (cur.matches(CH_QUESTION) && cur.matchesAt(1, CH_GT)) {
                 let payload = cur.sliceString(payloadStart, cur.idx)
                 cur.advance()
                 cur.advance()
@@ -88,8 +90,7 @@ extend XmlParser {
             }
             cur.advance()
         }
-        throw XmlParseException(
-            InvalidDeclaration(startPos, "unterminated processing instruction / declaration"))
+        throw XmlParseException(InvalidDeclaration(startPos, "unterminated processing instruction / declaration"))
     }
 
     public func parseBangMarkup(startPos: SourcePos, atTop!: Bool): XmlNode {
@@ -99,8 +100,7 @@ extend XmlParser {
         }
         if (cur.consumeIfMatch(RUNE_CDATA_PROLOGUE)) {
             if (atTop) {
-                throw XmlParseException(
-                    InvalidText(startPos, "CDATA is not allowed at document top level"))
+                throw XmlParseException(InvalidText(startPos, "CDATA is not allowed at document top level"))
             }
             return parseCdataBody(startPos)
         }

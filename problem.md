@@ -45,7 +45,7 @@
 ### 复现路径
 
 ```cangjie
-// src/parser/source_cursor.cj — 当前实现
+// src/parser/source_cursor.cj — 非 ASCII fallback 仍需走这条路径
 init(input: String, acceptBom: Bool) {
     let tmp = ArrayList<Rune>(input.size)  // 已预估容量
     for (r in input.runes()) {             // 每次迭代解码一个码点
@@ -63,6 +63,11 @@ init(input: String, acceptBom: Bool) {
 
 - `ArrayList<Rune>(input.size)` 预估容量，省 19 次 doubling 副本拷贝（见
   `source_cursor.cj` init）。**收益有限**，根本原因——4 字节宽度本身——无解。
+- `SourceCursor` 增加 ASCII-only 快路径：先按字节确认输入全 ASCII，再用
+  `Array<Rune>(input.size, { i => Rune(UInt32(input[i])) })` 直接构造 rune 数组，
+  跳过 `String.runes()` 迭代器与 `ArrayList.toArray()` 二次拷贝。该方案让 perf
+  9 个 ASCII fixture 的 parse / roundtrip 继续获得 15%~35% 改善，但对真实
+  Unicode 文档仍会退回 4-byte Rune 路径。
 
 ### 影响估算
 
@@ -72,7 +77,8 @@ init(input: String, acceptBom: Bool) {
 | 5 MB ASCII | ~20 MB | ~30 MB | ~5 MB |
 | 中文密集 1 MB | ~4 MB（每字符 3 字节 UTF-8 → 4 字节 UTF-32） | ~6 MB | ~1 MB |
 
-实测 `parse` 速度差距中"Rune 解码 + 4× 内存带宽"是常驻 30~50% 因素。
+实测 `parse` 速度差距中"Rune 解码 + 4× 内存带宽"是常驻 30~50% 因素。ASCII
+快路径只是规避最常见英文 XML 的解码开销，不能解决 Unicode 文档的结构性内存放大。
 
 ### 改进建议
 
@@ -340,7 +346,7 @@ XML，还包括 JSON / Protobuf / regex / template 等所有字节扫描场景�
 
 | 维度 | 库层（cangjie_xml）已榨干 | 等价于"等 SDK 改进" |
 |---|---|---|
-| Rune 数组前置物化 | 已预估容量；进一步要么字节流 parser（结构性大改），要么等 P1-1 | **是** |
+| Rune 数组前置物化 | 已预估容量，并为全 ASCII 输入加直接字节转 Rune 快路径；Unicode 文档仍需字节流 parser（结构性大改）或等 P1-1 | **是** |
 | 闭包热路径 | 已手工特化 3 个最热谓词；剩余 `skipWhile(pred)` 公开 API 仍保留 | 等 P1-2 |
 | Iterator 分配 | 已加 `attributeAt(i)` 索引访问绕开；childNodes 走链表直访 | 等 P2-1 |
 | 字节扫描 | 已字节级化，5-way 比较 ASCII 字符 | 等 P3-2（SIMD） |
