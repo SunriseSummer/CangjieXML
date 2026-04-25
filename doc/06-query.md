@@ -59,7 +59,7 @@ try {
 ### 示例
 
 ```cangjie
-let doc = XmlDocument.parseString(
+let doc = parseXml(
     "<store><name>SICP</name><price>42.5</price></store>")
 let root = doc.rootElement.getOrThrow()
 
@@ -119,15 +119,18 @@ public let STRING_CODEC:  StringCodec
 
 ### 自定义 codec
 
+> **示意草图**：本片段演示如何扩展 `XmlValueCodec<T>`，**不**进入
+> `doc_examples_test.cj` 的自动化断言范围。生产实现需根据自身格式约定
+> 完整处理 radix / 大小写 / 溢出 / 前后空白等边界。
+
 ```cangjie
-public class HexIntCodec <: XmlValueCodec<Int64> {
+public class HexInt64Codec <: XmlValueCodec<Int64> {
     public func tryParse(text: String): ?Int64 {
-        try { Some(Int64.parse("0x" + text.trimAscii(), radix: 16)) }
-        catch (_) { None }
+        // 伪代码：用户按自己的进制 / trim / 大小写策略实现
+        None
     }
     public func format(value: Int64): String {
-        // 以 16 进制字符串表达
-        // 具体实现略——见 doc_examples 测试
+        // 伪代码：按 16 进制格式化即可
         value.toString()
     }
 }
