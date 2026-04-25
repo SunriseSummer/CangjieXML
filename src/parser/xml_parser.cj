@@ -73,65 +73,81 @@ class XmlParser {
 // ----------------------------------------------------------------------
 // 无状态纯函数：文本工具
 // ----------------------------------------------------------------------
+//
+// XML 1.0 §2.3 的空白集合（U+0020 / U+0009 / U+000A / U+000D）全是 ASCII
+// 单字节；UTF-8 多字节序列的所有字节均 ≥ 0x80。因此对"识别空白 / 在空白上
+// 切分"这类操作，按字节扫描结果与按 Rune 扫描完全一致，但无需对整段输入做
+// Rune 物化。
+
+private const WS_SP: Byte = 0x20u8 // ' '
+private const WS_HT: Byte = 0x09u8 // '\t'
+private const WS_LF: Byte = 0x0Au8 // '\n'
+private const WS_CR: Byte = 0x0Du8 // '\r'
+
+private func isWsByte(b: Byte): Bool {
+    b == WS_SP || b == WS_HT || b == WS_LF || b == WS_CR
+}
 
 func trimLeft(s: String): String {
-    let rr = toRuneArray(s)
+    let n = s.size
     var i = 0
-    while (i < rr.size && isXmlWhitespace(rr[i])) {
+    while (i < n && isWsByte(s[i])) {
         i++
     }
-    let sb = StringBuilder()
-    while (i < rr.size) {
-        sb.append(rr[i])
-        i++
-    }
-    sb.toString()
+    if (i == 0) { return s }
+    if (i == n) { return String.empty }
+    s[i..n]
 }
 
 /** 若 payload 以 "xml" 起始，且后接空白 / 结束，则视为 XML 声明而非普通 PI。 */
 func isDeclarationPayload(trimmed: String): Bool {
-    let rr = toRuneArray(trimmed)
-    if (rr.size < 3) {
+    let n = trimmed.size
+    if (n < 3) { return false }
+    if (trimmed[0] != 0x78u8 || trimmed[1] != 0x6Du8 || trimmed[2] != 0x6Cu8) {
         return false
     }
-    if (rr[0] != r'x' || rr[1] != r'm' || rr[2] != r'l') {
-        return false
-    }
-    rr.size == 3 || isXmlWhitespace(rr[3])
+    n == 3 || isWsByte(trimmed[3])
 }
 
-/** 在 Collapse 模式下，把任意连续空白折叠为单个空格并去除首尾空白。 */
+/**
+ * Collapse 模式下把任意连续空白折叠为单个空格并去除首尾空白。
+ *
+ * 实现按字节遍历——遇到非空白字节段时一次性 `append`，避免对每个 Rune 分别
+ * 走 `s.runes()` 迭代器（UTF-8 多字节序列的所有字节均 ≥ 0x80，永远不会与
+ * 空白字节冲突，因此对 ASCII 与非 ASCII 文本一视同仁）。
+ */
 func collapseWhitespace(s: String): String {
+    let n = s.size
     let sb = StringBuilder()
     var lastWasWs = false
     var emitted = false
-    for (r in s.runes()) {
-        if (isXmlWhitespace(r)) {
-            if (emitted) {
-                lastWasWs = true
-            }
-        } else {
-            if (lastWasWs) {
-                sb.append(r' ')
-                lastWasWs = false
-            }
-            sb.append(r)
-            emitted = true
+    var i = 0
+    while (i < n) {
+        let b = s[i]
+        if (isWsByte(b)) {
+            if (emitted) { lastWasWs = true }
+            i++
+            continue
         }
+        if (lastWasWs) {
+            sb.append(r' ')
+            lastWasWs = false
+        }
+        let runStart = i
+        while (i < n && !isWsByte(s[i])) {
+            i++
+        }
+        sb.append(s[runStart..i])
+        emitted = true
     }
     sb.toString()
 }
 
 func isAllWhitespace(s: String): Bool {
-    // XML 1.0 §2.3 的空白集合都是 ASCII 单字节；UTF-8 多字节序列的所有字节
-    // 都 ≥ 0x80，因此按字节扫描结果与按 Rune 扫描完全一致，但更轻。
     let n = s.size
     var i = 0
     while (i < n) {
-        let b = s[i]
-        if (b != b' ' && b != b'\t' && b != b'\n' && b != b'\r') {
-            return false
-        }
+        if (!isWsByte(s[i])) { return false }
         i++
     }
     true
