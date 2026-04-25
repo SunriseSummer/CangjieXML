@@ -43,6 +43,24 @@ extend XmlElement {
     }
 
     /**
+     * 仅在不存在同名属性时新增，返回是否成功。
+     *
+     * 该方法是为 parser 等"已知 attribute 必须唯一"的高频路径准备的——
+     * 比 `hasAttribute` + `setAttribute` 的"两次查询"组合少一次 HashMap
+     * 查找；语义清晰：返回 `false` 即重复属性，调用方决定如何报错。
+     */
+    public func tryAddAttribute(name: String, value: String): Bool {
+        match (attrIndex.get(name)) {
+            case Some(_) => false
+            case None =>
+                let attr = XmlAttribute(name, value)
+                attrOrder.add(attr)
+                attrIndex[name] = attr
+                true
+        }
+    }
+
+    /**
      * 删除指定名称的属性。
      *
      * - 成功删除返回 `true`；

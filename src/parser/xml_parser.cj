@@ -4,10 +4,8 @@ import cangjie_xml.dom.*
 import cangjie_xml.error.*
 
 // 结构性字面量常量——集中避免魔鬼字符串散落到多个函数
-const CDATA_PROLOGUE: String = "[CDATA["
-const CDATA_EPILOGUE: String = "]]>"
-const COMMENT_OPEN_DASHES: String = "--"
-const COMMENT_EPILOGUE: String = "-->"
+// 注意：以下 String 形式仅用于错误消息 / 静态结构，热路径上的前缀匹配
+// 使用 `source_cursor.cj` 中预编译的 `RUNE_*` 数组避免重复 toRuneArray。
 const EPILOGUE_LEN: Int64 = 3 // length of "-->" / "]]>"
 
 /**
@@ -59,7 +57,12 @@ class XmlParser {
         cur.advance()
     }
 
-    /** 读取一个 XML Name（起始 `isNameStart`，后续 `isNameChar`）。 */
+    /**
+     * 读取一个 XML Name（起始 `isNameStart`，后续 `isNameChar`）。
+     *
+     * 起始字符校验之后的尾随扫描走 `cur.skipWhile(isNameChar)` 直接索引，
+     * 比 peek/advance 循环少两层 Option 装箱，是 parser 最热的子例程。
+     */
     func readName(): String {
         let start = cur.idx
         match (cur.peek()) {
@@ -72,13 +75,7 @@ class XmlParser {
                 throw XmlParseException(
                     InvalidText(cur.pos(), "unexpected EOF where name expected"))
         }
-        while (let Some(r) <- cur.peek()) {
-            if (isNameChar(r)) {
-                cur.advance()
-            } else {
-                break
-            }
-        }
+        cur.skipWhile(isNameChar)
         cur.sliceString(start, cur.idx)
     }
 }
@@ -130,8 +127,18 @@ func collapseWhitespace(s: String): String {
 }
 
 func isAllWhitespace(s: String): Bool {
-    for (r in s.runes()) {
-        if (!isXmlWhitespace(r)) { return false }
+    // 字节级快路径：XML 1.0 §2.3 的空白集合（`' '` `\t` `\n` `\r`）全部
+    // 是 ASCII 单字节；UTF-8 多字节序列的所有字节（前导 / 续位）都 ≥ 0x80，
+    // 不会与之相同，所以按字节扫描结果与按 Rune 扫描完全一致，但能省掉
+    // 解码迭代器的开销——对 Collapse 模式下的"是否纯空白"判断是热路径。
+    let n = s.size
+    var i = 0
+    while (i < n) {
+        let b = s[i]
+        if (b != b' ' && b != b'\t' && b != b'\n' && b != b'\r') {
+            return false
+        }
+        i++
     }
     true
 }

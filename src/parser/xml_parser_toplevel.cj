@@ -94,10 +94,10 @@ extend XmlParser {
 
     public func parseBangMarkup(startPos: SourcePos, atTop!: Bool): XmlNode {
         consumeExpected(CH_BANG)
-        if (cur.consumeIfMatch(COMMENT_OPEN_DASHES)) {
+        if (cur.consumeIfMatch(RUNE_COMMENT_OPEN_DASHES)) {
             return parseCommentBody(startPos)
         }
-        if (cur.consumeIfMatch(CDATA_PROLOGUE)) {
+        if (cur.consumeIfMatch(RUNE_CDATA_PROLOGUE)) {
             if (atTop) {
                 throw XmlParseException(
                     InvalidText(startPos, "CDATA is not allowed at document top level"))
@@ -110,7 +110,7 @@ extend XmlParser {
     public func parseCommentBody(startPos: SourcePos): XmlNode {
         let start = cur.idx
         while (!cur.eof()) {
-            if (cur.consumeIfMatch(COMMENT_EPILOGUE)) {
+            if (cur.consumeIfMatch(RUNE_COMMENT_EPILOGUE)) {
                 return doc.createComment(cur.sliceString(start, cur.idx - EPILOGUE_LEN))
             }
             cur.advance()
@@ -121,7 +121,7 @@ extend XmlParser {
     public func parseCdataBody(startPos: SourcePos): XmlNode {
         let start = cur.idx
         while (!cur.eof()) {
-            if (cur.consumeIfMatch(CDATA_EPILOGUE)) {
+            if (cur.consumeIfMatch(RUNE_CDATA_EPILOGUE)) {
                 return doc.createText(cur.sliceString(start, cur.idx - EPILOGUE_LEN), cdata: true)
             }
             cur.advance()

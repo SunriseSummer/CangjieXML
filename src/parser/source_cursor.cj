@@ -18,6 +18,21 @@ const CH_LF: Rune = r'\n'
 const RUNE_BOM: Rune = '\u{FEFF}'
 
 /**
+ * Parser 反复使用的常量前缀，预先编译成 `Array<Rune>`。
+ *
+ * `consumeIfMatch` 每次进入注释/CDATA/DOCTYPE 内层循环都会被调用——以前每次
+ * 调用都重新走 `toRuneArray(prefix: String)` 把 String 解码并 ArrayList
+ * 扩容，对长 CDATA / 长注释会是 O(n) 次小堆分配。把这几个常量前缀缓存到
+ * 包级 `let` 后，热路径上变成纯指针对比 + 数值比较。
+ *
+ * 对应 `xml_parser.cj` 中的 String 常量；命名一致以便维护。
+ */
+let RUNE_COMMENT_OPEN_DASHES: Array<Rune> = [r'-', r'-']
+let RUNE_CDATA_PROLOGUE: Array<Rune> = [r'[', r'C', r'D', r'A', r'T', r'A', r'[']
+let RUNE_COMMENT_EPILOGUE: Array<Rune> = [r'-', r'-', r'>']
+let RUNE_CDATA_EPILOGUE: Array<Rune> = [r']', r']', r'>']
+
+/**
  * 基于 `Rune` 数组的前向游标，供 Parser 使用。
  *
  * ## 为什么是 Rune 数组而非 String
@@ -92,32 +107,68 @@ class SourceCursor {
 
     /** 跳过所有 XML 空白字符（空格 / 制表 / LF / CR）。 */
     func skipWhitespace(): Unit {
-        while (let Some(r) <- peek()) {
-            if (isXmlWhitespace(r)) {
-                advance()
+        // 直接索引扫描——避免 peek()/advance() 路径上的 Option 装箱与重复 eof
+        // 检查；同时把 LF / 非 LF 的列号更新合并到一个分支里。skipWhitespace
+        // 在 parser 的几乎每个状态切换点都会调用，是真正的热路径。
+        let n = runes.size
+        while (idx < n) {
+            let r = runes[idx]
+            if (r == CH_LF) {
+                idx++
+                line++
+                column = 1
+            } else if (r == r' ' || r == r'\t' || r == r'\r') {
+                idx++
+                column++
             } else {
                 return
             }
         }
     }
 
-    /** 若后续以 `prefix` 起始则消费并返回 true，否则原位返回 false。 */
-    func consumeIfMatch(prefix: String): Bool {
-        let pr = toRuneArray(prefix)
-        var i = 0
-        while (i < pr.size) {
-            match (peekAt(i)) {
-                case Some(r) => if (r != pr[i]) { return false }
-                case None => return false
+    /**
+     * 跳过所有满足 `pred(r)` 的字符。
+     *
+     * 与"`peek` → 判定 → `advance`"循环等价，但直接索引 `runes` 数组：
+     * 省掉 `peek()` 的 `Option<Rune>` 与 `advance()` 重复的 eof 检查，
+     * 是 `readName` / `parseTextBody` / `readQuotedAttrValue` 等所有
+     * 内层"扫描到指定字符为止"循环的统一基础设施。
+     */
+    func skipWhile(pred: (Rune) -> Bool): Unit {
+        let n = runes.size
+        while (idx < n) {
+            let r = runes[idx]
+            if (!pred(r)) { return }
+            idx++
+            if (r == CH_LF) {
+                line++
+                column = 1
+            } else {
+                column++
             }
+        }
+    }
+
+    /**
+     * 若后续以 `prefix` 起始则消费并返回 true，否则原位返回 false。
+     *
+     * 该函数接受预编译好的 `Array<Rune>`，避免在内层循环中反复
+     * `toRuneArray(prefix: String)`——参见包级 `RUNE_*` 常量。
+     */
+    func consumeIfMatch(prefix: Array<Rune>): Bool {
+        let m = prefix.size
+        // 越界快速失败：剩余字符不足时直接返回，省掉 peekAt 的 Option 装箱。
+        if (idx + m > runes.size) { return false }
+        var i = 0
+        while (i < m) {
+            if (runes[idx + i] != prefix[i]) { return false }
             i++
         }
-        // 匹配成功，逐个 advance 以保持行列正确
-        i = 0
-        while (i < pr.size) {
-            advance()
-            i++
-        }
+        // 全部匹配——批量消费。前缀都是 ASCII（`-` / `[` / `]` / `>` / `C` ...），
+        // 不会出现 LF，因此可以一次性更新 idx 与 column，避免逐个 advance 的
+        // 分支与函数调用开销。
+        idx += m
+        column += m
         true
     }
 
@@ -126,15 +177,16 @@ class SourceCursor {
         SourcePos(idx, line, column)
     }
 
-    /** 从 `start`（含）到 `end`（不含）的切片拼成字符串。 */
+    /**
+     * 从 `start`（含）到 `end`（不含）的切片拼成字符串。
+     *
+     * 改为 `String(Array<Rune>)` 一次性构造——比逐 Rune `StringBuilder.append`
+     * 路径少一层 Builder 状态机和分摊扩容；对每个 name / 属性名 / 文本节点都
+     * 命中，是 parse 热路径上最大的常量倍率优化点之一。
+     */
     func sliceString(start: Int64, end: Int64): String {
-        let sb = StringBuilder()
-        var i = start
-        while (i < end) {
-            sb.append(runes[i])
-            i++
-        }
-        sb.toString()
+        if (end <= start) { return String.empty }
+        String(runes[start..end])
     }
 }
 

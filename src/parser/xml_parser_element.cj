@@ -55,11 +55,12 @@ extend XmlParser {
         cur.skipWhitespace()
         let raw = readQuotedAttrValue(attrName, attrPos)
         let decoded = decodeEntitiesOrRethrowAttr(raw, attrName, attrPos)
-        if (el.hasAttribute(attrName)) {
+        // 一次查询完成 dup-check + 插入；旧版本 `hasAttribute` + `setAttribute`
+        // 在解析超大配置（每元素 5+ 属性）时是 HashMap 路径上 ~50% 的开销。
+        if (!el.tryAddAttribute(attrName, decoded)) {
             throw XmlParseException(
                 InvalidAttribute(attrName, attrPos, "duplicate attribute"))
         }
-        el.setAttribute(attrName, decoded)
     }
 
     public func readQuotedAttrValue(attrName: String, attrPos: SourcePos): String {
@@ -76,21 +77,25 @@ extend XmlParser {
                 InvalidAttribute(attrName, attrPos, "unexpected EOF inside attribute value"))
         }
         let start = cur.idx
-        while (let Some(r) <- cur.peek()) {
-            if (r == quoteCh) {
-                let value = cur.sliceString(start, cur.idx)
-                cur.advance()
-                return value
-            }
+        // 直接索引扫描——属性值内出现 `<` 仍须校验为非法字符，所以不能完全
+        // 走 `skipWhile(_ != quoteCh)`；保留逐字符判定，但通过直接读 runes
+        // 数组绕开 peek() 的 Option 与 advance() 的多余 eof 检查。
+        cur.skipWhile { r =>
+            if (r == quoteCh) { return false }
             if (r == CH_LT) {
                 throw XmlParseException(
                     InvalidAttribute(attrName, cur.pos(),
                         "'<' is not allowed inside an attribute value"))
             }
-            cur.advance()
+            true
         }
-        throw XmlParseException(
-            InvalidAttribute(attrName, attrPos, "unterminated attribute value"))
+        if (!matchesChar(quoteCh)) {
+            throw XmlParseException(
+                InvalidAttribute(attrName, attrPos, "unterminated attribute value"))
+        }
+        let value = cur.sliceString(start, cur.idx)
+        cur.advance()
+        value
     }
 
     public func decodeEntitiesOrRethrowAttr(raw: String, attrName: String, attrPos: SourcePos): String {
@@ -160,10 +165,9 @@ extend XmlParser {
     public func parseTextBody(): XmlText {
         let textPos = cur.pos()
         let start = cur.idx
-        while (let Some(r) <- cur.peek()) {
-            if (r == CH_LT) { break }
-            cur.advance()
-        }
+        // 直接索引扫描到 `<`——比 peek/advance 循环少 Option 装箱与 LF 跟踪
+        // 之外的多余 eof 检查。
+        cur.skipWhile { r => r != CH_LT }
         let raw = cur.sliceString(start, cur.idx)
         let decoded = decodeEntities(raw, textPos)
         let finalText = match (opts.whitespace) {
