@@ -115,7 +115,7 @@ import cangjie_xml.parser.*
 import cangjie_xml.error.*
 
 try {
-    let doc = XmlDocument.parseString("<r>  a\n  b  </r>",
+    let doc = parseXml("<r>  a\n  b  </r>",
         XmlParseOptions(whitespace: Collapse))
     println(doc.rootElement.getOrThrow().textContent())
     // "a b"
@@ -151,7 +151,7 @@ public struct SourcePos <: ToString {
 
 ```cangjie
 let opts = XmlParseOptions(whitespace: Collapse)
-let doc = XmlDocument.parseString("<r>  a\n  b  </r>", opts)
+let doc = parseXml("<r>  a\n  b  </r>", opts)
 // 根元素文本变为 "a b"
 ```
 

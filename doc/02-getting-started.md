@@ -93,14 +93,18 @@ import cangjie_xml.dom.*
 import cangjie_xml.parser.*
 
 main(): Int64 {
-    let doc = XmlDocument.parseString(
-        "<catalog><book id=\"1\">SICP</book></catalog>")
+    let doc = parseXml("<catalog><book id=\"1\">SICP</book></catalog>")
     let root = doc.rootElement.getOrThrow()
     let book = root.firstChildElement(name: Some("book")).getOrThrow()
     println(book.textContent())    // "SICP"
     0
 }
 ```
+
+> **跨包调用建议**：本示例使用 `parser` 包中的顶层函数 `parseXml(...)`。受 cjc 1.0.5
+> 扩展可见性限制，`XmlDocument.parseString(...)` 静态方法形式仅在同包调用时可见，
+> 在你的应用代码（与 `cangjie_xml.parser` 不同包）中**应使用 `parseXml(...)`**。
+> 详细说明见 [04 — Parser](./04-parser.md#公共入口)。
 
 ---
 

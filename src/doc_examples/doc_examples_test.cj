@@ -73,7 +73,7 @@ func docGettingStartedCompactPrint(): Unit {
 // ----------------------------------------------------------------------
 @Test
 func docGettingStartedParseString(): Unit {
-    let doc = XmlDocument.parseString(
+    let doc = parseXml(
         "<catalog><book id=\"1\">SICP</book></catalog>")
     let root = doc.rootElement.getOrThrow()
     let book = root.firstChildElement(name: Some("book")).getOrThrow()
@@ -152,16 +152,16 @@ func docDomAttributesOrderAndHas(): Unit {
 @Test
 func docParserPreserveVsCollapse(): Unit {
     let src = "<r>  a\n  b  </r>"
-    let d1 = XmlDocument.parseString(src)
+    let d1 = parseXml(src)
     @Expect(d1.rootElement.getOrThrow().textContent(), "  a\n  b  ")
 
-    let d2 = XmlDocument.parseString(src, XmlParseOptions(whitespace: Collapse))
+    let d2 = parseXml(src, XmlParseOptions(whitespace: Collapse))
     @Expect(d2.rootElement.getOrThrow().textContent(), "a b")
 }
 
 @Test
 func docParserSelfClosingAndAttributes(): Unit {
-    let doc = XmlDocument.parseString("<book id=\"42\" lang='en'/>")
+    let doc = parseXml("<book id=\"42\" lang='en'/>")
     let r = doc.rootElement.getOrThrow()
     @Expect(r.name, "book")
     @Expect(r.attribute("id").getOrThrow(), "42")
@@ -247,7 +247,7 @@ func docWriterDeterminism(): Unit {
 @Test
 func docQueryTypedAttributes(): Unit {
     let src = "<book id=\"42\" price=\"19.99\" avail=\"true\">SICP</book>"
-    let book = XmlDocument.parseString(src).rootElement.getOrThrow()
+    let book = parseXml(src).rootElement.getOrThrow()
 
     @Expect(book.intAttribute("id").getOrThrow(), 42)
     let price = book.doubleAttribute("price").getOrThrow()
@@ -275,7 +275,7 @@ func docQueryRequiredAttributeThrowsOnMissing(): Unit {
 
 @Test
 func docQueryChildElementText(): Unit {
-    let doc = XmlDocument.parseString(
+    let doc = parseXml(
         "<store><name>SICP</name><price>42.5</price></store>")
     let root = doc.rootElement.getOrThrow()
 
@@ -527,7 +527,7 @@ func docErrorsDuplicateRootRejected(): Unit {
 func docErrorsParseExceptionCarriesXmlError(): Unit {
     var matched = false
     try {
-        let _ = XmlDocument.parseString("<a></b>")
+        let _ = parseXml("<a></b>")
     } catch (e: XmlParseException) {
         match (e.error) {
             case MismatchedElement(_, _, _) => matched = true
@@ -544,9 +544,9 @@ func docErrorsParseExceptionCarriesXmlError(): Unit {
 func docExampleRoundTripDeterminism(): Unit {
     let src = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
               "<catalog><book id=\"1\">SICP</book></catalog>"
-    let d1 = XmlDocument.parseString(src)
+    let d1 = parseXml(src)
     let xml = d1.writeToString(XmlWriteOptions.compactPreset())
-    let d2 = XmlDocument.parseString(xml)
+    let d2 = parseXml(xml)
     @Expect(d2.rootElement.getOrThrow()
         .requiredChildElement("book").textContent(), "SICP")
     // 对相同 DOM + options，两次序列化完全一致

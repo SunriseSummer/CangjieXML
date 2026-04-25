@@ -115,7 +115,7 @@ import cangjie_xml.error.*
 
 main() {
     try {
-        let doc = XmlDocument.parseString(
+        let doc = parseXml(
             "<catalog><book id=\"1\">SICP</book></catalog>")
         println(doc.rootElement.getOrThrow().firstChildElement(name: Some("book"))
                    .getOrThrow().textContent())
@@ -123,7 +123,7 @@ main() {
 
         // Collapse 模式：折叠空白并删除纯空白文本节点
         let opts = XmlParseOptions(whitespace: Collapse)
-        let doc2 = XmlDocument.parseString("<r>  a\n  b  </r>", opts)
+        let doc2 = parseXml("<r>  a\n  b  </r>", opts)
         println(doc2.rootElement.getOrThrow().textContent())
         // "a b"
     } catch (e: XmlParseException) {

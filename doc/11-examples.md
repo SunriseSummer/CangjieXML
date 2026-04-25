@@ -55,9 +55,9 @@ import cangjie_xml.writer.*
 let src = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
           "<catalog><book id=\"1\">SICP</book></catalog>"
 
-let d1 = XmlDocument.parseString(src)
+let d1 = parseXml(src)
 let xml = d1.writeToString(XmlWriteOptions.compactPreset())
-let d2 = XmlDocument.parseString(xml)
+let d2 = parseXml(xml)
 
 // d1 与 d2 的根元素语义一致
 d2.rootElement.getOrThrow().requiredChildElement("book").textContent()   // "SICP"
@@ -78,11 +78,11 @@ import cangjie_xml.parser.*
 let src = "<r>  a\n  b  </r>"
 
 // Preserve（默认）：保留所有空白
-let d1 = XmlDocument.parseString(src)
+let d1 = parseXml(src)
 d1.rootElement.getOrThrow().textContent()    // "  a\n  b  "
 
 // Collapse：折叠连续空白 + 去除纯空白
-let d2 = XmlDocument.parseString(src, XmlParseOptions(whitespace: Collapse))
+let d2 = parseXml(src, XmlParseOptions(whitespace: Collapse))
 d2.rootElement.getOrThrow().textContent()    // "a b"
 ```
 
@@ -96,7 +96,7 @@ import cangjie_xml.parser.*
 import cangjie_xml.query.*
 
 let src = "<book id=\"42\" price=\"19.99\" avail=\"true\">SICP</book>"
-let book = XmlDocument.parseString(src).rootElement.getOrThrow()
+let book = parseXml(src).rootElement.getOrThrow()
 
 book.intAttribute("id").getOrThrow()                 // 42
 book.doubleAttribute("price").getOrThrow()           // 19.99
