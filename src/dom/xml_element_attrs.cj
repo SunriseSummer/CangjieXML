@@ -43,6 +43,24 @@ extend XmlElement {
     }
 
     /**
+     * 仅在不存在同名属性时新增，返回是否成功。
+     *
+     * 用于 parser 等"已知 attribute 必须唯一"的高频路径——比 `hasAttribute`
+     * + `setAttribute` 的两次查询少一次 HashMap 查找；返回 `false` 即重复
+     * 属性，调用方决定如何报错。
+     */
+    public func tryAddAttribute(name: String, value: String): Bool {
+        match (attrIndex.get(name)) {
+            case Some(_) => false
+            case None =>
+                let attr = XmlAttribute(name, value)
+                attrOrder.add(attr)
+                attrIndex[name] = attr
+                true
+        }
+    }
+
+    /**
      * 删除指定名称的属性。
      *
      * - 成功删除返回 `true`；
@@ -65,6 +83,17 @@ extend XmlElement {
     /** 当前元素的属性数量。 */
     public func attributeCount(): Int64 {
         attrOrder.size
+    }
+
+    /**
+     * 按插入顺序索引访问属性（0 ≤ i < attributeCount()）。
+     *
+     * 提供索引访问以便给热路径（writer 序列化、批量诊断）一条不分配迭代器
+     * 对象的遍历方式：`for i in 0..el.attributeCount() { el.attributeAt(i) }`。
+     * 越界时抛 `IndexOutOfBoundsException`（直接走 ArrayList 的语义）。
+     */
+    public func attributeAt(i: Int64): XmlAttribute {
+        attrOrder[i]
     }
 
     /** 从顺序数组移除指定名称——抽取独立辅助以降低 `removeAttribute` 圈复杂度。 */

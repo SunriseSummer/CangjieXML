@@ -3,6 +3,7 @@
   name = "xlsx_to_csv"
   version = "0.1.0"
   output-type = "executable"
+  compile-option = "-O2"
   description = "用 CangjieXML 解析 xlsx（OOXML）并把每个 sheet 导出为 CSV，验证 XML 库的能力"
   src-dir = "src"
   target-dir = "target"

@@ -23,14 +23,14 @@ CangjieXML 是一个**纯仓颉语言实现**的 XML 处理库。它以 tinyxml2
 
 ```
 cangjie_xml/                 # 根包，仅含版本号
-├── dom/                     # DOM 节点模型（M1）
-├── parser/                  # 递归下降解析器（M3）
-├── writer/                  # 序列化器、XmlSink、XmlWriteOptions（M2）
-├── query/                   # 类型化属性 / 子元素查询、codec（M4）
-├── build/                   # Builder DSL（M4）
-├── visit/                   # walk / XmlVisitor（M5）
-├── io/                      # 文件 / 字节 IO（M6）
-├── error/                   # 错误类型（贯穿全期）
+├── dom/                     # DOM 节点模型
+├── parser/                  # 递归下降解析器
+├── writer/                  # 序列化器、XmlSink、XmlWriteOptions
+├── query/                   # 类型化属性 / 子元素查询、codec
+├── build/                   # Builder DSL
+├── visit/                   # walk / XmlVisitor
+├── io/                      # 文件 / 字节 IO
+├── error/                   # 错误类型
 └── internal/                # 内部工具（转义、字符分类），不对外开放
 ```
 

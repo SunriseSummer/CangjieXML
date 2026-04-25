@@ -4,7 +4,7 @@ e2etest/xml 入口脚本——替代原先的 `run.sh`（项目规范禁止 sh �
 
 流程：
   1. `python3 fixtures/generate.py`                 —— 生成 10 份 `.xml`
-  2. `cjpm build` （在 `cangjie_probe/` 下）        —— 构建仓颉 probe
+  2. `cjpm build` （在 `cangjie_probe/` 下）        —— 以 `-O2` 构建仓颉 probe
   3. `python_probe/probe.py`                         —— Python 端指纹 → `out/python.json`
   4. `cangjie_probe` 以多种模式分别跑 → 多份 cangjie 指纹 JSON
   5. `diff.py` 逐模式对比 Python 指纹

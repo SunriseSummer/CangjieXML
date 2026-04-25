@@ -37,20 +37,26 @@ public func walk(node: XmlNode, visit: (XmlNodeKind) -> XmlWalkControl): Unit {
 
 /** 内部工作函数，返回"是否继续处理兄弟节点"。 */
 func walkImpl(node: XmlNode, visit: (XmlNodeKind) -> XmlWalkControl): Bool {
-    match (visit(node.kind())) {
+    // `kind()` 缓存一次，使后续 visit 与 match 共用同一个值，避免重复求值。
+    let k = node.kind()
+    match (visit(k)) {
         case Stop         => return false
         case SkipChildren => return true
         case Continue     => ()
     }
-    // 进入子节点
-    match (node.kind()) {
+    // 直接走双向链表，避免每次都构造 `childNodes()` 的迭代器对象。
+    match (k) {
         case Document(d) =>
-            for (child in d.childNodes()) {
-                if (!walkImpl(child, visit)) { return false }
+            var cur = d.firstChild
+            while (let Some(n) <- cur) {
+                if (!walkImpl(n, visit)) { return false }
+                cur = n.nextSibling
             }
         case Element(e) =>
-            for (child in e.childNodes()) {
-                if (!walkImpl(child, visit)) { return false }
+            var cur = e.firstChild
+            while (let Some(n) <- cur) {
+                if (!walkImpl(n, visit)) { return false }
+                cur = n.nextSibling
             }
         case _ => ()  // 叶子
     }

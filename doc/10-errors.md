@@ -17,12 +17,12 @@ public enum XmlError <: ToString {
     // DOM
     | DomOperationFailed(String)
 
-    // IO（M6）
+    // IO
     | FileNotFound(String)
     | FileReadFailed(String, String)      // path, cause
     | FileWriteFailed(String, String)     // path, cause
 
-    // 解析（M3）
+    // 解析
     | EmptyDocument
     | MismatchedElement(String, String, SourcePos)   // open, close, at
     | InvalidAttribute(String, SourcePos, String)    // name, at, reason
@@ -33,7 +33,7 @@ public enum XmlError <: ToString {
     | InvalidEncoding(SourcePos, String)
     | ElementDepthExceeded(Int64, SourcePos)         // limit, at
 
-    // Query（M4）
+    // Query
     | ValueDecodeFailed(String, String, SourcePos)   // targetType, text, at
 }
 ```

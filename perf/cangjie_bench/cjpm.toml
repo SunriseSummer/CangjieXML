@@ -1,14 +1,14 @@
 [package]
   cjc-version = "1.0.5"
-  name = "cangjie_probe"
+  name = "cangjie_bench"
   version = "0.1.0"
   output-type = "executable"
   compile-option = "-O2"
-  description = "E2E probe — parse fixtures with cangjie_xml and emit a fingerprint JSON for diff."
+  description = "Perf probe — bench cangjie_xml against tinyxml2 / python on shared fixtures."
   src-dir = "src"
   target-dir = "target"
 
 [dependencies]
-  cangjie_xml = { path = "../../.." }
+  cangjie_xml = { path = "../.." }
 
 [test-dependencies]

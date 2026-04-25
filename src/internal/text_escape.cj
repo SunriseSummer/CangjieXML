@@ -8,8 +8,7 @@ import std.collection.*
  * ## 职责
  *
  * 把任意 `String` 值按上下文（文本节点 / 属性值）转换为 XML 语法合法的形式。
- * 本模块仅做"写出方向"的转义；反方向的实体解码由 Parser 阶段的
- * `internal.entity_decoder`（M3）承担。
+ * 反方向的实体解码由 Parser 阶段的 `entity_decoder` 承担。
  *
  * ## 转义矩阵
  *
@@ -21,13 +20,10 @@ import std.collection.*
  *
  * ## 为什么是 internal
  *
- * 转义规则属于 XML 语法层的实现细节，不应成为公共 API。如果未来想允许用户
- * 自定义转义策略（例如保留 Unicode 实体），那是单独 RFC，不在 v1.0 范围内。
+ * 转义规则属于 XML 语法层的实现细节，不应成为公共 API。
  */
 
-// ----------------------------------------------------------------------
 // 集中常量定义：避免魔鬼字符串 / 魔鬼数字散落到多个函数中。
-// ----------------------------------------------------------------------
 
 const CDATA_OPEN: String = "<![CDATA["
 const CDATA_CLOSE: String = "]]>"
@@ -40,26 +36,48 @@ const BOM_BYTE_0: Byte = 0xEFu8
 const BOM_BYTE_1: Byte = 0xBBu8
 const BOM_BYTE_2: Byte = 0xBFu8
 
+// 转义触发字节——以字节常量声明，避免在热路径上每次比较都做 `Rune → UInt8` 转换。
+private const ESCAPE_AMP: Byte = 0x26u8 // '&'
+private const ESCAPE_LT: Byte = 0x3Cu8  // '<'
+private const ESCAPE_GT: Byte = 0x3Eu8  // '>'
+private const ESCAPE_QUOT: Byte = 0x22u8 // '"'
+
 /**
  * 把文本内容（PCDATA）按 XML 规则转义。
  *
- * 针对 `&` / `<` / `>` 做最小必要转义。不转义 `"` / `'`，因为文本节点无引号歧义。
+ * 针对 `&` / `<` / `>` 做最小必要转义，不转义 `"` / `'`（文本节点无引号歧义）。
+ * 若输入不包含任一待转义字符，直接返回原字符串，零分配快路径。
  *
- * 若输入不包含任一待转义字符，直接返回原字符串（零分配快路径）。
+ * 慢路径按字节扫描并以"区间拷贝 + 实体替换"成块输出：`& < >` 都是 ASCII
+ * 单字节，UTF-8 多字节序列的所有字节均 ≥ 0x80，因此按字节定位边界与按
+ * Rune 扫描结果一致但无需解码。
  */
 public func escapeText(s: String): String {
     if (!needsTextEscape(s)) {
         return s
     }
+    let n = s.size
     let sb = StringBuilder()
-    for (ch in s.runes()) {
-        match (ch) {
-            case r'&' => sb.append("&amp;")
-            case r'<' => sb.append("&lt;")
-            case r'>' => sb.append("&gt;")
-            case _    => sb.append(ch)
+    var i = 0
+    var lastEmit = 0
+    while (i < n) {
+        let b = s[i]
+        if (b == ESCAPE_AMP) {
+            if (i > lastEmit) { sb.append(s[lastEmit..i]) }
+            sb.append("&amp;")
+            lastEmit = i + 1
+        } else if (b == ESCAPE_LT) {
+            if (i > lastEmit) { sb.append(s[lastEmit..i]) }
+            sb.append("&lt;")
+            lastEmit = i + 1
+        } else if (b == ESCAPE_GT) {
+            if (i > lastEmit) { sb.append(s[lastEmit..i]) }
+            sb.append("&gt;")
+            lastEmit = i + 1
         }
+        i++
     }
+    if (lastEmit < n) { sb.append(s[lastEmit..n]) }
     sb.toString()
 }
 
@@ -67,21 +85,38 @@ public func escapeText(s: String): String {
  * 把属性值按 XML 规则转义。属性值总是以双引号 `"` 包裹，因此需转义 `"`。
  *
  * 对 `&` / `<` 必转义（`>` 在 tinyxml2 默认行为中也转义，为兼容保留）。
+ * 性能策略与 [escapeText] 一致——纯字节扫描 + 区间拷贝。
  */
 public func escapeAttribute(s: String): String {
     if (!needsAttrEscape(s)) {
         return s
     }
+    let n = s.size
     let sb = StringBuilder()
-    for (ch in s.runes()) {
-        match (ch) {
-            case r'&' => sb.append("&amp;")
-            case r'<' => sb.append("&lt;")
-            case r'>' => sb.append("&gt;")
-            case r'"' => sb.append("&quot;")
-            case _    => sb.append(ch)
+    var i = 0
+    var lastEmit = 0
+    while (i < n) {
+        let b = s[i]
+        if (b == ESCAPE_AMP) {
+            if (i > lastEmit) { sb.append(s[lastEmit..i]) }
+            sb.append("&amp;")
+            lastEmit = i + 1
+        } else if (b == ESCAPE_LT) {
+            if (i > lastEmit) { sb.append(s[lastEmit..i]) }
+            sb.append("&lt;")
+            lastEmit = i + 1
+        } else if (b == ESCAPE_GT) {
+            if (i > lastEmit) { sb.append(s[lastEmit..i]) }
+            sb.append("&gt;")
+            lastEmit = i + 1
+        } else if (b == ESCAPE_QUOT) {
+            if (i > lastEmit) { sb.append(s[lastEmit..i]) }
+            sb.append("&quot;")
+            lastEmit = i + 1
         }
+        i++
     }
+    if (lastEmit < n) { sb.append(s[lastEmit..n]) }
     sb.toString()
 }
 
@@ -140,25 +175,32 @@ public let UTF8_BOM: Array<Byte> = [BOM_BYTE_0, BOM_BYTE_1, BOM_BYTE_2]
 public let UTF8_BOM_STRING: String = "\u{FEFF}"
 
 // ----------------------------------------------------------------------
-// 内部快路径：判断是否需要转义
+// 内部快路径：判断是否需要转义。
+//
+// 这两个判定函数对每个文本节点 / 每个属性值都会被调用。`& < > "` 都是 ASCII
+// 单字节，UTF-8 多字节序列的所有字节均 ≥ 0x80，按字节扫描即可一次到位。
 // ----------------------------------------------------------------------
 
 func needsTextEscape(s: String): Bool {
-    for (ch in s.runes()) {
-        match (ch) {
-            case r'&' | r'<' | r'>' => return true
-            case _ => ()
-        }
+    let n = s.size
+    var i = 0
+    while (i < n) {
+        let b = s[i]
+        if (b == ESCAPE_AMP || b == ESCAPE_LT || b == ESCAPE_GT) { return true }
+        i++
     }
     false
 }
 
 func needsAttrEscape(s: String): Bool {
-    for (ch in s.runes()) {
-        match (ch) {
-            case r'&' | r'<' | r'>' | r'"' => return true
-            case _ => ()
+    let n = s.size
+    var i = 0
+    while (i < n) {
+        let b = s[i]
+        if (b == ESCAPE_AMP || b == ESCAPE_LT || b == ESCAPE_GT || b == ESCAPE_QUOT) {
+            return true
         }
+        i++
     }
     false
 }

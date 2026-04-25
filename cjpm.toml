@@ -3,6 +3,7 @@
   name = "cangjie_xml"
   version = "0.1.0"
   output-type = "static"
+  compile-option = "-O2"
   description = "CangjieXML — 纯仓颉实现的 XML 库（DOM / Parser / Writer），受 tinyxml2 启发。"
   src-dir = "src"
   target-dir = "target"

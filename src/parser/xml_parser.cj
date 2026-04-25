@@ -3,15 +3,13 @@ package cangjie_xml.parser
 import cangjie_xml.dom.*
 import cangjie_xml.error.*
 
-// 结构性字面量常量——集中避免魔鬼字符串散落到多个函数
-const CDATA_PROLOGUE: String = "[CDATA["
-const CDATA_EPILOGUE: String = "]]>"
-const COMMENT_OPEN_DASHES: String = "--"
-const COMMENT_EPILOGUE: String = "-->"
+// 结构性字面量常量，集中避免散落到多个函数。
+// 注意：以下 String 形式仅用于错误消息 / 静态结构；热路径上的前缀匹配使用
+// `source_cursor.cj` 中预编译的 `RUNE_*` 数组。
 const EPILOGUE_LEN: Int64 = 3 // length of "-->" / "]]>"
 
 /**
- * 递归下降 XML 解析器（M3）。
+ * 递归下降 XML 解析器。
  *
  * ## 覆盖范围
  *
@@ -29,9 +27,9 @@ const EPILOGUE_LEN: Int64 = 3 // length of "-->" / "]]>"
  *
  * ## 文件拆分
  *
- * 为保持单文件 ≤ 300 行并规避 cjc 1.0.5 的 `extend` 调用方向限制，实际的
- * 解析逻辑放入 `xml_parser_impl.cj` 的 `extend XmlParser` 中；本文件仅定义
- * 类骨架与不依赖解析状态机的纯工具函数。
+ * 类骨架定义在本文件，元素级与文档级语法分别落到 `xml_parser_element.cj`
+ * 与 `xml_parser_toplevel.cj`，均以 `extend XmlParser` 挂回，使每个源文件
+ * 都不超过 300 行的工程红线。
  */
 class XmlParser {
     let cur: SourceCursor
@@ -44,41 +42,33 @@ class XmlParser {
         this.doc = doc
     }
 
-    // 下列小工具不会反向调用 extend 中的解析函数，放在此处安全——
-    // 也让 extend 文件专注于节点级语法。
+    // 不依赖解析状态机的小工具放在此处，使 extend 文件专注于节点级语法。
 
     func matchesChar(ch: Rune): Bool {
-        cur.peek() == Some(ch)
+        cur.matches(ch)
     }
 
     func consumeExpected(ch: Rune): Unit {
-        if (!matchesChar(ch)) {
-            throw XmlParseException(
-                InvalidText(cur.pos(), "expected '${ch}'"))
+        if (!cur.matches(ch)) {
+            throw XmlParseException(InvalidText(cur.pos(), "expected '${ch}'"))
         }
         cur.advance()
     }
 
-    /** 读取一个 XML Name（起始 `isNameStart`，后续 `isNameChar`）。 */
+    /**
+     * 读取一个 XML Name（起始 `isNameStart`，后续 `isNameChar`）。
+     * 起始字符校验后通过 [SourceCursor.skipNameChars] 完成尾随扫描。
+     */
     func readName(): String {
         let start = cur.idx
-        match (cur.peek()) {
-            case Some(r) =>
-                if (!isNameStart(r)) {
-                    throw XmlParseException(
-                        InvalidText(cur.pos(), "expected name-start character"))
-                }
-            case None =>
-                throw XmlParseException(
-                    InvalidText(cur.pos(), "unexpected EOF where name expected"))
+        if (start >= cur.runes.size) {
+            throw XmlParseException(InvalidText(cur.pos(), "unexpected EOF where name expected"))
         }
-        while (let Some(r) <- cur.peek()) {
-            if (isNameChar(r)) {
-                cur.advance()
-            } else {
-                break
-            }
+        let r = cur.runes[start]
+        if (!isNameStart(r)) {
+            throw XmlParseException(InvalidText(cur.pos(), "expected name-start character"))
         }
+        cur.skipNameChars()
         cur.sliceString(start, cur.idx)
     }
 }
@@ -104,8 +94,12 @@ func trimLeft(s: String): String {
 /** 若 payload 以 "xml" 起始，且后接空白 / 结束，则视为 XML 声明而非普通 PI。 */
 func isDeclarationPayload(trimmed: String): Bool {
     let rr = toRuneArray(trimmed)
-    if (rr.size < 3) { return false }
-    if (rr[0] != r'x' || rr[1] != r'm' || rr[2] != r'l') { return false }
+    if (rr.size < 3) {
+        return false
+    }
+    if (rr[0] != r'x' || rr[1] != r'm' || rr[2] != r'l') {
+        return false
+    }
     rr.size == 3 || isXmlWhitespace(rr[3])
 }
 
@@ -116,7 +110,9 @@ func collapseWhitespace(s: String): String {
     var emitted = false
     for (r in s.runes()) {
         if (isXmlWhitespace(r)) {
-            if (emitted) { lastWasWs = true }
+            if (emitted) {
+                lastWasWs = true
+            }
         } else {
             if (lastWasWs) {
                 sb.append(r' ')
@@ -130,8 +126,16 @@ func collapseWhitespace(s: String): String {
 }
 
 func isAllWhitespace(s: String): Bool {
-    for (r in s.runes()) {
-        if (!isXmlWhitespace(r)) { return false }
+    // XML 1.0 §2.3 的空白集合都是 ASCII 单字节；UTF-8 多字节序列的所有字节
+    // 都 ≥ 0x80，因此按字节扫描结果与按 Rune 扫描完全一致，但更轻。
+    let n = s.size
+    var i = 0
+    while (i < n) {
+        let b = s[i]
+        if (b != b' ' && b != b'\t' && b != b'\n' && b != b'\r') {
+            return false
+        }
+        i++
     }
     true
 }

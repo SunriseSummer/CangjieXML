@@ -6,8 +6,7 @@ import cangjie_xml.error.*
 /**
  * `XmlParser` 的文档级与非元素节点解析逻辑。
  *
- * 与 `xml_parser_element.cj` 对应——两者均以 `extend XmlParser` 方式挂回同一类，
- * 对调用方无差别；分文件是为了把单源文件控制在 300 行内。
+ * 与 `xml_parser_element.cj` 对应，二者均以 `extend XmlParser` 挂回同一类。
  */
 extend XmlParser {
 
@@ -36,7 +35,9 @@ extend XmlParser {
         var sawRoot = false
         while (!cur.eof()) {
             cur.skipWhitespace()
-            if (cur.eof()) { return }
+            if (cur.eof()) {
+                return
+            }
             if (!matchesChar(CH_LT)) {
                 throw XmlParseException(
                     InvalidText(cur.pos(),
@@ -53,30 +54,30 @@ extend XmlParser {
     public func parseMarkupAtTop(rootSeenAlready: Bool): XmlNode {
         let startPos = cur.pos()
         consumeExpected(CH_LT)
-        match (cur.peek()) {
-            case Some(r) =>
-                if (r == CH_QUESTION) { return parsePiOrDeclarationTop(startPos) }
-                if (r == CH_BANG)     { return parseBangMarkup(startPos, atTop: true) }
-                if (r == CH_SLASH) {
-                    throw XmlParseException(
-                        MismatchedElement("(none)", peekSkippedName(), startPos))
-                }
-                if (rootSeenAlready) {
-                    throw XmlParseException(
-                        InvalidText(startPos, "only one root element is allowed"))
-                }
-                return parseElement(startPos, 1)
-            case None =>
-                throw XmlParseException(
-                    InvalidText(startPos, "unexpected EOF after '<'"))
+        if (cur.eof()) {
+            throw XmlParseException(InvalidText(startPos, "unexpected EOF after '<'"))
         }
+        let r = cur.runes[cur.idx]
+        if (r == CH_QUESTION) {
+            return parsePiOrDeclarationTop(startPos)
+        }
+        if (r == CH_BANG) {
+            return parseBangMarkup(startPos, atTop: true)
+        }
+        if (r == CH_SLASH) {
+            throw XmlParseException(MismatchedElement("(none)", peekSkippedName(), startPos))
+        }
+        if (rootSeenAlready) {
+            throw XmlParseException(InvalidText(startPos, "only one root element is allowed"))
+        }
+        parseElement(startPos, 1)
     }
 
     public func parsePiOrDeclarationTop(startPos: SourcePos): XmlNode {
         consumeExpected(CH_QUESTION)
         let payloadStart = cur.idx
         while (!cur.eof()) {
-            if (matchesChar(CH_QUESTION) && cur.peekAt(1) == Some(CH_GT)) {
+            if (cur.matches(CH_QUESTION) && cur.matchesAt(1, CH_GT)) {
                 let payload = cur.sliceString(payloadStart, cur.idx)
                 cur.advance()
                 cur.advance()
@@ -88,19 +89,17 @@ extend XmlParser {
             }
             cur.advance()
         }
-        throw XmlParseException(
-            InvalidDeclaration(startPos, "unterminated processing instruction / declaration"))
+        throw XmlParseException(InvalidDeclaration(startPos, "unterminated processing instruction / declaration"))
     }
 
     public func parseBangMarkup(startPos: SourcePos, atTop!: Bool): XmlNode {
         consumeExpected(CH_BANG)
-        if (cur.consumeIfMatch(COMMENT_OPEN_DASHES)) {
+        if (cur.consumeIfMatch(RUNE_COMMENT_OPEN_DASHES)) {
             return parseCommentBody(startPos)
         }
-        if (cur.consumeIfMatch(CDATA_PROLOGUE)) {
+        if (cur.consumeIfMatch(RUNE_CDATA_PROLOGUE)) {
             if (atTop) {
-                throw XmlParseException(
-                    InvalidText(startPos, "CDATA is not allowed at document top level"))
+                throw XmlParseException(InvalidText(startPos, "CDATA is not allowed at document top level"))
             }
             return parseCdataBody(startPos)
         }
@@ -110,7 +109,7 @@ extend XmlParser {
     public func parseCommentBody(startPos: SourcePos): XmlNode {
         let start = cur.idx
         while (!cur.eof()) {
-            if (cur.consumeIfMatch(COMMENT_EPILOGUE)) {
+            if (cur.consumeIfMatch(RUNE_COMMENT_EPILOGUE)) {
                 return doc.createComment(cur.sliceString(start, cur.idx - EPILOGUE_LEN))
             }
             cur.advance()
@@ -121,7 +120,7 @@ extend XmlParser {
     public func parseCdataBody(startPos: SourcePos): XmlNode {
         let start = cur.idx
         while (!cur.eof()) {
-            if (cur.consumeIfMatch(CDATA_EPILOGUE)) {
+            if (cur.consumeIfMatch(RUNE_CDATA_EPILOGUE)) {
                 return doc.createText(cur.sliceString(start, cur.idx - EPILOGUE_LEN), cdata: true)
             }
             cur.advance()
@@ -140,9 +139,8 @@ extend XmlParser {
             } else if (r == CH_GT && depth == 0) {
                 let body = cur.sliceString(start, cur.idx)
                 cur.advance()
-                // `value` 语义与 tinyxml2 `XMLUnknown::_value` 对齐：只承载
-                // `<!` 与 `>` 之间的正文，不再带头部的 `!`——这样 writer 仅需
-                // 为"非 PI 形态"的 Unknown 补 `<!...>` 包装即可。
+                // 与 tinyxml2 `XMLUnknown::_value` 对齐：仅承载 `<!` 与 `>` 之间
+                // 的正文，不带头部 `!`，writer 会按需为 bang markup 补 `<!...>`。
                 return doc.createUnknown(body)
             }
             cur.advance()

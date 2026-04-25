@@ -3,34 +3,6 @@ package cangjie_xml.writer
 import cangjie_xml.dom.*
 import cangjie_xml.internal.*
 
-// ====================================================================
-// 语法片段常量：集中管理，避免在函数内散落魔鬼字符串。
-// 导出 DEFAULT_XML_DECLARATION_VALUE 供上层选择复用。
-// ====================================================================
-
-public const DEFAULT_XML_DECLARATION_VALUE: String = "xml version=\"1.0\" encoding=\"UTF-8\""
-
-const TAG_OPEN: String = "<"
-const TAG_OPEN_SLASH: String = "</"
-const TAG_CLOSE: String = ">"
-const TAG_SELF_CLOSE: String = "/>"
-const PI_OPEN: String = "<?"
-const PI_CLOSE: String = "?>"
-const COMMENT_OPEN: String = "<!--"
-const COMMENT_CLOSE: String = "-->"
-const UNKNOWN_OPEN: String = "<!"
-const UNKNOWN_CLOSE: String = ">"
-const ATTR_EQUALS_QUOTE: String = "=\""
-const ATTR_CLOSE_QUOTE: String = "\""
-const ATTR_SPACE: String = " "
-
-/** 元素排版决策枚举——把 if/else 级联抽象为显式三态。 */
-enum ElementLayout {
-    | SelfClosing
-    | Inline
-    | Block
-}
-
 /**
  * XML 写出器：把 DOM 子树序列化为 XML 文本并写入指定 `XmlSink`。
  *
@@ -75,15 +47,14 @@ public class XmlWriter {
         }
     }
 
-
     private func writeNodeDispatch(node: XmlNode): Unit {
         match (node.kind()) {
-            case Document(_)    => ()
-            case Element(e)     => writeElementBlock(e)
-            case Text(t)        => writeTextNode(t)
-            case Comment(c)     => writeCommentNode(c)
+            case Document(_) => ()
+            case Element(e) => writeElementBlock(e)
+            case Text(t) => writeTextNode(t)
+            case Comment(c) => writeCommentNode(c)
             case Declaration(d) => writeDeclarationNode(d)
-            case Unknown(u)     => writeUnknownNode(u)
+            case Unknown(u) => writeUnknownNode(u)
         }
     }
 
@@ -104,10 +75,12 @@ public class XmlWriter {
     }
 
     private func writeTopLevelBody(doc: XmlDocument): Unit {
-        for (n in doc.childNodes()) {
+        var cur = doc.firstChild
+        while (let Some(n) <- cur) {
             if (!isDeclaration(n)) {
                 writeNodeDispatch(n)
             }
+            cur = n.nextSibling
         }
     }
 
@@ -117,7 +90,6 @@ public class XmlWriter {
             case _ => false
         }
     }
-
 
     private func writeDeclarationNode(d: XmlDeclaration): Unit {
         indentIfNeeded()
@@ -152,7 +124,6 @@ public class XmlWriter {
         maybeNewline()
     }
 
-
     /** 块级模式写出元素；排版决策由 `chooseLayout` 给出，主流程分三态处理。 */
     private func writeElementBlock(el: XmlElement): Unit {
         indentIfNeeded()
@@ -172,8 +143,11 @@ public class XmlWriter {
 
     private func finishAsInline(el: XmlElement): Unit {
         sink.write(TAG_CLOSE)
-        for (child in el.childNodes()) {
+        // 直接走链表，避免每次都构造迭代器对象。
+        var cur = el.firstChild
+        while (let Some(child) <- cur) {
             writeNodeInline(child)
+            cur = child.nextSibling
         }
         writeCloseTag(el.name)
         maybeNewline()
@@ -183,8 +157,10 @@ public class XmlWriter {
         sink.write(TAG_CLOSE)
         maybeNewline()
         depth++
-        for (child in el.childNodes()) {
+        var cur = el.firstChild
+        while (let Some(child) <- cur) {
             writeNodeDispatch(child)
+            cur = child.nextSibling
         }
         depth--
         indentIfNeeded()
@@ -195,12 +171,17 @@ public class XmlWriter {
     private func writeOpenTagWithAttrs(el: XmlElement): Unit {
         sink.write(TAG_OPEN)
         sink.write(el.name)
-        for (a in el.attributes()) {
+        // 索引迭代避免为每个属性构造一个 `ArrayList.Iterator` 对象。
+        let n = el.attributeCount()
+        var i = 0
+        while (i < n) {
+            let a = el.attributeAt(i)
             sink.write(ATTR_SPACE)
             sink.write(a.name)
             sink.write(ATTR_EQUALS_QUOTE)
             sink.write(escapeAttribute(a.value))
             sink.write(ATTR_CLOSE_QUOTE)
+            i++
         }
     }
 
@@ -210,15 +191,14 @@ public class XmlWriter {
         sink.write(TAG_CLOSE)
     }
 
-
     private func writeNodeInline(node: XmlNode): Unit {
         match (node.kind()) {
-            case Document(_)    => ()
-            case Element(e)     => writeElementInline(e)
-            case Text(t)        => writeTextNode(t)
-            case Comment(c)     => writeCommentRaw(c.value)
+            case Document(_) => ()
+            case Element(e) => writeElementInline(e)
+            case Text(t) => writeTextNode(t)
+            case Comment(c) => writeCommentRaw(c.value)
             case Declaration(d) => writePiRaw(d.value)
-            case Unknown(u)     => writeUnknownRaw(u.value)
+            case Unknown(u) => writeUnknownRaw(u.value)
         }
     }
 
@@ -231,12 +211,13 @@ public class XmlWriter {
             case Some(_) => ()
         }
         sink.write(TAG_CLOSE)
-        for (child in el.childNodes()) {
+        var cur = el.firstChild
+        while (let Some(child) <- cur) {
             writeNodeInline(child)
+            cur = child.nextSibling
         }
         writeCloseTag(el.name)
     }
-
 
     private func writePiRaw(value: String): Unit {
         sink.write(PI_OPEN)
@@ -251,19 +232,29 @@ public class XmlWriter {
     }
 
     private func writeUnknownRaw(value: String): Unit {
-        // PI 形态（`?...?`）原样，bang markup 包 `<!...>`。
+        // PI 形态（`?...?`）原样输出，bang markup 包 `<!...>`。
         if (value.startsWith("?")) {
-            sink.write(TAG_OPEN); sink.write(value); sink.write(TAG_CLOSE)
+            sink.write(TAG_OPEN);
+            sink.write(value);
+            sink.write(TAG_CLOSE)
         } else {
-            sink.write(UNKNOWN_OPEN); sink.write(value); sink.write(UNKNOWN_CLOSE)
+            sink.write(UNKNOWN_OPEN);
+            sink.write(value);
+            sink.write(UNKNOWN_CLOSE)
         }
     }
 
-
-    private static func chooseLayout(el: XmlElement): ElementLayout {
+    private func chooseLayout(el: XmlElement): ElementLayout {
         match (el.firstChild) {
             case None => SelfClosing
-            case Some(_) => if (hasTextChild(el)) { Inline } else { Block }
+            case Some(_) =>
+                // 紧凑模式无缩进 / 换行语义，非空元素一律按 inline 写出，
+                // 避免为每个元素再扫描子链表判断是否含文本节点。
+                if (opts.compact || hasTextChild(el)) {
+                    Inline
+                } else {
+                    Block
+                }
         }
     }
 

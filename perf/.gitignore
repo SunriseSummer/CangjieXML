@@ -1,0 +1,5 @@
+# 生成物 / 构建产物
+fixtures/*.xml
+tinyxml2_bench/bench
+cangjie_bench/target/
+out/
