@@ -3,7 +3,7 @@
 > 本目录为 **CangjieXML** 的完整 API 参考文档。CangjieXML 是一个纯仓颉语言实现的
 > XML 库，以 [tinyxml2](https://github.com/leethomason/tinyxml2) 为参照，
 > 在保留其"DOM + 基础读写"能力边界的同时，围绕仓颉的 `enum` / 模式匹配 /
-> `Option` / 扩展 / 泛型 重建 API。
+> `Option` / 扩展 等现代语言特性重建 API。
 
 本文档描述的公共 API 对应仓颉 SDK **1.0.5** 与 CangjieXML `0.1.0`。
 
