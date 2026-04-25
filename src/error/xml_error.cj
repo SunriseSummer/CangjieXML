@@ -5,46 +5,35 @@ package cangjie_xml.error
  *
  * 使用带上下文的枚举表达错误——比 tinyxml2 的整数错误码信息密度更高，
  * 也天然契合仓颉的模式匹配。
- *
- * ## 里程碑范围
- *
- * - M1（DOM 内核）：仅需要非常少量的错误分支，核心是 DOM 手工构造期间的
- *   参数校验（例如尝试给无父节点的节点调用 `removeSelf`）。
- * - M3（Parser）：将补齐 `MismatchedElement` / `InvalidAttribute` 等全部
- *   结构性解析错误。
- * - M6（IO + 收口）：将补齐 `FileNotFound` / `FileReadFailed` / `FileWriteFailed` 等 IO 错误。
- *
- * 因此在 M1 阶段，我们只落位 DESIGN 中承诺的完整枚举骨架——构造器全部保留，
- * 但暂时仅 DOM 操作会真正触发 `DomOperationFailed`。
  */
 public enum XmlError <: ToString {
     /** DOM 手工构造时的非法操作（例如从空父节点移除）。 */
     | DomOperationFailed(String)
-    /** 文件不存在（M6 使用）。 */
+    /** 文件不存在。 */
     | FileNotFound(String)
-    /** 文件读取失败：path, cause（M6 使用）。 */
+    /** 文件读取失败：path, cause。 */
     | FileReadFailed(String, String)
-    /** 文件写入失败：path, cause（M6 使用）。 */
+    /** 文件写入失败：path, cause。 */
     | FileWriteFailed(String, String)
-    /** 空文档（M3 使用）。 */
+    /** 空文档。 */
     | EmptyDocument
-    /** 起止标签不匹配：openTag, closeTag, at（M3 使用）。 */
+    /** 起止标签不匹配：openTag, closeTag, at。 */
     | MismatchedElement(String, String, SourcePos)
-    /** 非法属性：name, at, reason（M3 使用）。 */
+    /** 非法属性：name, at, reason。 */
     | InvalidAttribute(String, SourcePos, String)
-    /** 非法文本：at, reason（M3 使用）。 */
+    /** 非法文本：at, reason。 */
     | InvalidText(SourcePos, String)
-    /** 非法注释：at, reason（M3 使用）。 */
+    /** 非法注释：at, reason。 */
     | InvalidComment(SourcePos, String)
-    /** 非法 XML 声明：at, reason（M3 使用）。 */
+    /** 非法 XML 声明：at, reason。 */
     | InvalidDeclaration(SourcePos, String)
-    /** 非法未知节点：at, reason（M3 使用）。 */
+    /** 非法未知节点：at, reason。 */
     | InvalidUnknownNode(SourcePos, String)
-    /** 非法编码：at, reason（M3 使用）。 */
+    /** 非法编码：at, reason。 */
     | InvalidEncoding(SourcePos, String)
-    /** 元素嵌套深度超限：limit, at（M3 使用）。 */
+    /** 元素嵌套深度超限：limit, at。 */
     | ElementDepthExceeded(Int64, SourcePos)
-    /** 值编解码失败：targetType, text, at（M4 使用）。 */
+    /** 值编解码失败：targetType, text, at。 */
     | ValueDecodeFailed(String, String, SourcePos)
 
     public func toString(): String {

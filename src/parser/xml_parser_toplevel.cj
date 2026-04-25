@@ -6,8 +6,7 @@ import cangjie_xml.error.*
 /**
  * `XmlParser` 的文档级与非元素节点解析逻辑。
  *
- * 与 `xml_parser_element.cj` 对应——两者均以 `extend XmlParser` 方式挂回同一类，
- * 对调用方无差别；分文件是为了把单源文件控制在 300 行内。
+ * 与 `xml_parser_element.cj` 对应，二者均以 `extend XmlParser` 挂回同一类。
  */
 extend XmlParser {
 
@@ -140,9 +139,8 @@ extend XmlParser {
             } else if (r == CH_GT && depth == 0) {
                 let body = cur.sliceString(start, cur.idx)
                 cur.advance()
-                // `value` 语义与 tinyxml2 `XMLUnknown::_value` 对齐：只承载
-                // `<!` 与 `>` 之间的正文，不再带头部的 `!`——这样 writer 仅需
-                // 为"非 PI 形态"的 Unknown 补 `<!...>` 包装即可。
+                // 与 tinyxml2 `XMLUnknown::_value` 对齐：仅承载 `<!` 与 `>` 之间
+                // 的正文，不带头部 `!`，writer 会按需为 bang markup 补 `<!...>`。
                 return doc.createUnknown(body)
             }
             cur.advance()

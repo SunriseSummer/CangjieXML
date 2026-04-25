@@ -13,9 +13,8 @@ import cangjie_xml.parser.*
  * - 本函数只负责"把字节读上来、交给 parser"和把 IO 异常收敛成
  *   `XmlIoException`。字节本身的 XML 合法性由 `parseXml` 判定；
  *   语法错误仍以 `XmlParseException` 抛出，不被吞掉也不被包装。
- * - 文件一律按 **UTF-8** 解读。XML 声明里的 `encoding="..."` 在 M6 不参与实际
- *   解码（parser 以 String 为输入）——这点在 `XmlParseOptions` 的说明里已做
- *   备注；M7 若开放二进制级解码再行扩展。
+ * - 文件一律按 **UTF-8** 解读。XML 声明里的 `encoding="..."` 不参与实际解码
+ *   （parser 以 String 为输入）。
  *
  * ## 错误映射
  *

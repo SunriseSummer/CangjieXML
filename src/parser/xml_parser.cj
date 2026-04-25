@@ -3,13 +3,13 @@ package cangjie_xml.parser
 import cangjie_xml.dom.*
 import cangjie_xml.error.*
 
-// 结构性字面量常量——集中避免魔鬼字符串散落到多个函数
-// 注意：以下 String 形式仅用于错误消息 / 静态结构，热路径上的前缀匹配
-// 使用 `source_cursor.cj` 中预编译的 `RUNE_*` 数组避免重复 toRuneArray。
+// 结构性字面量常量，集中避免散落到多个函数。
+// 注意：以下 String 形式仅用于错误消息 / 静态结构；热路径上的前缀匹配使用
+// `source_cursor.cj` 中预编译的 `RUNE_*` 数组。
 const EPILOGUE_LEN: Int64 = 3 // length of "-->" / "]]>"
 
 /**
- * 递归下降 XML 解析器（M3）。
+ * 递归下降 XML 解析器。
  *
  * ## 覆盖范围
  *
@@ -27,9 +27,9 @@ const EPILOGUE_LEN: Int64 = 3 // length of "-->" / "]]>"
  *
  * ## 文件拆分
  *
- * 为保持单文件 ≤ 300 行并规避 cjc 1.0.5 的 `extend` 调用方向限制，实际的
- * 解析逻辑放入 `xml_parser_impl.cj` 的 `extend XmlParser` 中；本文件仅定义
- * 类骨架与不依赖解析状态机的纯工具函数。
+ * 类骨架定义在本文件，元素级与文档级语法分别落到 `xml_parser_element.cj`
+ * 与 `xml_parser_toplevel.cj`，均以 `extend XmlParser` 挂回，使每个源文件
+ * 都不超过 300 行的工程红线。
  */
 class XmlParser {
     let cur: SourceCursor
@@ -42,8 +42,7 @@ class XmlParser {
         this.doc = doc
     }
 
-    // 下列小工具不会反向调用 extend 中的解析函数，放在此处安全——
-    // 也让 extend 文件专注于节点级语法。
+    // 不依赖解析状态机的小工具放在此处，使 extend 文件专注于节点级语法。
 
     func matchesChar(ch: Rune): Bool {
         cur.matches(ch)
@@ -58,9 +57,7 @@ class XmlParser {
 
     /**
      * 读取一个 XML Name（起始 `isNameStart`，后续 `isNameChar`）。
-     *
-     * 起始字符校验后的尾随扫描走特化的 `cur.skipNameChars()`，避免传函数
-     * 引用作 `pred` 时的闭包分配——是 parser 最热的子例程。
+     * 起始字符校验后通过 [SourceCursor.skipNameChars] 完成尾随扫描。
      */
     func readName(): String {
         let start = cur.idx
@@ -129,10 +126,8 @@ func collapseWhitespace(s: String): String {
 }
 
 func isAllWhitespace(s: String): Bool {
-    // 字节级快路径：XML 1.0 §2.3 的空白集合（`' '` `\t` `\n` `\r`）全部
-    // 是 ASCII 单字节；UTF-8 多字节序列的所有字节（前导 / 续位）都 ≥ 0x80，
-    // 不会与之相同，所以按字节扫描结果与按 Rune 扫描完全一致，但能省掉
-    // 解码迭代器的开销——对 Collapse 模式下的"是否纯空白"判断是热路径。
+    // XML 1.0 §2.3 的空白集合都是 ASCII 单字节；UTF-8 多字节序列的所有字节
+    // 都 ≥ 0x80，因此按字节扫描结果与按 Rune 扫描完全一致，但更轻。
     let n = s.size
     var i = 0
     while (i < n) {

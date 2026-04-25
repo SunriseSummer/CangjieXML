@@ -30,8 +30,8 @@ import cangjie_xml.error.*
 public class XmlElement <: XmlNode {
     public var name: String
 
-    // 字段改为包内可见（不加 private），以便同包内的 extend 文件访问。
-    // 命名上以 `Child` / `attr` 前缀去歧义，避免与 `firstChild` / `attributes()`
+    // 字段为包内可见（不加 private），以便同包内的 extend 文件访问。
+    // 命名以 `Child` / `attr` 前缀去歧义，避免与 `firstChild` / `attributes()`
     // 这些公共 API 冲突。
     var headChild: ?XmlNode = None
     var tailChild: ?XmlNode = None

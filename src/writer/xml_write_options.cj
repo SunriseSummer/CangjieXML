@@ -14,7 +14,7 @@ package cangjie_xml.writer
  * | `lineEnd` | 行结束符；`compact = true` 时该字段无效 | `"\n"` |
  * | `writeDeclaration` | 是否输出 `<?xml ... ?>` 声明。`true` 时：若文档已有声明则原样输出，否则输出默认声明；`false` 时：不输出任何声明 | `true` |
  * | `writeBom` | 是否在输出开头写入 UTF-8 BOM（`EF BB BF`）。若文档 `writeBom=true` 可在此处强制关闭 | `false` |
- * | `boolTrueText` / `boolFalseText` | Query / Builder 层（M4）写出 `Bool` 属性时使用的字面量 | `"true"` / `"false"` |
+ * | `boolTrueText` / `boolFalseText` | Query / Builder 层写出 `Bool` 属性时使用的字面量 | `"true"` / `"false"` |
  *
  * ## 不可变性
  *

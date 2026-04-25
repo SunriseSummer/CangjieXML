@@ -7,7 +7,7 @@ import cangjie_xml.error.*
 import cangjie_xml.writer.*
 
 // ====================================================================
-// M3 Parser：顺路径行为测试。
+// Parser：顺路径行为测试。
 //
 // 组织方式：核心输入用例覆盖主要语法分支，round-trip 测试验证
 // "parse → write → 再 parse → 语义一致"。

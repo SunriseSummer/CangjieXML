@@ -37,18 +37,14 @@ public func walk(node: XmlNode, visit: (XmlNodeKind) -> XmlWalkControl): Unit {
 
 /** 内部工作函数，返回"是否继续处理兄弟节点"。 */
 func walkImpl(node: XmlNode, visit: (XmlNodeKind) -> XmlWalkControl): Bool {
-    // 缓存 `kind()` 一次——旧版本先 `visit(node.kind())`、随后又
-    // `match (node.kind())` 重算，对几十万节点的大文档每次 match 都重新
-    // 装箱 / 取址，是 traverse 场景的纯额外成本。
+    // `kind()` 缓存一次，使后续 visit 与 match 共用同一个值，避免重复求值。
     let k = node.kind()
     match (visit(k)) {
         case Stop         => return false
         case SkipChildren => return true
         case Continue     => ()
     }
-    // 进入子节点：直接走双向链表，避免每次都构造 `XmlChildIter` /
-    // `XmlChildIterator` 两个对象（旧路径上 `for child in e.childNodes()`
-    // 每个非叶子节点都会触发；catalog_large 上是 ~50K 次额外小对象分配）。
+    // 直接走双向链表，避免每次都构造 `childNodes()` 的迭代器对象。
     match (k) {
         case Document(d) =>
             var cur = d.firstChild

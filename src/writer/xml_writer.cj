@@ -4,7 +4,7 @@ import cangjie_xml.dom.*
 import cangjie_xml.internal.*
 
 // ====================================================================
-// 语法片段常量：集中管理，避免在函数内散落魔鬼字符串。
+// 语法片段常量：集中管理，避免散落到多个函数。
 // 导出 DEFAULT_XML_DECLARATION_VALUE 供上层选择复用。
 // ====================================================================
 
@@ -23,7 +23,7 @@ const ATTR_EQUALS_QUOTE: String = "=\""
 const ATTR_CLOSE_QUOTE: String = "\""
 const ATTR_SPACE: String = " "
 
-/** 元素排版决策枚举——把 if/else 级联抽象为显式三态。 */
+/** 元素排版三态：自闭合 / 内联 / 块级。 */
 enum ElementLayout {
     | SelfClosing
     | Inline
@@ -170,7 +170,7 @@ public class XmlWriter {
 
     private func finishAsInline(el: XmlElement): Unit {
         sink.write(TAG_CLOSE)
-        // 直接走链表，避免每次都构造 `XmlChildIter` / `XmlChildIterator`。
+        // 直接走链表，避免每次都构造迭代器对象。
         var cur = el.firstChild
         while (let Some(child) <- cur) {
             writeNodeInline(child)
@@ -198,9 +198,7 @@ public class XmlWriter {
     private func writeOpenTagWithAttrs(el: XmlElement): Unit {
         sink.write(TAG_OPEN)
         sink.write(el.name)
-        // 改为索引迭代——`for a in el.attributes()` 每个元素都会构造一个
-        // `ArrayList.Iterator` 对象；config_large 上 ~50K 元素 × 多次序列化
-        // 时这是真实 GC 压力。
+        // 索引迭代避免为每个属性构造一个 `ArrayList.Iterator` 对象。
         let n = el.attributeCount()
         var i = 0
         while (i < n) {
@@ -261,7 +259,7 @@ public class XmlWriter {
     }
 
     private func writeUnknownRaw(value: String): Unit {
-        // PI 形态（`?...?`）原样，bang markup 包 `<!...>`。
+        // PI 形态（`?...?`）原样输出，bang markup 包 `<!...>`。
         if (value.startsWith("?")) {
             sink.write(TAG_OPEN);
             sink.write(value);
@@ -277,8 +275,8 @@ public class XmlWriter {
         match (el.firstChild) {
             case None => SelfClosing
             case Some(_) =>
-                // 紧凑模式没有缩进/换行语义，非空元素全部按 inline 写出即可
-                // 这样避免为每个元素二次扫描子链表判断是否含文本节点
+                // 紧凑模式无缩进 / 换行语义，非空元素一律按 inline 写出，
+                // 避免为每个元素再扫描子链表判断是否含文本节点。
                 if (opts.compact || hasTextChild(el)) {
                     Inline
                 } else {

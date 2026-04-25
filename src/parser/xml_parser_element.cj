@@ -6,8 +6,8 @@ import cangjie_xml.error.*
 /**
  * `XmlParser` 的元素级解析：元素、属性、子节点扫描、文本、闭合标签。
  *
- * 与 `xml_parser_toplevel.cj` 互补——通过 `extend` 将同一个 `XmlParser` 类
- * 的成员分布到多个文件以满足单文件 ≤ 300 行的工程红线。
+ * 与 `xml_parser_toplevel.cj` 互补——两者均以 `extend XmlParser` 挂回同一类，
+ * 分文件是为了把单源文件控制在 300 行内。
  */
 extend XmlParser {
     public func parseElement(startPos: SourcePos, depth: Int64): XmlElement {
@@ -53,8 +53,7 @@ extend XmlParser {
         cur.skipWhitespace()
         let raw = readQuotedAttrValue(attrName, attrPos)
         let decoded = decodeEntitiesOrRethrowAttr(raw, attrName, attrPos)
-        // 一次查询完成 dup-check + 插入；旧版本 `hasAttribute` + `setAttribute`
-        // 在解析超大配置（每元素 5+ 属性）时是 HashMap 路径上 ~50% 的开销。
+        // 一次查询完成 dup-check + 插入，避免 hasAttribute + setAttribute 的两次 HashMap 查找。
         if (!el.tryAddAttribute(attrName, decoded)) {
             throw XmlParseException(InvalidAttribute(attrName, attrPos, "duplicate attribute"))
         }
@@ -79,10 +78,8 @@ extend XmlParser {
             throw XmlParseException(InvalidAttribute(attrName, attrPos, "attribute value must be quoted"))
         }
         let start = cur.idx
-        // 特化扫描——闭包零开销路径。
         let foundQuote = cur.skipAttrValueChars(quoteCh)
         if (!foundQuote) {
-            // 区分两种失败：遇到 `<` vs EOF
             if (cur.matches(CH_LT)) {
                 throw XmlParseException(
                     InvalidAttribute(attrName, cur.pos(), "'<' is not allowed inside an attribute value"))
@@ -148,7 +145,6 @@ extend XmlParser {
     public func parseTextBody(): XmlText {
         let textPos = cur.pos()
         let start = cur.idx
-        // 特化扫描——闭包零开销路径。
         cur.skipUntilLt()
         let raw = cur.sliceString(start, cur.idx)
         let decoded = decodeEntities(raw, textPos)

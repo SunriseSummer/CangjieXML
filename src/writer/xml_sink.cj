@@ -4,13 +4,8 @@ package cangjie_xml.writer
  * 字符串输出汇聚点。`XmlWriter` 通过 `XmlSink` 与真正的目的地（字符串缓冲区、
  * 文件、流）解耦。
  *
- * ## 为什么是 interface 而非直接用 `StringBuilder`
- *
- * - 解耦目的地：同一个 Writer 既可驱动 `writeToString`，也可驱动未来的
- *   `saveFile`（M6）或网络流。
- * - 适配层易替换：日后要引入"按块刷写到磁盘的流式 Sink"，只需新增实现，
- *   不改 Writer 本身。
- * - 契合 DESIGN §9.3 的分层：Sink 只做字节搬运，不做 XML 语法决策。
+ * - 同一个 Writer 既可驱动 `writeToString`，也可驱动 `saveFile` 等其他目的地；
+ * - Sink 只做字节搬运，不做 XML 语法决策。
  */
 public interface XmlSink {
     /** 追加一段 UTF-8 字符串到目的地。 */

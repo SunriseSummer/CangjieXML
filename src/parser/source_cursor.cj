@@ -3,7 +3,7 @@ package cangjie_xml.parser
 import std.collection.*
 import cangjie_xml.error.*
 
-// Unicode 字符常量：避免字面量散落
+// Parser 中常用的单字符 Rune 常量，集中声明便于复用。
 const CH_LT: Rune = r'<'
 const CH_GT: Rune = r'>'
 const CH_AMP: Rune = r'&'
@@ -14,19 +14,13 @@ const CH_QUESTION: Rune = r'?'
 const CH_BANG: Rune = r'!'
 const CH_EQUALS: Rune = r'='
 const CH_LF: Rune = r'\n'
-/** BOM 的 Rune（码点）形式，区别于 `text_escape.cj` 中字节级的 `BOM_BYTE_*`。 */
+/** UTF-8 BOM 的码点形式，对应 `text_escape.cj` 中的字节常量。 */
 const RUNE_BOM: Rune = '\u{FEFF}'
 const ASCII_LIMIT_BYTE: Byte = 0x80u8
 
 /**
- * Parser 反复使用的常量前缀，预先编译成 `Array<Rune>`。
- *
- * `consumeIfMatch` 每次进入注释/CDATA/DOCTYPE 内层循环都会被调用——以前每次
- * 调用都重新走 `toRuneArray(prefix: String)` 把 String 解码并 ArrayList
- * 扩容，对长 CDATA / 长注释会是 O(n) 次小堆分配。把这几个常量前缀缓存到
- * 包级 `let` 后，热路径上变成纯指针对比 + 数值比较。
- *
- * 对应 `xml_parser.cj` 中的 String 常量；命名一致以便维护。
+ * 注释 / CDATA / DOCTYPE 等结构关键串的预编译 `Array<Rune>` 形式，
+ * 供 [SourceCursor.consumeIfMatch] 在热路径上避免重复字符串解码。
  */
 let RUNE_COMMENT_OPEN_DASHES: Array<Rune> = [r'-', r'-']
 let RUNE_CDATA_PROLOGUE: Array<Rune> = [r'[', r'C', r'D', r'A', r'T', r'A', r'[']
@@ -36,15 +30,9 @@ let RUNE_CDATA_EPILOGUE: Array<Rune> = [r']', r']', r'>']
 /**
  * 基于 `Rune` 数组的前向游标，供 Parser 使用。
  *
- * ## 为什么是 Rune 数组而非 String
- *
- * XML 内容以码点为最小语义单元（例如字符实体 `&#xNN;`）。把整串一次性转为
- * `Array<Rune>` 后：
- *
- * - `peek(offset)` / `advance()` 均为 O(1)；
- * - 行列定位（为 `SourcePos`）按 `Rune` 计数，与"列号以码点计"的约定吻合；
- * - 代价是一次前置分配，对 M3 典型输入规模（KB~MB）完全可接受，
- *   性能优化（流式 UTF-8 扫描）推迟到 M8 基准阶段按需展开。
+ * 输入字符串在构造时一次性转为 `Array<Rune>`，使 `peek` / `advance` 与按码点
+ * 计数的行列定位均为 O(1)。同时为纯 ASCII 输入提供快路径，跳过 `String.runes()`
+ * 解码迭代器。
  */
 class SourceCursor {
     let runes: Array<Rune>
@@ -52,8 +40,8 @@ class SourceCursor {
     var line: Int64 = 1
     var column: Int64 = 1
 
-    // 解析前输入是否以 UTF-8 BOM 起首——由 parser 在构造文档后回写到
-    // `XmlDocument.hasBom`，以便 parse→write 的往返保留 BOM 语义。
+    // 输入是否以 UTF-8 BOM 起首，由 parser 在构造文档后回写到
+    // `XmlDocument.hasBom`，使 parse→write 往返保留 BOM 语义。
     let sawBom: Bool
 
     init(input: String, acceptBom: Bool) {
@@ -62,15 +50,11 @@ class SourceCursor {
             this.runes = Array<Rune>(input.size, {i => Rune(UInt32(input[i]))})
             return
         }
-        // 容量预估：UTF-8 中 byte 数 ≥ rune 数（ASCII 时相等），用 `input.size`
-        // 作为上界初始化 `ArrayList` 可彻底消除增长副本——对 5 MB ASCII fixture
-        // 而言，旧版从 16 → 5_000_000 要做 ~19 次 doubling，本身的字节拷贝量
-        // 与最终数组同数量级。
+        // UTF-8 中字节数 ≥ 码点数，用 `input.size` 作上界一次到位预分配。
         let tmp = ArrayList<Rune>(input.size)
         for (r in input.runes()) {
             tmp.add(r)
         }
-        // 剥离 BOM（仅当起首出现 U+FEFF 时）
         var sawBomLocal = false
         if (tmp.size > 0 && tmp[0] == RUNE_BOM) {
             if (!acceptBom) {
@@ -109,12 +93,12 @@ class SourceCursor {
         }
     }
 
-    /** 当前字符是否等于 `ch`，EOF 时直接返回 false，供 parser 热路径绕开 Option */
+    /** 当前字符是否等于 `ch`；EOF 时返回 false，供 parser 热路径绕开 Option。 */
     func matches(ch: Rune): Bool {
         idx < runes.size && runes[idx] == ch
     }
 
-    /** 偏移 k 位处字符是否等于 `ch`，越界时直接返回 false */
+    /** 偏移 `k` 位处字符是否等于 `ch`；越界时返回 false。 */
     func matchesAt(k: Int64, ch: Rune): Bool {
         let p = idx + k
         p >= 0 && p < runes.size && runes[p] == ch
@@ -138,9 +122,6 @@ class SourceCursor {
 
     /** 跳过所有 XML 空白字符（空格 / 制表 / LF / CR）。 */
     func skipWhitespace(): Unit {
-        // 直接索引扫描——避免 peek()/advance() 路径上的 Option 装箱与重复 eof
-        // 检查；同时把 LF / 非 LF 的列号更新合并到一个分支里。skipWhitespace
-        // 在 parser 的几乎每个状态切换点都会调用，是真正的热路径。
         let n = runes.size
         while (idx < n) {
             let r = runes[idx]
@@ -158,19 +139,15 @@ class SourceCursor {
     }
 
     /**
-     * 特化版：跳过所有 `isNameChar(r)` 字符。
+     * 跳过所有 `isNameChar(r)` 字符，专为 [readName] 等热路径设计。
      *
-     * `readName` 在 parser 上几乎每个状态切换都要调用，旧版 `skipWhile(isNameChar)`
-     * 把函数引用作为参数传入，每次调用产生一次 callable 闭包对象——对
-     * config_large 这种属性密集的 fixture，单次 parse 上百万次循环，
-     * 闭包分配是真正可观的 GC 压力源。这里把 `isNameChar` 的判定直接内联。
+     * `isNameChar` 判定按 ASCII 范围内联展开，避免把谓词作为闭包传入引发的
+     * 堆分配；Name 字符不可能是 LF，因此不维护行号。
      */
     func skipNameChars(): Unit {
         let n = runes.size
         while (idx < n) {
             let r = runes[idx]
-            // 内联展开 isNameChar 判定（ASCII letter / digit / '_' / ':' / '-' / '.'）
-            // Name 字符不允许是 LF，所以不必维护行号。
             var isName = false
             if (r >= r'a' && r <= r'z') {
                 isName = true
@@ -190,12 +167,7 @@ class SourceCursor {
         }
     }
 
-    /**
-     * 特化版：扫描到下一个 `<` 或 EOF。`parseTextBody` 主循环。
-     *
-     * 同 [skipNameChars] 的理由——避开闭包；同时把"是否 LF 增行号"这条
-     * 仅在文本节点里才有意义的分支保留下来。
-     */
+    /** 扫描到下一个 `<` 或 EOF；供 `parseTextBody` 使用，遇到 LF 时维护行号。 */
     func skipUntilLt(): Unit {
         let n = runes.size
         while (idx < n) {
@@ -214,10 +186,10 @@ class SourceCursor {
     }
 
     /**
-     * 特化版：扫描到下一个 `quote`（`"` 或 `'`）、或 `<`（属性值不允许）、或 EOF。
+     * 扫描属性值字符直到遇到 `quoteCh`、`<` 或 EOF。
      *
-     * 返回值告知调用方"为何停下"：`true` 表示遇到了引号；`false` 表示
-     * 遇到 `<` 或 EOF（由调用方区分并报错）。
+     * 返回 `true` 表示遇到引号成功停下；`false` 表示遇到 `<` 或 EOF，
+     * 由调用方进一步区分并报错。
      */
     func skipAttrValueChars(quoteCh: Rune): Bool {
         let n = runes.size
@@ -243,12 +215,11 @@ class SourceCursor {
     /**
      * 若后续以 `prefix` 起始则消费并返回 true，否则原位返回 false。
      *
-     * 该函数接受预编译好的 `Array<Rune>`，避免在内层循环中反复
-     * `toRuneArray(prefix: String)`——参见包级 `RUNE_*` 常量。
+     * 使用包级预编译的 `RUNE_*` 常量做一次性比较；前缀全为 ASCII，不可能含 LF，
+     * 匹配成功后批量更新 `idx` 与 `column`。
      */
     func consumeIfMatch(prefix: Array<Rune>): Bool {
         let m = prefix.size
-        // 越界快速失败：剩余字符不足时直接返回，省掉 peekAt 的 Option 装箱。
         if (idx + m > runes.size) {
             return false
         }
@@ -259,26 +230,17 @@ class SourceCursor {
             }
             i++
         }
-        // 全部匹配——批量消费。前缀都是 ASCII（`-` / `[` / `]` / `>` / `C` ...），
-        // 不会出现 LF，因此可以一次性更新 idx 与 column，避免逐个 advance 的
-        // 分支与函数调用开销。
         idx += m
         column += m
         true
     }
 
-    /** 当前坐标的 `SourcePos`（offset = 码点下标，非字节；供诊断足够）。 */
+    /** 当前坐标的 `SourcePos`（offset 以码点计，行列从 1 起）。 */
     func pos(): SourcePos {
         SourcePos(idx, line, column)
     }
 
-    /**
-     * 从 `start`（含）到 `end`（不含）的切片拼成字符串。
-     *
-     * 改为 `String(Array<Rune>)` 一次性构造——比逐 Rune `StringBuilder.append`
-     * 路径少一层 Builder 状态机和分摊扩容；对每个 name / 属性名 / 文本节点都
-     * 命中，是 parse 热路径上最大的常量倍率优化点之一。
-     */
+    /** 取 `[start, end)` 区间的子串。一次性 `String(Array<Rune>)` 构造。 */
     func sliceString(start: Int64, end: Int64): String {
         if (end <= start) {
             return String.empty
@@ -292,7 +254,7 @@ func isXmlWhitespace(r: Rune): Bool {
     r == r' ' || r == r'\t' || r == CH_LF || r == r'\r'
 }
 
-/** 名称起始字符（简化版本：M3 采用 XML 1.0 Name 子集：字母 / 数字 / `_:-.`）。 */
+/** 名称起始字符（XML 1.0 Name 子集：字母 / `_` / `:`）。 */
 func isNameStart(r: Rune): Bool {
     isAsciiLetter(r) || r == r'_' || r == r':'
 }
