@@ -1,9 +1,6 @@
 # CangjieXML
 
-> 纯仓颉语言实现的 XML 库 —— 以 [tinyxml2](https://github.com/leethomason/tinyxml2)
-> 为参照，在保留其务实能力边界（DOM + 基础读写）的同时，用仓颉的 `enum` /
-> 模式匹配 / `Option` / 扩展 / 泛型 重建 API。**不是** 对 tinyxml2 的逐行翻译，
-> 而是一次面向仓颉现代语言特性的重构复刻。
+> 纯仓颉语言实现的 XML 库，基于 [tinyxml2](https://github.com/leethomason/tinyxml2) 做重构优化式复刻，充分发挥仓颉现代语言特性，在对齐 tinyxml2 功能基础上，提供更优雅便捷的使用体验。
 
 完整 API 文档请参阅 [`doc/`](./doc/README.md)
 
