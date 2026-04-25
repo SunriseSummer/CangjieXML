@@ -541,3 +541,42 @@ public class FileXmlSink <: XmlSink & Resource {
 到此 M0–M6 全链路贯通，M8 的 e2e 验收作为"可用性证明"一次性通过。**M7 并发**与 DESIGN §4 的"DOM 不承诺线程安全"约定冲突，并非 tinyxml2 公共 API 的一部分，按约定跳过——后续若有专门的线程安全子类（`XmlThreadSafeDocument`）需求再另开分支。
 
 CangjieXML 可以作为 **0.1.0** 候选发布版推进——tag 动作由维护方在 PR 合入后触发。
+
+---
+
+## 6. 迭代 8（代码质量复审 + 微优化）
+
+聚焦点：在 M0–M8 全链路落地后，对仓库整体做一次**代码质量复审 + 沿现有模式的微优化**，
+不引入新机制、不改变任何公共契约。
+
+### 6.1 代码质量
+
+- **死代码移除**：`src/parser/source_cursor.cj` 的 `isXmlWhitespace(r: Rune)`
+  自迭代 6 起已无调用方（实际空白识别均走包内 `isWsByte(b: Byte)` 字节版本），
+  本次直接删除以消除 build warning。
+
+### 6.2 微优化（沿用既有"字节扫描 + 直接链表遍历"模式）
+
+| 改动 | 文件 | 收益方向 |
+|---|---|---|
+| `trimAscii` / `lowerAscii` 改字节扫描 + 零分配快路径，废弃 `Array<Rune>` 物化 | `src/query/builtin_codecs.cj` | 每次 `attributeAs<T>` 解码（含所有 `intAttribute` / `boolAttribute` 等便捷方法）少一次 Rune 数组分配 + 拷贝；输入"无需修改"时直接返回原串 |
+| `acceptDocument` / `acceptElement` 改走双向链表直访 | `src/visit/accept.cj` | 与 `walk.cj` 同型；遍历每个容器节点不再分配 `XmlChildIter` 迭代器对象 |
+
+两项改动都遵循仓库既有约束：
+- ASCII 路径按字节扫描——空白 / `'A'..'Z'` 都是单字节，UTF-8 多字节序列的所有续字节
+  均 ≥ 0x80，按字节扫描结果与按 Rune 一致；
+- 链表直访——`walk` 已沿用此策略以避免 P2-1 中描述的 Iterator 分配开销。
+
+### 6.3 文档同步
+
+- `perf/run.py` 与 `perf/report.md` 末尾"历史项已落地"清单追加本轮两项条目。
+- `doc/` 与代码 API 复核一遍，无破坏性差异（公共 API 全部保持不变）。
+
+### 6.4 质量门禁
+
+| 门禁 | 状态 |
+|---|---|
+| `cjpm build` | ✅（仅余测试文件中的 `unused`/line-terminator warnings，与本轮无关） |
+| `cjpm test` | ✅ **260/260** |
+| `perf/run.py` | ✅ 端到端跑通；roundtrip 字节级一致性 9/9 |
+| 公共 API | ✅ 完全不变 |
