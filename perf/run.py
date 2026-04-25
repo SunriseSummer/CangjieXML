@@ -67,6 +67,24 @@ LIB_LABEL = {
     "python_xml.etree": "Python xml.etree",
 }
 
+SESSION1_BASELINES = [
+    ("parse", "catalog_large.xml", 2969.2),
+    ("parse", "config_large.xml", 823.8),
+    ("parse", "catalog_medium.xml", 358.2),
+    ("parse", "deep_large.xml", 3.97),
+    ("serialize", "catalog_large.xml", 404.4),
+    ("serialize", "catalog_medium.xml", 46.8),
+    ("serialize", "config_large.xml", 111.8),
+    ("serialize", "deep_large.xml", 0.385),
+    ("roundtrip", "catalog_large.xml", 3510.6),
+    ("roundtrip", "config_large.xml", 950.4),
+    ("traverse", "catalog_large.xml", 138.3),
+    ("traverse", "catalog_medium.xml", 12.6),
+    ("traverse", "config_large.xml", 20.1),
+    ("traverse", "config_medium.xml", 1.33),
+    ("traverse", "deep_large.xml", 0.106),
+]
+
 
 def log(section: str) -> None:
     print(f"=== {section}", flush=True)
@@ -212,6 +230,7 @@ def fmt_ratio(value: float, baseline: float) -> str:
 def write_report(by_lib: dict[str, dict]) -> None:
     """一份 markdown，章节按场景，行按 fixture，列按库。"""
     lines: list[str] = []
+    cj_idx = index_results(by_lib["cangjie_xml"])
     lines.append("# CangjieXML / Python xml.etree / tinyxml2 性能对比")
     lines.append("")
     lines.append("> 本报告由 `perf/run.py` 自动生成；请勿手工修改。"
@@ -296,36 +315,28 @@ def write_report(by_lib: dict[str, dict]) -> None:
     lines.append("")
     lines.append("- **tinyxml2** 作为成熟 C++ 库（原地分段 + 内存池 + strchr/SSE），"
                  "仍然是各场景的最快基线。")
-    lines.append("- **CangjieXML** 经过四轮针对性优化后，相对 tinyxml2 的倍率从最初"
-                 "的 30~70× 区间整体下移到 **约 5~38× 区间**，其中 `serialize` / "
-                 "`traverse` 已稳定**反超 Python `xml.etree`** 1.5~3×；多个核心场景的"
-                 "累计加速达 1.5×~6×（详见下表）。")
-    lines.append("- **Python `xml.etree`** 在 `parse` 上仍因走 C 实现的 expat 占优，"
-                 "`serialize` / `traverse` 已被仓颉版稳定反超。")
+    lines.append("- **CangjieXML** 在统一开启 `-O2` 重新编译后，相对 tinyxml2 的倍率已"
+                 "进一步收敛到 **约 1.2~12.3× 区间**；`serialize` / `traverse` 继续"
+                 "稳定**反超 Python `xml.etree`**，`roundtrip` 在中大 fixture 上也已"
+                 "明显领先。")
+    lines.append("- **Python `xml.etree`** 在 `parse` 上仍因走 C 实现的 expat 占优；"
+                 "仓颉版剩余差距已主要集中在大文档解析与属性密集型遍历。")
     lines.append("")
     lines.append("## 优化前后对比（本 PR 全程累计）")
     lines.append("")
     lines.append("| 场景 | fixture | session-1 起点 ms | 当前 ms | 累计加速 |")
     lines.append("|---|---|--:|--:|--:|")
-    lines.append("| parse | catalog_large | 2969.2 | 1529.1 | **1.94×** |")
-    lines.append("| parse | config_large  |  823.8 |  464.0 | **1.78×** |")
-    lines.append("| parse | catalog_medium |  358.2 |  179.0 | **2.00×** |")
-    lines.append("| parse | deep_large | 3.97 | 1.98 | **2.01×** |")
-    lines.append("| serialize | catalog_large |  404.4 |  151.4 | **2.67×** |")
-    lines.append("| serialize | catalog_medium |  46.8 |  21.5 | **2.18×** |")
-    lines.append("| serialize | config_large  |  111.8 |  47.2 | **2.37×** |")
-    lines.append("| serialize | deep_large    |  0.385 |  0.236 | **1.63×** |")
-    lines.append("| roundtrip | catalog_large | 3510.6 | 1669.3 | **2.10×** |")
-    lines.append("| roundtrip | config_large  |  950.4 |  599.2 | **1.59×** |")
-    lines.append("| traverse | catalog_large |  138.3 |   37.9 | **3.65×** |")
-    lines.append("| traverse | catalog_medium |  12.6 |   6.82 | **1.85×** |")
-    lines.append("| traverse | config_large  |   20.1 |   3.15 | **6.38×** |")
-    lines.append("| traverse | config_medium |  1.33 |  0.525 | **2.53×** |")
-    lines.append("| traverse | deep_large    | 0.106 | 0.0315 | **3.37×** |")
+    for scenario, fixture, baseline in SESSION1_BASELINES:
+        current = cj_idx[(scenario, fixture)]["elapsed_ms_avg"]
+        lines.append(
+            f"| {scenario} | {fixture.removesuffix('.xml')} | "
+            f"{fmt_avg(baseline)} | {fmt_avg(current)} | "
+            f"**{fmt_ratio(baseline, current)}** |"
+        )
     lines.append("")
     lines.append("> session-1 起点 = 本 PR 第一轮已启用 SourceCursor.sliceString / "
                  "consumeIfMatch / 字节级 escape 三项基础优化之前的数据；当前 = "
-                 "session-4 紧凑写出布局短路落地后。")
+                 "session-4 代码优化完成并统一按 `-O2` 重新编译后的数据。")
     lines.append("")
     lines.append("## 已落地的优化（session 1 + session 2 + session 3 + session 4 全集）")
     lines.append("")

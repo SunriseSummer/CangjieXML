@@ -9,8 +9,8 @@
 > 建议"五段式整理，旨在反馈给 Cangjie SDK 团队；与 `cangjie_xml` 库本身的
 > bug 无关。
 >
-> **环境**：仓颉 SDK 1.0.5（cjnative，`x86_64-unknown-linux-gnu`），
-> 仓颉 STDX 1.0.5.1。基准对照对象：tinyxml2 11.0.0（C++ -O2）、
+> **环境**：仓颉 SDK 1.0.5（cjnative，`x86_64-unknown-linux-gnu`，仓颉侧统一
+> `-O2` 编译），仓颉 STDX 1.0.5.1。基准对照对象：tinyxml2 11.0.0（C++ -O2）、
 > Python 3 `xml.etree`（CPython 3.12）。
 
 ---
