@@ -65,7 +65,6 @@
 ### 构建与测试
 
 ```bash
-source /opt/cangjie/envsetup.sh   # 或自行配置仓颉 SDK
 cjpm build
 cjpm test
 ```
