@@ -31,11 +31,16 @@ let RUNE_CDATA_EPILOGUE: Array<Rune> = [r']', r']', r'>']
  * 基于 `Rune` 数组的前向游标，供 Parser 使用。
  *
  * 输入字符串在构造时一次性转为 `Array<Rune>`，使 `peek` / `advance` 与按码点
- * 计数的行列定位均为 O(1)。同时为纯 ASCII 输入提供快路径，跳过 `String.runes()`
- * 解码迭代器。
+ * 计数的行列定位均为 O(1)。同时为纯 ASCII 输入提供快路径：跳过 `String.runes()`
+ * 解码迭代器；并保留原始 `String` 供 [sliceString] 在 ASCII 路径上直接切片，
+ * 避免 `String(runes[start..end])` 的 UTF-8 重编码。
  */
 class SourceCursor {
     let runes: Array<Rune>
+    /** 与 [runes] 等长的原串：ASCII 路径 byte index == rune index，可直接切片。 */
+    let source: String
+    /** 输入是否纯 ASCII（含构造时跳过 BOM 后再判定）。 */
+    let isAsciiOnly: Bool
     var idx: Int64 = 0
     var line: Int64 = 1
     var column: Int64 = 1
@@ -47,6 +52,8 @@ class SourceCursor {
     init(input: String, acceptBom: Bool) {
         if (isAsciiInput(input)) {
             this.sawBom = false
+            this.source = input
+            this.isAsciiOnly = true
             this.runes = Array<Rune>(input.size, {i => Rune(UInt32(input[i]))})
             return
         }
@@ -56,15 +63,20 @@ class SourceCursor {
             tmp.add(r)
         }
         var sawBomLocal = false
+        var trimmedSource = input
         if (tmp.size > 0 && tmp[0] == RUNE_BOM) {
             if (!acceptBom) {
                 throw XmlParseException(InvalidEncoding(SourcePos(0, 1, 1), "unexpected UTF-8 BOM (acceptBom = false)"))
             }
             tmp.remove(at: 0)
             sawBomLocal = true
+            // BOM 是 3 字节序列 EF BB BF；剥掉后续 source 与 runes 重新对齐。
+            trimmedSource = input[3..input.size]
         }
         this.sawBom = sawBomLocal
         this.runes = tmp.toArray()
+        this.source = trimmedSource
+        this.isAsciiOnly = false
     }
 
     private static func isAsciiInput(input: String): Bool {
@@ -240,10 +252,19 @@ class SourceCursor {
         SourcePos(idx, line, column)
     }
 
-    /** 取 `[start, end)` 区间的子串。一次性 `String(Array<Rune>)` 构造。 */
+    /**
+     * 取 `[start, end)` 区间的子串。
+     *
+     * - **ASCII 路径**：byte index == rune index，直接走 `source[start..end]`，
+     *   避免 `String(runes[start..end])` 的 Rune 数组切片 + UTF-8 重编码。
+     * - **非 ASCII 路径**：rune index 与 byte index 不一致，回退到从 Rune 数组重建。
+     */
     func sliceString(start: Int64, end: Int64): String {
         if (end <= start) {
             return String.empty
+        }
+        if (isAsciiOnly) {
+            return source[start..end]
         }
         String(runes[start..end])
     }
@@ -270,13 +291,4 @@ func isAsciiLetter(r: Rune): Bool {
 
 func isAsciiDigit(r: Rune): Bool {
     r >= r'0' && r <= r'9'
-}
-
-/** 小工具：把 String 平铺为 Rune 数组（内联使用，避免依赖 internal 包）。 */
-func toRuneArray(s: String): Array<Rune> {
-    let list = ArrayList<Rune>()
-    for (r in s.runes()) {
-        list.add(r)
-    }
-    list.toArray()
 }

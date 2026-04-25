@@ -3,8 +3,7 @@ package cangjie_xml.error
 /**
  * CangjieXML 库统一的错误类型。
  *
- * 使用带上下文的枚举表达错误——比 tinyxml2 的整数错误码信息密度更高，
- * 也天然契合仓颉的模式匹配。
+ * 带上下文的枚举：每个分支携带定位与原因信息，调用方可直接做模式匹配处理。
  */
 public enum XmlError <: ToString {
     /** DOM 手工构造时的非法操作（例如从空父节点移除）。 */
@@ -61,7 +60,7 @@ public enum XmlError <: ToString {
  *
  * 与 `XmlError` 区分：
  * - `Option<T>`：可预期"无值"。
- * - `XmlError`（包装在 Result 里）：可预期"可能失败"，调用方应显式处理。
+ * - `XmlError`：可预期"可能失败"，调用方应显式处理。
  * - `XmlException`：不可预期、程序员错误，应修复代码而非捕获。
  */
 public class XmlException <: Exception {

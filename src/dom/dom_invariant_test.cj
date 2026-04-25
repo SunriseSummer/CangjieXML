@@ -15,9 +15,8 @@ import cangjie_xml.error.*
 
 @Test
 func testAttributeNameIsImmutable(): Unit {
-    // 本测试存在的意义是"锁死编译期契约"——若未来有人把 `name` 改回 `var`，
-    // 这里就无需断言什么，编译期另一个修正就会失败。我们反向验证：创建后
-    // 再通过 setAttribute 改名，老名不可再索引到值。
+    // 锁死编译期契约：若有人把 `name` 改回 `var`，编译期检查会失败。
+    // 这里反向验证：创建后再通过 setAttribute 改名，旧名不可再索引到值。
     let doc = XmlDocument()
     let el = doc.createElement("x")
     el.setAttribute("id", "1")

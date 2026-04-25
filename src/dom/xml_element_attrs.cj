@@ -1,16 +1,16 @@
 package cangjie_xml.dom
 
 /**
- * `XmlElement` 属性相关 API。
+ * `XmlElement` 属性 API。
  *
- * 通过 `extend` 植回 `XmlElement`，与主文件解耦以满足"单文件 ≤ 300 行"的
- * 工程红线。所有方法语义与 DESIGN §6.2 一致，仅作位置迁移。
+ * 通过 `extend` 植回 `XmlElement`；底层名称查找走 [XmlElement.findAttr]，
+ * 在属性数 ≤ [ATTR_INDEX_THRESHOLD] 时为线性扫描，超阈值后才使用 HashMap。
  */
 extend XmlElement {
 
     /** 查找指定名称的属性值；不存在返回 `None`。 */
     public func attribute(name: String): ?String {
-        match (attrIndex.get(name)) {
+        match (findAttr(name)) {
             case Some(a) => Some(a.value)
             case None => None
         }
@@ -23,7 +23,7 @@ extend XmlElement {
      * - `hasAttribute("id", value: Some("1"))`：同时要求值等于 `"1"`。
      */
     public func hasAttribute(name: String, value!: ?String = None): Bool {
-        match (attrIndex.get(name)) {
+        match (findAttr(name)) {
             case None => false
             case Some(a) => matchValue(a.value, value)
         }
@@ -33,29 +33,21 @@ extend XmlElement {
      * 新增或覆盖属性。同名属性按"后写覆盖"语义处理，不改变属性插入顺序。
      */
     public func setAttribute(name: String, value: String): Unit {
-        match (attrIndex.get(name)) {
+        match (findAttr(name)) {
             case Some(a) => a.value = value
-            case None =>
-                let attr = XmlAttribute(name, value)
-                attrOrder.add(attr)
-                attrIndex[name] = attr
+            case None => addNewAttr(XmlAttribute(name, value))
         }
     }
 
     /**
-     * 仅在不存在同名属性时新增，返回是否成功。
-     *
-     * 用于 parser 等"已知 attribute 必须唯一"的高频路径——比 `hasAttribute`
-     * + `setAttribute` 的两次查询少一次 HashMap 查找；返回 `false` 即重复
-     * 属性，调用方决定如何报错。
+     * 仅在不存在同名属性时新增，返回是否成功。供 parser 等"已知 attribute
+     * 必须唯一"的高频路径使用：返回 `false` 即重复属性，调用方决定如何报错。
      */
     public func tryAddAttribute(name: String, value: String): Bool {
-        match (attrIndex.get(name)) {
+        match (findAttr(name)) {
             case Some(_) => false
             case None =>
-                let attr = XmlAttribute(name, value)
-                attrOrder.add(attr)
-                attrIndex[name] = attr
+                addNewAttr(XmlAttribute(name, value))
                 true
         }
     }
@@ -67,12 +59,17 @@ extend XmlElement {
      * - 属性不存在返回 `false`。
      */
     public func removeAttribute(name: String): Bool {
-        match (attrIndex.remove(name)) {
-            case None => false
-            case Some(_) =>
-                removeFromOrderList(name)
-                true
+        let n = attrOrder.size
+        var i = 0
+        while (i < n) {
+            if (attrOrder[i].name == name) {
+                attrOrder.remove(at: i)
+                dropFromAttrIndex(name)
+                return true
+            }
+            i++
         }
+        false
     }
 
     /** 以插入顺序遍历所有属性。 */
@@ -95,23 +92,9 @@ extend XmlElement {
     public func attributeAt(i: Int64): XmlAttribute {
         attrOrder[i]
     }
-
-    /** 从顺序数组移除指定名称——抽取独立辅助以降低 `removeAttribute` 圈复杂度。 */
-    private func removeFromOrderList(name: String): Unit {
-        var i = 0
-        while (i < attrOrder.size) {
-            if (attrOrder[i].name == name) {
-                attrOrder.remove(at: i)
-                return
-            }
-            i++
-        }
-    }
 }
 
-/**
- * 辅助：把 `hasAttribute` 的可选值比较从 match 中提出，避免主路径嵌套。
- */
+/** 把 `hasAttribute` 的可选值比较从 match 中提出，使主路径无嵌套。 */
 func matchValue(actual: String, expected: ?String): Bool {
     match (expected) {
         case None => true

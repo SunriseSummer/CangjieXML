@@ -6,19 +6,10 @@ import cangjie_xml.query.*
 /**
  * 元素构建器。**不是** 并行的 DOM——`build()` 的产物仍是普通 `XmlElement`。
  *
- * ## 设计要点
- *
- * - 每次配置调用都返回 `this`，允许链式；
- * - 子作用域通过 lambda 传入，形成近似 DSL 的结构化书写；
- * - 内部持有一个实际的 `XmlElement`，所有操作立即落回 DOM——因此即便
- *   用户在 lambda 内拿到同一个 builder 并越权越界，也不会破坏 DOM 不变量
- *   （最多是逻辑不合预期）。
- *
- * ## 为什么不做懒构造
- *
- * 延迟到 `build()` 再一次性落地能提供更强的事务性校验（例如出错全回滚），
- * 但也要求 Builder 复刻一套平行表示——正是 DESIGN §10.3 明确反对的。
- * 立即落回 DOM 的做法保持了"Builder 只是体验层"的定位。
+ * 内部持有一个真实 `XmlElement`，所有操作立即落回 DOM。每次配置调用都返回
+ * `this`，允许链式；子作用域通过 lambda 形成近似 DSL 的结构化写法。
+ * 即便用户在 lambda 内借助同一个 builder 越权操作，也不会破坏 DOM 不变量
+ * （最多是逻辑不合预期）。
  */
 public class XmlElementBuilder {
     let target: XmlElement

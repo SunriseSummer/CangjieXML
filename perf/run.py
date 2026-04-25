@@ -296,7 +296,7 @@ def write_report(by_lib: dict[str, dict]) -> None:
     lines.append("")
     lines.append("- **tinyxml2** 作为成熟 C++ 库（原地分段 + 内存池 + strchr/SSE），"
                  "在各场景上是最快基线。")
-    lines.append("- **CangjieXML** 在 `-O2` 下相对 tinyxml2 的倍率落在 **约 1.5~16×**；"
+    lines.append("- **CangjieXML** 在 `-O2` 下相对 tinyxml2 的倍率落在 **约 1× ~ 9×**；"
                  "`serialize` / `traverse` 稳定**反超 Python `xml.etree`**，"
                  "`roundtrip` 在中大 fixture 上同样领先 Python。")
     lines.append("- **Python `xml.etree`** 在 `parse` 上仍因走 C 实现的 expat 占优；"
@@ -385,18 +385,24 @@ def write_report(by_lib: dict[str, dict]) -> None:
     lines.append("")
     lines.append("### 后续应用层可继续推进的优化（不依赖 SDK 修复）")
     lines.append("")
-    lines.append("1. **`SourceCursor` 字节流扫描化**：废弃整体 `Array<Rune>` "
-                 "前置物化，改为 UTF-8 字节流 + 必要时按需解码。直接受益项："
-                 "parse 内存峰值下降 ~10×；属结构性改动需独立 PR 推进。")
+    lines.append("1. **`SourceCursor` 完全字节流扫描化**：当前 ASCII 输入下 "
+                 "`sliceString` 已经直接走原 `String` 字节切片，但 `runes` 仍被"
+                 "完整物化（用于 `peek` / `advance` 等热路径上的码点等值比较）。"
+                 "下一步可彻底废弃整体 `Array<Rune>` 前置物化，改为 UTF-8 字节流 + "
+                 "按需解码；理论上 parse 内存峰值再降 ~4×，属结构性改动需独立 PR 推进。")
     lines.append("2. **DOM 节点对象池**：现在每个 `XmlElement` / `XmlText` / "
                  "`XmlAttribute` 都是单独 class 实例，5 MB fixture 解析过程中会"
                  "产生 ~50 万个小对象触发 GC 抖动；可参考 tinyxml2 的 MemPool "
                  "做 size-class 池化。")
     lines.append("3. **streaming parse API**：跳过完整 DOM 构造、仅发事件回调，"
                  "覆盖\"扫一遍提取信息\"场景，理论吞吐可逼近 tinyxml2。")
-    lines.append("4. **`HashMap<String, XmlAttribute>` 在 ≤4 个属性的元素上"
-                 "退化为线性扫描**：典型业务文档每元素属性数 < 8，HashMap 的"
-                 "哈希计算 + 桶寻址在小 N 上反而比线性扫描慢。")
+    lines.append("")
+    lines.append("> 历史项已在仓内落地：实体解码字节扫描化、CDATA 拆分字节扫描化、"
+                 "`XmlElement` 属性容器懒建索引（≤ 8 个属性走线性扫描）、"
+                 "ASCII 输入下 `SourceCursor.sliceString` 直接走原 `String` 字节切片"
+                 "（避免 `Array<Rune>` 切片 + UTF-8 重编码）、"
+                 "`trimLeft` / `isDeclarationPayload` / `collapseWhitespace` 字节扫描化，"
+                 "上面的数据已包含这些改造的收益。")
     lines.append("")
     lines.append("---")
     lines.append("")

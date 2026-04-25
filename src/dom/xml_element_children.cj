@@ -1,15 +1,11 @@
 package cangjie_xml.dom
 
 /**
- * `XmlElement` 子节点相关 API：插入、删除、遍历、导航。
+ * `XmlElement` 子节点 API：插入、删除、遍历、导航。
  *
- * 从 `xml_element.cj` 抽出以保持单文件 ≤ 300 行。所有方法的外部契约与
- * DESIGN §6.2 保持一致，仅做位置迁移与局部降圈复杂度重构：
- *
- * - `checkInsertable` 原先嵌套过深，本文件拆为若干小辅助（检查自环、检查节点类型、
- *   检查文档归属、检查祖先环）。
- * - `prependChild` 与 `insertChildBefore` 通过 `linkAtEnd` / `linkBetween`
- *   复用底层挂接逻辑。
+ * `checkInsertable` 拆为若干小辅助（自环检查、节点类型检查、文档归属检查、
+ * 祖先环检查），主路径无嵌套；`prependChild` 与 `insertChildBefore` 复用
+ * `linkAtEnd` / `linkBefore` 底层挂接逻辑。
  */
 extend XmlElement {
 
@@ -155,10 +151,7 @@ extend XmlElement {
         }
     }
 
-    /**
-     * 合法性检查：把原先 `_checkInsertable` 嵌套的 match + while 拆散到多个
-     * 私有小函数中，降低圈复杂度，任何一条约束失败即抛异常。
-     */
+    /** 合法性检查：任何一条约束失败立即抛 `XmlException`。 */
     private func checkInsertable(node: XmlNode): Unit {
         rejectSelfInsertion(node)
         rejectIllegalKindAsChild(node)

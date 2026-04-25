@@ -15,7 +15,7 @@ CangjieXML 是一个**纯仓颉语言实现**的 XML 处理库。它以 tinyxml2
 | **配置模型** | 不可变 `struct`（`XmlParseOptions` / `XmlWriteOptions`），无全局开关 |
 | **遍历模型** | 函数式 `walk` + 经典 `XmlVisitor`，两种范式并存                   |
 | **确定性**   | 相同 DOM + 相同 `XmlWriteOptions` → 逐字节一致输出                |
-| **工程红线** | 单文件 ≤ 300 行、无下划线前缀、低圈复杂度、常量化              |
+| **代码风格** | 无下划线前缀、注释只描述当前实现、常量集中声明                  |
 
 ---
 

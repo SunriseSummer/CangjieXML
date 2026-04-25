@@ -5,17 +5,9 @@ import cangjie_xml.dom.*
 /**
  * Query 扩展的接口契约。
  *
- * ## 为什么需要这个接口
- *
- * cjc 1.0.5 规则：跨包 `extend T <: I { ... }` 的公共方法，调用方只能通过
- * 接口 `I` 声明的签名来访问——未出现在 `I` 中的方法即使写成 `public`，
- * 跨包也不可见。把 Query API 一次性列在 `XmlQueryable` 里是最贴近意图的做法：
- * 即"让用户 `import cangjie_xml.query.*` 后，直接在 `XmlElement` 上使用
- * 完整的查询能力"。
- *
- * ## 使用
- *
- * 用户无需显式引用 `XmlQueryable`。
+ * `query` 包通过 `extend XmlElement <: XmlQueryable` 植入下列方法；接口声明
+ * 保证了"`import cangjie_xml.query.*` 后直接在 `XmlElement` 上调用"的跨包
+ * 可见性。用户无需显式引用 `XmlQueryable`。
  */
 public interface XmlQueryable {
     func attributeAs<T>(name: String, codec: XmlValueCodec<T>): ?T

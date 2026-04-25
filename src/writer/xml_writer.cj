@@ -7,7 +7,7 @@ import cangjie_xml.internal.*
  * XML 写出器：把 DOM 子树序列化为 XML 文本并写入指定 `XmlSink`。
  *
  * 所有行为由 `XmlWriteOptions` 控制，不存在全局静态开关——相同 DOM + 相同
- * options 必然产生相同输出（确定性契约，见 DESIGN §13.2）。
+ * options 必然产生相同输出（确定性契约）。
  *
  * ## 排版决策
  *

@@ -24,7 +24,7 @@
 | P2-1 | std.collection | `Iterable` / `Iterator` 接口虚分发 + `Option<T>` 装箱 | writer 在 50K 元素 × N 属性场景每次都分配迭代器 | P2 |
 | P2-2 | std.core | `String.runes()` 无零开销 `forEachByte` 替代品 | escape / whitespace 检测被迫绕字节级实现 | P2 |
 | P2-3 | std.core | `StringBuilder` 缺公开容量预分配 API | 长串构造 ~19 次扩容副本拷贝 | P2 |
-| P2-4 | std.collection | `HashMap<String, V>` 哈希对短键也走全字节扫描 | parser 属性表插入耗时占比 ~8% | P2 |
+| P2-4 | std.collection | `HashMap<String, V>` 哈希对短键也走全字节扫描 | parser 属性表插入耗时占比 ~8%（已通过应用层"≤8 属性走线性扫描"懒索引规避大部分场景，但根因仍在） | P2 |
 | P3-1 | std.core | `String → Array<Byte>` 与 `StringBuilder → Array<Byte>` 多一次 UTF-8 编码 | `writeXmlToBytes` 路径多一次全量字节拷贝 | P3 |
 | P3-2 | compiler/runtime | 缺 SIMD intrinsic / `strchr` 等价物 | 字节扫描"特殊字符"只能逐字节 if，无法接近 C 量级 | P3 |
 

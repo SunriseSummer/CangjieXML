@@ -1,11 +1,7 @@
 package cangjie_xml.dom
 
 /**
- * `XmlElement` 子节点迭代器。
- *
- * 拆到独立文件以避免 `xml_element.cj` 超过单文件 300 行的工程红线——
- * 这些迭代器只对 `XmlElement.childNodes()` / `childElements()` 服务，
- * 与元素本身关系松散，放在同包独立文件既不影响可见性，又让主文件更聚焦。
+ * `XmlElement` 子节点迭代器：服务于 `childNodes()` / `childElements()`。
  */
 
 /** 遍历任意类型的直接子节点。 */

@@ -32,15 +32,15 @@
 
 | fixture | 迭代 | CangjieXML (ms/次) | tinyxml2 (ms/次) | Python xml.etree (ms/次) | CangjieXML 倍率 | Python xml.etree 倍率 |
 |---|--:|--:|--:|--:|--:|--:|
-| `catalog_small.xml` | 500 | 0.4496 | 0.1351 | 0.2755 | 3.33× | 2.04× |
-| `catalog_medium.xml` | 30 | 28.609 | 7.569 | 16.460 | 3.78× | 2.17× |
-| `catalog_large.xml` | 5 | 298.7 | 49.049 | 106.3 | 6.09× | 2.17× |
-| `config_small.xml` | 500 | 0.2050 | 0.0321 | 0.1301 | 6.38× | 4.05× |
-| `config_medium.xml` | 60 | 7.213 | 1.671 | 6.505 | 4.32× | 3.89× |
-| `config_large.xml` | 10 | 67.501 | 10.620 | 43.410 | 6.36× | 4.09× |
-| `deep_small.xml` | 500 | 0.0313 | 0.0107 | 0.0336 | 2.93× | 3.13× |
-| `deep_medium.xml` | 200 | 0.1142 | 0.0625 | 0.1274 | 1.83× | 2.04× |
-| `deep_large.xml` | 50 | 0.4048 | 0.1733 | 0.3089 | 2.34× | 1.78× |
+| `catalog_small.xml` | 500 | 0.2692 | 0.1985 | 0.2393 | 1.36× | 1.21× |
+| `catalog_medium.xml` | 30 | 12.835 | 11.847 | 16.916 | 1.08× | 1.43× |
+| `catalog_large.xml` | 5 | 91.768 | 70.548 | 112.4 | 1.30× | 1.59× |
+| `config_small.xml` | 500 | 0.0568 | 0.0391 | 0.1233 | 1.45× | 3.15× |
+| `config_medium.xml` | 60 | 3.233 | 1.963 | 5.967 | 1.65× | 3.04× |
+| `config_large.xml` | 10 | 27.490 | 13.482 | 45.730 | 2.04× | 3.39× |
+| `deep_small.xml` | 500 | 0.0125 | 0.0128 | 0.0323 | 0.98× | 2.52× |
+| `deep_medium.xml` | 200 | 0.0535 | 0.0749 | 0.1238 | 0.71× | 1.65× |
+| `deep_large.xml` | 50 | 0.1054 | 0.2078 | 0.3233 | 0.51× | 1.56× |
 
 > 倍率列以 `tinyxml2` 为 1×；数值越小越快。
 
@@ -48,15 +48,15 @@
 
 | fixture | 迭代 | CangjieXML (ms/次) | tinyxml2 (ms/次) | Python xml.etree (ms/次) | CangjieXML 倍率 | Python xml.etree 倍率 |
 |---|--:|--:|--:|--:|--:|--:|
-| `catalog_small.xml` | 500 | 0.1445 | 0.0401 | 0.9550 | 3.60× | 23.8× |
-| `catalog_medium.xml` | 30 | 10.550 | 2.660 | 46.869 | 3.97× | 17.6× |
-| `catalog_large.xml` | 5 | 81.330 | 14.255 | 283.2 | 5.71× | 19.9× |
-| `config_small.xml` | 500 | 0.0589 | 0.0163 | 0.3636 | 3.61× | 22.3× |
-| `config_medium.xml` | 60 | 3.635 | 0.8152 | 17.029 | 4.46× | 20.9× |
-| `config_large.xml` | 10 | 25.083 | 5.155 | 102.1 | 4.87× | 19.8× |
-| `deep_small.xml` | 500 | 0.0141 | 0.0043 | 0.1167 | 3.32× | 27.4× |
-| `deep_medium.xml` | 200 | 0.0570 | 0.0165 | 0.5484 | 3.46× | 33.2× |
-| `deep_large.xml` | 50 | 0.1388 | 0.0332 | 1.082 | 4.18× | 32.5× |
+| `catalog_small.xml` | 500 | 0.1625 | 0.0476 | 1.001 | 3.42× | 21.1× |
+| `catalog_medium.xml` | 30 | 9.314 | 3.731 | 50.432 | 2.50× | 13.5× |
+| `catalog_large.xml` | 5 | 62.613 | 17.084 | 301.0 | 3.66× | 17.6× |
+| `config_small.xml` | 500 | 0.0596 | 0.0182 | 0.3903 | 3.27× | 21.4× |
+| `config_medium.xml` | 60 | 3.630 | 0.9004 | 18.813 | 4.03× | 20.9× |
+| `config_large.xml` | 10 | 21.238 | 5.606 | 113.6 | 3.79× | 20.3× |
+| `deep_small.xml` | 500 | 0.0147 | 0.0051 | 0.1218 | 2.87× | 23.8× |
+| `deep_medium.xml` | 200 | 0.0682 | 0.0201 | 0.6686 | 3.39× | 33.3× |
+| `deep_large.xml` | 50 | 0.1132 | 0.0399 | 1.325 | 2.83× | 33.2× |
 
 > 倍率列以 `tinyxml2` 为 1×；数值越小越快。
 
@@ -64,15 +64,15 @@
 
 | fixture | 迭代 | CangjieXML (ms/次) | tinyxml2 (ms/次) | Python xml.etree (ms/次) | CangjieXML 倍率 | Python xml.etree 倍率 |
 |---|--:|--:|--:|--:|--:|--:|
-| `catalog_small.xml` | 500 | 0.4993 | 0.1995 | 1.240 | 2.50× | 6.22× |
-| `catalog_medium.xml` | 30 | 39.354 | 10.532 | 62.515 | 3.74× | 5.94× |
-| `catalog_large.xml` | 5 | 360.3 | 67.300 | 393.3 | 5.35× | 5.84× |
-| `config_small.xml` | 500 | 0.1874 | 0.0503 | 0.5031 | 3.72× | 10.00× |
-| `config_medium.xml` | 60 | 11.320 | 2.568 | 23.581 | 4.41× | 9.18× |
-| `config_large.xml` | 10 | 86.777 | 20.727 | 144.8 | 4.19× | 6.99× |
-| `deep_small.xml` | 500 | 0.0459 | 0.0151 | 0.1588 | 3.04× | 10.5× |
-| `deep_medium.xml` | 200 | 0.1918 | 0.0796 | 0.7352 | 2.41× | 9.23× |
-| `deep_large.xml` | 50 | 0.3363 | 0.2067 | 1.430 | 1.63× | 6.92× |
+| `catalog_small.xml` | 500 | 0.3094 | 0.2731 | 1.265 | 1.13× | 4.63× |
+| `catalog_medium.xml` | 30 | 23.759 | 14.943 | 65.948 | 1.59× | 4.41× |
+| `catalog_large.xml` | 5 | 216.4 | 91.200 | 415.4 | 2.37× | 4.55× |
+| `config_small.xml` | 500 | 0.1159 | 0.0589 | 0.5201 | 1.97× | 8.83× |
+| `config_medium.xml` | 60 | 7.116 | 2.921 | 24.904 | 2.44× | 8.53× |
+| `config_large.xml` | 10 | 46.851 | 29.294 | 156.5 | 1.60× | 5.34× |
+| `deep_small.xml` | 500 | 0.0278 | 0.0181 | 0.1582 | 1.54× | 8.76× |
+| `deep_medium.xml` | 200 | 0.1085 | 0.0949 | 0.8629 | 1.14× | 9.09× |
+| `deep_large.xml` | 50 | 0.2186 | 0.2500 | 1.692 | 0.87× | 6.77× |
 
 > 倍率列以 `tinyxml2` 为 1×；数值越小越快。
 
@@ -80,22 +80,22 @@
 
 | fixture | 迭代 | CangjieXML (ms/次) | tinyxml2 (ms/次) | Python xml.etree (ms/次) | CangjieXML 倍率 | Python xml.etree 倍率 |
 |---|--:|--:|--:|--:|--:|--:|
-| `catalog_small.xml` | 500 | 0.0127 | 0.0031 | 0.0294 | 4.07× | 9.42× |
-| `catalog_medium.xml` | 30 | 1.781 | 0.2663 | 1.558 | 6.69× | 5.85× |
-| `catalog_large.xml` | 5 | 41.591 | 2.602 | 13.617 | 16.0× | 5.23× |
-| `config_small.xml` | 500 | 0.0016 | 0.000490 | 0.0064 | 3.35× | 13.0× |
-| `config_medium.xml` | 60 | 0.1201 | 0.0798 | 0.3193 | 1.51× | 4.00× |
-| `config_large.xml` | 10 | 1.112 | 0.6454 | 1.936 | 1.72× | 3.00× |
-| `deep_small.xml` | 500 | 0.0012 | 0.000469 | 0.0030 | 2.54× | 6.46× |
-| `deep_medium.xml` | 200 | 0.0062 | 0.0020 | 0.0125 | 3.05× | 6.16× |
-| `deep_large.xml` | 50 | 0.0100 | 0.0046 | 0.0250 | 2.18× | 5.44× |
+| `catalog_small.xml` | 500 | 0.0145 | 0.0059 | 0.0313 | 2.46× | 5.32× |
+| `catalog_medium.xml` | 30 | 0.9267 | 0.2955 | 1.702 | 3.14× | 5.76× |
+| `catalog_large.xml` | 5 | 49.349 | 3.411 | 15.337 | 14.5× | 4.50× |
+| `config_small.xml` | 500 | 0.0018 | 0.000722 | 0.0065 | 2.54× | 8.95× |
+| `config_medium.xml` | 60 | 0.2097 | 0.0583 | 0.3505 | 3.59× | 6.01× |
+| `config_large.xml` | 10 | 0.7146 | 0.4619 | 2.157 | 1.55× | 4.67× |
+| `deep_small.xml` | 500 | 0.000980 | 0.000407 | 0.0033 | 2.41× | 8.19× |
+| `deep_medium.xml` | 200 | 0.0042 | 0.0016 | 0.0135 | 2.69× | 8.67× |
+| `deep_large.xml` | 50 | 0.0090 | 0.0032 | 0.0303 | 2.80× | 9.43× |
 
 > 倍率列以 `tinyxml2` 为 1×；数值越小越快。
 
 ## 结论与观察
 
 - **tinyxml2** 作为成熟 C++ 库（原地分段 + 内存池 + strchr/SSE），在各场景上是最快基线。
-- **CangjieXML** 在 `-O2` 下相对 tinyxml2 的倍率落在 **约 1.5~16×**；`serialize` / `traverse` 稳定**反超 Python `xml.etree`**，`roundtrip` 在中大 fixture 上同样领先 Python。
+- **CangjieXML** 在 `-O2` 下相对 tinyxml2 的倍率落在 **约 1× ~ 9×**；`serialize` / `traverse` 稳定**反超 Python `xml.etree`**，`roundtrip` 在中大 fixture 上同样领先 Python。
 - **Python `xml.etree`** 在 `parse` 上仍因走 C 实现的 expat 占优；仓颉版的剩余差距集中在大文档解析与属性密集型遍历。
 
 ## 测试期间对 cangjie_xml 库的 bug 排查
@@ -158,10 +158,11 @@ DOM / parser / writer / escape 层面的算法优化已经基本榨干（参考 
 
 ### 后续应用层可继续推进的优化（不依赖 SDK 修复）
 
-1. **`SourceCursor` 字节流扫描化**：废弃整体 `Array<Rune>` 前置物化，改为 UTF-8 字节流 + 必要时按需解码。直接受益项：parse 内存峰值下降 ~10×；属结构性改动需独立 PR 推进。
+1. **`SourceCursor` 完全字节流扫描化**：当前 ASCII 输入下 `sliceString` 已经直接走原 `String` 字节切片，但 `runes` 仍被完整物化（用于 `peek` / `advance` 等热路径上的码点等值比较）。下一步可彻底废弃整体 `Array<Rune>` 前置物化，改为 UTF-8 字节流 + 按需解码；理论上 parse 内存峰值再降 ~4×，属结构性改动需独立 PR 推进。
 2. **DOM 节点对象池**：现在每个 `XmlElement` / `XmlText` / `XmlAttribute` 都是单独 class 实例，5 MB fixture 解析过程中会产生 ~50 万个小对象触发 GC 抖动；可参考 tinyxml2 的 MemPool 做 size-class 池化。
 3. **streaming parse API**：跳过完整 DOM 构造、仅发事件回调，覆盖"扫一遍提取信息"场景，理论吞吐可逼近 tinyxml2。
-4. **`HashMap<String, XmlAttribute>` 在 ≤4 个属性的元素上退化为线性扫描**：典型业务文档每元素属性数 < 8，HashMap 的哈希计算 + 桶寻址在小 N 上反而比线性扫描慢。
+
+> 历史项已在仓内落地：实体解码字节扫描化、CDATA 拆分字节扫描化、`XmlElement` 属性容器懒建索引（≤ 8 个属性走线性扫描）、ASCII 输入下 `SourceCursor.sliceString` 直接走原 `String` 字节切片（避免 `Array<Rune>` 切片 + UTF-8 重编码）、`trimLeft` / `isDeclarationPayload` / `collapseWhitespace` 字节扫描化，上面的数据已包含这些改造的收益。
 
 ---
 

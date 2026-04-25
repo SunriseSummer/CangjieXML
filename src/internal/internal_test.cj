@@ -4,11 +4,10 @@ import std.unittest.*
 import std.unittest.testmacro.*
 
 /**
- * 覆盖 `internal.text_escape` 的写出方向转义工具。
+ * 覆盖 `internal.text_escape` 的写出方向转义工具的单元测试。
  *
- * 这些函数原先只通过 `XmlWriter` 的路径被间接覆盖——对于单元回归而言，
- * 边界（CDATA 中含 `]]>` 这类隐蔽输入）最好由一组能独立复现的专项断言
- * 钉死。任何一条断言挂了都能精确指到"转义规则自身"这一层。
+ * 直接对单一函数做边界断言（如 CDATA 中含 `]]>` 的分段），失败时能精确指到
+ * "转义规则自身"这一层。
  */
 
 @Test

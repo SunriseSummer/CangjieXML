@@ -6,8 +6,7 @@ import cangjie_xml.error.*
 /**
  * `XmlParser` 的元素级解析：元素、属性、子节点扫描、文本、闭合标签。
  *
- * 与 `xml_parser_toplevel.cj` 互补——两者均以 `extend XmlParser` 挂回同一类，
- * 分文件是为了把单源文件控制在 300 行内。
+ * 与 `xml_parser_toplevel.cj` 同样以 `extend XmlParser` 挂回同一个类。
  */
 extend XmlParser {
     public func parseElement(startPos: SourcePos, depth: Int64): XmlElement {

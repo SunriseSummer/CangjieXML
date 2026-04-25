@@ -5,25 +5,17 @@ import cangjie_xml.dom.*
 /**
  * 按 `XmlVisitor` 协议，前序 + 后序派发访问 `node` 及其后代。
  *
- * ## 语义摘要
- *
- * - `Document`：调用 `visitEnter(document)`；若返回 `true`，递归所有子节点；
- *   结束后调用 `visitExit(document)`；整体返回与 `visitExit` 的返回相同。
- * - `Element`：同上（`visitEnter/Exit(element)`）。
+ * - `Document` / `Element`：调用 `visitEnter`，若返回 `true` 则递归所有子节点，
+ *   结束后调用 `visitExit`；整体返回与 `visitExit` 的返回相同。
  * - 叶子节点：调用 `visit(text|comment|declaration|unknown)`，返回值即为本次
  *   派发的返回值。
  *
- * ## 返回值
- *
- * 对齐 tinyxml2：`accept` 返回 `false` 表示"请在我这里中止后续遍历"。具体而言：
- *
- * - 叶子节点 `visit(...)` 返回 `false` → `accept` 返回 `false`；
- * - 容器节点 `visitEnter(...)` 返回 `false` → 跳过子节点，**不**调用 `visitExit`，
- *   `accept` 本身返回 `true`（对兄弟一层仍可继续）；
- * - 容器节点的任何子节点 `accept` 返回 `false` → 立刻中止剩余子节点的处理，
- *   仍然调用 `visitExit`，`accept` 返回 `false`。
- *
- * 这一组约定既贴合 tinyxml2 用户的直觉，又保持 `visitExit` 的 RAII-风格对称性。
+ * 返回值约定（与 tinyxml2 对齐）：`accept` 返回 `false` 表示"请在我这里中止
+ * 后续遍历"。叶子节点 `visit(...)` 返回 `false` → `accept` 返回 `false`；
+ * 容器节点 `visitEnter(...)` 返回 `false` → 跳过子节点，**不**调用
+ * `visitExit`，`accept` 本身仍返回 `true`（兄弟仍可继续）；容器节点的任何
+ * 子节点 `accept` 返回 `false` → 立刻中止剩余子节点，仍调用 `visitExit`，
+ * `accept` 返回 `false`。
  */
 public func accept(node: XmlNode, visitor: XmlVisitor): Bool {
     acceptImpl(node, visitor)

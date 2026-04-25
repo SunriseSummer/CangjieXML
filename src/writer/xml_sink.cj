@@ -28,9 +28,12 @@ public class StringXmlSink <: XmlSink {
         this.buffer = StringBuilder()
     }
 
+    /**
+     * 接受容量提示的构造形态，便于上层把"预期输出大小"沿着 sink 链路传下来；
+     * 当前 `StringBuilder` 暂无公开容量 API，参数被忽略。
+     */
     public init(initialCapacity: Int64) {
         this.buffer = StringBuilder()
-        // 预分配提示（当前 StringBuilder 无公开容量 API，保留入参形态以兼容未来）。
         let _ = initialCapacity
     }
 

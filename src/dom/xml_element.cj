@@ -8,36 +8,30 @@ import cangjie_xml.error.*
  *
  * ## 内部表示
  *
- * - **子节点**：双向链表。选择链表而非 `ArrayList<XmlNode>` 的理由见
- *   DESIGN.md §7.1——XML DOM 典型操作是"在已知节点附近插入 / 删除 /
- *   顺序遍历"，链表能让这些操作 O(1)，且 `previousSibling` / `nextSibling`
- *   实现天然。
- * - **属性**：`ArrayList<XmlAttribute>` 保留插入顺序，`HashMap<String, XmlAttribute>`
- *   提供 O(1) 名称查找。同名属性以"后写覆盖"语义处理（与 XML 规范一致，
- *   不允许同一元素出现两个同名属性）。
+ * - **子节点**：双向链表。XML DOM 典型操作是"在已知节点附近插入 / 删除 /
+ *   顺序遍历"，链表让这些操作 O(1)，并天然实现 `previousSibling` /
+ *   `nextSibling`。
+ * - **属性**：`ArrayList<XmlAttribute>` 保留插入顺序；当属性数超过
+ *   `ATTR_INDEX_THRESHOLD` 时，再构建 `HashMap<String, XmlAttribute>`
+ *   做 O(1) 名称查找。≤ 阈值时一律线性扫描——典型 XML 元素属性数 < 8，
+ *   线性扫描比 HashMap 哈希计算 + 桶寻址更快。同名属性以"后写覆盖"语义
+ *   处理（与 XML 规范一致，禁止同一元素出现两个同名属性）。
  *
- * ## 文件拆分
- *
- * 为保持单文件不超过 300 行（工程红线），属性 API 与子节点 API 分别放入：
- *
- * - `xml_element_attrs.cj`
- * - `xml_element_children.cj`
- * - `xml_element_iters.cj`（迭代器实现）
- *
- * 本文件仅承载类声明、字段、基础构造与 `kind()`，以及 `textContent` 读写与
- * 少量供 `extend` 共享的内部工具。
+ * 属性、子节点 API 与子节点迭代器分别落到 `xml_element_attrs.cj` /
+ * `xml_element_children.cj` / `xml_element_iters.cj`，本文件只承载类声明、
+ * 字段、`kind()`、`textContent` 读写以及供 `extend` 共享的内部工具。
  */
 public class XmlElement <: XmlNode {
     public var name: String
 
-    // 字段为包内可见（不加 private），以便同包内的 extend 文件访问。
-    // 命名以 `Child` / `attr` 前缀去歧义，避免与 `firstChild` / `attributes()`
-    // 这些公共 API 冲突。
+    // 字段对包内 extend 可见，命名加 `Child` / `attr` 前缀以避免与公开 API
+    // `firstChild` / `attributes()` 同名。
     var headChild: ?XmlNode = None
     var tailChild: ?XmlNode = None
 
     let attrOrder: ArrayList<XmlAttribute> = ArrayList<XmlAttribute>()
-    let attrIndex: HashMap<String, XmlAttribute> = HashMap<String, XmlAttribute>()
+    /** 仅在属性数超过 `ATTR_INDEX_THRESHOLD` 时实例化的名称索引。 */
+    var attrIndex: ?HashMap<String, XmlAttribute> = None
 
     init(doc: XmlDocument, name: String) {
         super(doc)
@@ -46,6 +40,60 @@ public class XmlElement <: XmlNode {
 
     public override func kind(): XmlNodeKind {
         XmlNodeKind.Element(this)
+    }
+
+    // ==================================================================
+    // 属性容器内部工具
+    // ==================================================================
+
+    /**
+     * 按名称查找属性：≤ 阈值线性扫描；超阈值后走名称索引。
+     */
+    func findAttr(name: String): ?XmlAttribute {
+        match (attrIndex) {
+            case Some(m) => m.get(name)
+            case None =>
+                let n = attrOrder.size
+                var i = 0
+                while (i < n) {
+                    let a = attrOrder[i]
+                    if (a.name == name) {
+                        return Some(a)
+                    }
+                    i++
+                }
+                None
+        }
+    }
+
+    /**
+     * 追加一个新属性（调用方已确认无同名属性）。
+     * 当总数刚跨过阈值时一次性构建 `attrIndex`。
+     */
+    func addNewAttr(attr: XmlAttribute): Unit {
+        attrOrder.add(attr)
+        match (attrIndex) {
+            case Some(m) => m[attr.name] = attr
+            case None =>
+                if (attrOrder.size > ATTR_INDEX_THRESHOLD) {
+                    let m = HashMap<String, XmlAttribute>()
+                    let n = attrOrder.size
+                    var i = 0
+                    while (i < n) {
+                        let a = attrOrder[i]
+                        m[a.name] = a
+                        i++
+                    }
+                    attrIndex = Some(m)
+                }
+        }
+    }
+
+    /** 从名称索引（若已建）中移除一条记录；不动 `attrOrder`。 */
+    func dropFromAttrIndex(name: String): Unit {
+        if (let Some(m) <- attrIndex) {
+            m.remove(name)
+        }
     }
 
     // ==================================================================
