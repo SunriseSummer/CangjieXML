@@ -465,7 +465,7 @@ def write_report(by_lib: dict[str, dict]) -> None:
     lines.append("")
     lines.append("1. P1：`String` 内部 UTF-8 但 `Rune` 解码到 4-byte——"
                  "parser 必须前置物化 `Array<Rune>`，5 MB ASCII 输入即耗 ~20 MB。")
-    lines.append("2. P1：闭包参数 `(T) -> R` 触发堆分配——XML 闭包密集场景的"
+    lines.append("2. P1：闭包参数 `(T) -> R` 触发堆分配——XML 闭包密集场景的 "
                  "GC 压力源，逼迫库代码用宏式特化 workaround（已在 `SourceCursor` "
                  "里手动展开 `skipNameChars` / `skipUntilLt` / `skipAttrValueChars`）。")
     lines.append("3. P2：`Iterable<T>` / `Iterator<T>` 接口虚分发 + Option 装箱——"
