@@ -1,5 +1,5 @@
 /*
- * CangjieXML —— 仓颉版 tinyxml2
+ * CangjieXML —— 纯仓颉实现的 XML 库。
  *
  * 根包 `cangjie_xml` 只做两件事：
  *   1. 承载库级常量（如版本号）；

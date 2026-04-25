@@ -7,18 +7,18 @@ import cangjie_xml.writer.*
 
 /**
  * 基于 `File` 的流式 `XmlSink`——把每次 `write(text)` 直接以 UTF-8 写入文件
- * （经 `BufferedOutputStream` 缓冲），避免 `saveXmlToFile` 先把整个文档
- * 放进 `StringBuilder` 的内存峰值。
+ * （经 `BufferedOutputStream` 缓冲），避免 `saveXmlToFile` 先把整个文档放进
+ * `StringBuilder` 的内存峰值。
  *
- * ## 何时用它
+ * ## 何时使用
  *
  * - 文档足够大（几 MB 以上）；
  * - 上层自己组合 `XmlWriter` 而不走 `saveXmlToFile` 的便捷路径；
- * - 要把写入"拆分" 到同一个文件里（比如连续 append 多个子树）。
+ * - 需要把多次写入合并到同一个文件里。
  *
  * ## 资源语义
  *
- * `FileXmlSink` 实现 `XmlSink + Resource`：
+ * 实现 `XmlSink + Resource`：
  *
  * ```cangjie
  * try (sink = FileXmlSink("/tmp/out.xml")) {
@@ -27,9 +27,8 @@ import cangjie_xml.writer.*
  * }
  * ```
  *
- * 退出 `try-with-resource` 时会先 `flush` 再 `close`，整条链失败时文件
- * 可能半写入——这与"大文档 + 流式"的权衡一致；若需要"全有或全无"，请改用
- * `saveXmlToFile`（先序列化到字符串再一次性写盘）。
+ * 退出 `try-with-resource` 时会先 `flush` 再 `close`。整条链失败时文件可能
+ * 半写入；若需要"全有或全无"语义，请改用 `saveXmlToFile`。
  */
 public class FileXmlSink <: XmlSink & Resource {
     private let path: String

@@ -3,8 +3,7 @@ package cangjie_xml.writer
 /*
  * Writer 的语法片段常量与排版三态枚举。
  *
- * 集中放在一处避免散落到各个写出函数内部；`DEFAULT_XML_DECLARATION_VALUE`
- * 公开导出，供上层在合成默认声明时复用。
+ * `DEFAULT_XML_DECLARATION_VALUE` 公开导出，供上层在合成默认声明时复用。
  */
 
 public const DEFAULT_XML_DECLARATION_VALUE: String = "xml version=\"1.0\" encoding=\"UTF-8\""

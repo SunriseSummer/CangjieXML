@@ -11,6 +11,9 @@ const EPILOGUE_LEN: Int64 = 3 // length of "-->" / "]]>"
 /**
  * 递归下降 XML 解析器。
  *
+ * 类骨架定义在本文件；元素级与文档级语法分别由 `xml_parser_element.cj` /
+ * `xml_parser_toplevel.cj` 通过 `extend XmlParser` 挂回。
+ *
  * ## 覆盖范围
  *
  * - XML 声明 `<?xml ... ?>`
@@ -24,12 +27,6 @@ const EPILOGUE_LEN: Int64 = 3 // length of "-->" / "]]>"
  *
  * 解析错误统一抛 `XmlParseException(XmlError, SourcePos)`，由公共入口
  * `XmlDocument.parseString` 透传。
- *
- * ## 文件拆分
- *
- * 类骨架定义在本文件，元素级与文档级语法分别落到 `xml_parser_element.cj`
- * 与 `xml_parser_toplevel.cj`，均以 `extend XmlParser` 挂回，使每个源文件
- * 都不超过 300 行的工程红线。
  */
 class XmlParser {
     let cur: SourceCursor

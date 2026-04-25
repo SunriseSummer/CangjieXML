@@ -8,15 +8,8 @@ import cangjie_xml.parser.*
 /**
  * 从文件加载 XML 文档——对 `parseXml` 的 IO 侧封装。
  *
- * ## 关注点分离
- *
- * - 本函数只负责"把字节读上来、交给 parser"和把 IO 异常收敛成
- *   `XmlIoException`。字节本身的 XML 合法性由 `parseXml` 判定；
- *   语法错误仍以 `XmlParseException` 抛出，不被吞掉也不被包装。
- * - 文件一律按 **UTF-8** 解读。XML 声明里的 `encoding="..."` 不参与实际解码
- *   （parser 以 String 为输入）。
- *
- * ## 错误映射
+ * 文件一律按 **UTF-8** 解读；XML 声明里的 `encoding="..."` 不参与实际解码。
+ * IO 异常被收敛成 `XmlIoException`；语法错误仍以 `XmlParseException` 原样抛出。
  *
  * | 触发情形 | 抛出 |
  * |---|---|

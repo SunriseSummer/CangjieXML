@@ -9,7 +9,7 @@ package cangjie_xml.dom
  *   用户只能通过 `doc.createXxx()` 创建，借此强制"每个节点都归属一个文档"。
  * - **文档级容器**：持有一条可选的 XML 声明、零或一个根元素，以及任意数量的
  *   顶层注释 / 未知节点（`<!DOCTYPE ...>` 等）。
- * - **文档级元信息**：当前承载 `hasBom` / `writeBom`，未来还可承载字符集等。
+ * - **文档级元信息**：`hasBom` / `writeBom`。
  */
 public class XmlDocument <: XmlNode {
 

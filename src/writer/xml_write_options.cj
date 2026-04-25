@@ -3,9 +3,8 @@ package cangjie_xml.writer
 /**
  * XML 写出选项。
  *
- * DESIGN §9.2 要求把 tinyxml2 依赖全局静态状态的写出配置收敛为"单次写出的显式配置"。
- *
- * ## 字段
+ * 不可变值类型（`struct` + `let`），一经构造不可修改——保证"相同 DOM +
+ * 相同 options → 完全相同输出"的确定性。
  *
  * | 字段 | 语义 | 默认 |
  * |---|---|---|
@@ -15,11 +14,6 @@ package cangjie_xml.writer
  * | `writeDeclaration` | 是否输出 `<?xml ... ?>` 声明。`true` 时：若文档已有声明则原样输出，否则输出默认声明；`false` 时：不输出任何声明 | `true` |
  * | `writeBom` | 是否在输出开头写入 UTF-8 BOM（`EF BB BF`）。若文档 `writeBom=true` 可在此处强制关闭 | `false` |
  * | `boolTrueText` / `boolFalseText` | Query / Builder 层写出 `Bool` 属性时使用的字面量 | `"true"` / `"false"` |
- *
- * ## 不可变性
- *
- * `XmlWriteOptions` 为只读值类型（`struct` + `let`），一经构造不可改写。
- * 这保证"相同 DOM + 相同 options → 完全相同的输出"——这是 DESIGN §13.2 的确定性承诺。
  */
 public struct XmlWriteOptions {
     public let compact: Bool

@@ -7,11 +7,8 @@ import cangjie_xml.error.*
 /**
  * `XmlElement` 的查询便利扩展——属性访问、必填语义、子元素按名字定位。
  *
- * 命名原因：`intAttribute` / `boolAttribute` 等使用驼峰命名（而非 tinyxml2
- * 的 `IntAttribute`）以遵循仓颉命名规范；`doubleAttribute` 保留 tinyxml2
- * 习惯（`Double` ≈ `Float64`）。
- *
- * 通过 `<: XmlQueryable` 满足 cjc 1.0.5 的跨包扩展可见性要求。
+ * 通过 `<: XmlQueryable` 满足跨包扩展可见性要求，让 `import
+ * cangjie_xml.query.*` 后即可直接在 `XmlElement` 上使用本节方法。
  */
 extend XmlElement <: XmlQueryable {
 

@@ -3,11 +3,8 @@ package cangjie_xml.parser
 /**
  * XML 空白处理策略。
  *
- * 对应 tinyxml2 的 `PRESERVE_WHITESPACE` / `COLLAPSE_WHITESPACE`。
- * 合并模式会把任何连续空白序列折叠为单个空格，常见于"只关心语义值"的场景。
- *
- * `Pedantic` 暂不实现——tinyxml2 中它与 `Preserve` 行为差异极小，推迟到
- * 日后如有用户需求再补。
+ * - `Preserve`：保留原文本空白。
+ * - `Collapse`：把连续空白序列折叠为单个空格，并删除纯空白文本节点。
  */
 public enum XmlWhitespaceMode <: ToString {
     | Preserve
@@ -21,7 +18,7 @@ public enum XmlWhitespaceMode <: ToString {
     }
 }
 
-/** 默认的最大元素嵌套深度，与 tinyxml2 的 `TIXML2_MAX_ELEMENT_DEPTH` 对齐。 */
+/** 默认的最大元素嵌套深度。 */
 public const DEFAULT_MAX_ELEMENT_DEPTH: Int64 = 500
 
 /**

@@ -355,9 +355,8 @@ func testWriteAttributeValueEscapesQuote(): Unit {
 
 @Test
 func testXmlWritableIsAPublicInterface(): Unit {
-    // 回归测试：`writeToString` 必须经由 `XmlWritable` 接口声明，才能被跨包
-    // 调用方通过 `import cangjie_xml.writer.*` 看见——否则属于 cjc 1.0.5 的
-    // "extension 方法跨包不可见"坑（同 `query.XmlQueryable` 的历史教训）。
+    // 回归测试：`writeToString` 必须经由 `XmlWritable` 接口声明，才能在
+    // `import cangjie_xml.writer.*` 后被跨包调用方看到。
     let doc = XmlDocument()
     let el = doc.createElement("r")
     doc.appendChild(el)

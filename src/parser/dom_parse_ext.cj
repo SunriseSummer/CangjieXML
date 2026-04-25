@@ -5,10 +5,8 @@ import cangjie_xml.dom.*
 /**
  * 顶层解析函数——与 `XmlDocument.parseString` 等价，专供跨包调用使用。
  *
- * 背景：cjc 1.0.5 对"在 A 包里 `extend` B 包类型且不实现任何接口"的扩展，
- * 会要求调用方"至少导入该扩展的某个继承接口"；而我们这个扩展只是追加方法，
- * 没有任何接口——于是跨包调用 `XmlDocument.parseString` 会编译失败。
- * 顶层函数则没有这个限制，作为稳定的跨包入口。
+ * `parser` 包里通过 `extend XmlDocument` 添加的 `parseString` 方法不实现接口，
+ * 跨包调用 cjc 1.0.5 不可见；本顶层函数作为稳定的跨包入口。
  */
 public func parseXml(xml: String): XmlDocument {
     parseXml(xml, XmlParseOptions.default_())
@@ -23,10 +21,8 @@ public func parseXml(xml: String, options: XmlParseOptions): XmlDocument {
 }
 
 /**
- * 把 `parseString` 植回 `XmlDocument`，保持 DESIGN §4 约定的公共入口形态，
- * 同时让 `dom` 包不依赖 `parser`（反向依赖）。
- *
- * 注意：受 cjc 1.0.5 的 extension 可见性限制，跨包使用推荐 `parseXml(...)`。
+ * 把 `parseString` 植回 `XmlDocument`，保持公共入口形态，同时让 `dom` 包
+ * 不依赖 `parser`。跨包使用推荐 `parseXml(...)`。
  */
 extend XmlDocument {
 

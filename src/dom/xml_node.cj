@@ -3,13 +3,10 @@ package cangjie_xml.dom
 /**
  * XML DOM 的统一节点基类。
  *
- * ## 为什么是 `sealed abstract class`
- *
- * 1. **共享导航状态**：`prev` / `next` / `parentElement` / `document` 四条引用对
- *    所有具体节点完全一致，放到抽象基类可以避免在 6 个子类里重复实现同一套链表维护。
- * 2. **等价的封闭性**：`sealed` 仍保证外部不可派生，`abstract` 仍保证不可实例化。
- * 3. **模式匹配不受影响**：公共入口仍然是 `kind(): XmlNodeKind`，模式匹配由 enum 承载，
- *    不依赖于基类形态。
+ * - **共享导航状态**：`prev` / `next` / `parent` / `document` 四条引用对所有
+ *   具体节点完全一致，集中放到抽象基类避免子类重复实现链表维护。
+ * - **封闭性**：`sealed` 保证外部不可派生，`abstract` 保证不可实例化。
+ * - **模式匹配**：公共入口仍为 `kind(): XmlNodeKind`，由 enum 承载，与基类形态无关。
  *
  * ## 所有权模型
  *
@@ -106,8 +103,7 @@ sealed abstract class XmlNode {
     /**
      * 判断两个 XmlNode 是否引用同一个对象（身份比较）。
      *
-     * XML DOM 中节点通常是可变、带身份的实体，"相等"以身份为准更符合直觉；
-     * 结构等值比较不在公共 API 范围内。
+     * XML DOM 中节点是可变、带身份的实体；以身份相等为默认更符合直觉。
      */
     public operator func ==(other: XmlNode): Bool {
         refEq(this, other)

@@ -1,26 +1,21 @@
 package cangjie_xml.internal
 
-import std.collection.*
-
 /**
- * XML 文本转义工具。
+ * XML 文本转义工具。属于 internal——XML 语法层细节，不对外公开。
  *
- * ## 职责
- *
- * 把任意 `String` 值按上下文（文本节点 / 属性值）转换为 XML 语法合法的形式。
- * 反方向的实体解码由 Parser 阶段的 `entity_decoder` 承担。
+ * 把任意 `String` 值按上下文（文本节点 / 属性值 / CDATA）转换为 XML 语法
+ * 合法的形式；反方向的实体解码由 Parser 阶段的 `entity_decoder` 承担。
  *
  * ## 转义矩阵
  *
  * |          | `&` | `<` | `>` | `"` | `'` | 备注 |
  * |----------|-----|-----|-----|-----|-----|------|
- * | 文本节点 | ✅  | ✅  | ✅  | —   | —   | 与 tinyxml2 `XMLPrinter::PrintString` 行为一致 |
- * | 属性值   | ✅  | ✅  | —   | ✅  | —   | 属性以双引号包裹，故不转义 `>`，转义 `"` |
- * | CDATA    | 均不转义，内容原样进入 `<![CDATA[ ... ]]>` | | | | | 若 `value` 含 `]]>` 将按 XML 规范分段（见 `escapeCdata`） |
+ * | 文本节点 | ✅  | ✅  | ✅  | —   | —   | 与 tinyxml2 `XMLPrinter::PrintString` 一致 |
+ * | 属性值   | ✅  | ✅  | ✅  | ✅  | —   | 属性以双引号包裹，故转义 `"` |
+ * | CDATA    | 均不转义，内容原样进入 `<![CDATA[ ... ]]>` | | | | | 含 `]]>` 时按 XML 规范分段（见 [escapeCdata]） |
  *
- * ## 为什么是 internal
- *
- * 转义规则属于 XML 语法层的实现细节，不应成为公共 API。
+ * 三个公共入口（[escapeText] / [escapeAttribute] / [escapeCdata]）都先做
+ * 字节级快速判定，无可转义内容时直接返回原串、零分配。
  */
 
 // 集中常量定义：避免魔鬼字符串 / 魔鬼数字散落到多个函数中。
@@ -135,7 +130,7 @@ public func escapeCdata(s: String): String {
     let sb = StringBuilder()
     sb.append(CDATA_OPEN)
     if (s.contains(CDATA_TERMINATOR)) {
-        appendWithCdataSplit(sb, toRuneArray(s))
+        appendWithCdataSplit(sb, s)
     } else {
         sb.append(s)
     }
@@ -143,29 +138,38 @@ public func escapeCdata(s: String): String {
     sb.toString()
 }
 
-/** CDATA 内容中遇到 `]]>` 的分段处理：拆入流程从主函数提出，降低圈复杂度。 */
-func appendWithCdataSplit(sb: StringBuilder, runes: Array<Rune>): Unit {
+/** CDATA 内容中遇到 `]]>` 的分段处理：以字节扫描定位 `]]>`（全 ASCII，UTF-8
+ *  多字节序列的所有字节均 ≥ 0x80）；命中时把 `]]` 与 `>` 分入相邻 CDATA 段。 */
+func appendWithCdataSplit(sb: StringBuilder, s: String): Unit {
+    let n = s.size
     var i = 0
-    while (i < runes.size) {
-        if (isCdataTerminatorAt(runes, i)) {
-            sb.append(r']')
-            sb.append(r']')
+    var lastEmit = 0
+    while (i < n) {
+        if (isCdataTerminatorAt(s, i, n)) {
+            if (i > lastEmit) {
+                sb.append(s[lastEmit..i])
+            }
+            // 把 `]]>` 拆成 `]]` + reopen + `>`，二者各自归属相邻的 CDATA 段。
+            sb.append(s[i..i + 2])
             sb.append(CDATA_REOPEN_AFTER_BRACKETS)
-            sb.append(r'>')
+            sb.append(s[i + 2..i + 3])
             i += CDATA_TERMINATOR_LEN
+            lastEmit = i
         } else {
-            sb.append(runes[i])
             i++
         }
     }
+    if (lastEmit < n) {
+        sb.append(s[lastEmit..n])
+    }
 }
 
-/** 判断 `runes[i..i+3]` 是否为 `]]>`。 */
-func isCdataTerminatorAt(runes: Array<Rune>, i: Int64): Bool {
-    i + CDATA_TERMINATOR_LEN <= runes.size
-        && runes[i] == r']'
-        && runes[i + 1] == r']'
-        && runes[i + 2] == r'>'
+/** 判断 `s[i..i+3]` 是否为 ASCII 字节 `]]>`。 */
+func isCdataTerminatorAt(s: String, i: Int64, n: Int64): Bool {
+    i + CDATA_TERMINATOR_LEN <= n
+        && s[i] == 0x5Du8 // ']'
+        && s[i + 1] == 0x5Du8
+        && s[i + 2] == 0x3Eu8 // '>'
 }
 
 /** UTF-8 BOM 字节序列：EF BB BF。 */
@@ -203,13 +207,4 @@ func needsAttrEscape(s: String): Bool {
         i++
     }
     false
-}
-
-/** 把字符串拉平为 `Rune` 数组，便于随机访问查找 `]]>`。 */
-func toRuneArray(s: String): Array<Rune> {
-    let list = ArrayList<Rune>()
-    for (r in s.runes()) {
-        list.add(r)
-    }
-    list.toArray()
 }
