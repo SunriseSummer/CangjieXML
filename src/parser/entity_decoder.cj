@@ -103,25 +103,25 @@ func decodeOneEntity(s: String, start: Int64, out: StringBuilder, pos: SourcePos
 
 private func appendNamedEntity(s: String, start: Int64, end: Int64, out: StringBuilder, pos: SourcePos): Unit {
     let len = end - start
-    if (len == 2 && s[start] == bAt(r'l') && s[start + 1] == bAt(r't')) {
+    if (len == 2 && s[start] == asciiByte(r'l') && s[start + 1] == asciiByte(r't')) {
         out.append(r'<')
         return
     }
-    if (len == 2 && s[start] == bAt(r'g') && s[start + 1] == bAt(r't')) {
+    if (len == 2 && s[start] == asciiByte(r'g') && s[start + 1] == asciiByte(r't')) {
         out.append(r'>')
         return
     }
-    if (len == 3 && s[start] == bAt(r'a') && s[start + 1] == bAt(r'm') && s[start + 2] == bAt(r'p')) {
+    if (len == 3 && s[start] == asciiByte(r'a') && s[start + 1] == asciiByte(r'm') && s[start + 2] == asciiByte(r'p')) {
         out.append(r'&')
         return
     }
-    if (len == 4 && s[start] == bAt(r'q') && s[start + 1] == bAt(r'u') && s[start + 2] == bAt(r'o') &&
-        s[start + 3] == bAt(r't')) {
+    if (len == 4 && s[start] == asciiByte(r'q') && s[start + 1] == asciiByte(r'u') && s[start + 2] == asciiByte(r'o') &&
+        s[start + 3] == asciiByte(r't')) {
         out.append(r'"')
         return
     }
-    if (len == 4 && s[start] == bAt(r'a') && s[start + 1] == bAt(r'p') && s[start + 2] == bAt(r'o') &&
-        s[start + 3] == bAt(r's')) {
+    if (len == 4 && s[start] == asciiByte(r'a') && s[start + 1] == asciiByte(r'p') && s[start + 2] == asciiByte(r'o') &&
+        s[start + 3] == asciiByte(r's')) {
         out.append(r'\'')
         return
     }
@@ -139,7 +139,7 @@ private func appendNumericEntity(
         throw XmlParseException(InvalidText(pos, "empty numeric entity"))
     }
     var codepoint: Int64 = 0
-    if (s[start] == bAt(r'x') || s[start] == bAt(r'X')) {
+    if (s[start] == asciiByte(r'x') || s[start] == asciiByte(r'X')) {
         codepoint = parseHexDigits(s, start + 1, end, pos)
     } else {
         codepoint = parseDecimalDigits(s, start, end, pos)
@@ -175,24 +175,24 @@ private func parseDecimalDigits(s: String, start: Int64, end: Int64, pos: Source
     var i = start
     while (i < end) {
         let bv = s[i]
-        if (bv < bAt(r'0') || bv > bAt(r'9')) {
+        if (bv < asciiByte(r'0') || bv > asciiByte(r'9')) {
             throw XmlParseException(InvalidText(pos, "non-digit character in numeric entity"))
         }
-        acc = acc * 10 + Int64(bv - bAt(r'0'))
+        acc = acc * 10 + Int64(bv - asciiByte(r'0'))
         i++
     }
     acc
 }
 
 private func hexDigitValueByte(bv: Byte): Int64 {
-    if (bv >= bAt(r'0') && bv <= bAt(r'9')) {
-        return Int64(bv - bAt(r'0'))
+    if (bv >= asciiByte(r'0') && bv <= asciiByte(r'9')) {
+        return Int64(bv - asciiByte(r'0'))
     }
-    if (bv >= bAt(r'a') && bv <= bAt(r'f')) {
-        return Int64(bv - bAt(r'a')) + 10
+    if (bv >= asciiByte(r'a') && bv <= asciiByte(r'f')) {
+        return Int64(bv - asciiByte(r'a')) + 10
     }
-    if (bv >= bAt(r'A') && bv <= bAt(r'F')) {
-        return Int64(bv - bAt(r'A')) + 10
+    if (bv >= asciiByte(r'A') && bv <= asciiByte(r'F')) {
+        return Int64(bv - asciiByte(r'A')) + 10
     }
     -1
 }
@@ -207,7 +207,7 @@ private func min(a: Int64, b: Int64): Int64 {
     if (a < b) { a } else { b }
 }
 
-/** 把 ASCII Rune 字面量转成对应字节。 */
-private func bAt(r: Rune): Byte {
+/** 把 ASCII `Rune` 字面量转成对应字节，便于与 `String` 字节做直接比较。 */
+private func asciiByte(r: Rune): Byte {
     UInt8(UInt32(r))
 }

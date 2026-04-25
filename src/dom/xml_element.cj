@@ -30,7 +30,7 @@ public class XmlElement <: XmlNode {
     var tailChild: ?XmlNode = None
 
     let attrOrder: ArrayList<XmlAttribute> = ArrayList<XmlAttribute>()
-    /** 仅在属性数 > [ATTR_INDEX_THRESHOLD] 时实例化的名称索引。 */
+    /** 仅在属性数超过 `ATTR_INDEX_THRESHOLD` 时实例化的名称索引。 */
     var attrIndex: ?HashMap<String, XmlAttribute> = None
 
     init(doc: XmlDocument, name: String) {

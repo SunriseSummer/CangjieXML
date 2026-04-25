@@ -12,7 +12,7 @@ package cangjie_xml.internal
  * |----------|-----|-----|-----|-----|-----|------|
  * | 文本节点 | ✅  | ✅  | ✅  | —   | —   | 与 tinyxml2 `XMLPrinter::PrintString` 一致 |
  * | 属性值   | ✅  | ✅  | ✅  | ✅  | —   | 属性以双引号包裹，故转义 `"` |
- * | CDATA    | 均不转义，内容原样进入 `<![CDATA[ ... ]]>` | | | | | 含 `]]>` 时按 XML 规范分段（见 [escapeCdata]） |
+ * | CDATA    | 均不转义，内容原样进入 `<![CDATA[ ... ]]>` | | | | | 含 `]]>` 时按 XML 规范分段（见 `escapeCdata`） |
  *
  * 三个公共入口（[escapeText] / [escapeAttribute] / [escapeCdata]）都先做
  * 字节级快速判定，无可转义内容时直接返回原串、零分配。
@@ -80,7 +80,7 @@ public func escapeText(s: String): String {
  * 把属性值按 XML 规则转义。属性值总是以双引号 `"` 包裹，因此需转义 `"`。
  *
  * 对 `&` / `<` 必转义（`>` 在 tinyxml2 默认行为中也转义，为兼容保留）。
- * 性能策略与 [escapeText] 一致——纯字节扫描 + 区间拷贝。
+ * 性能策略与 `escapeText` 一致——纯字节扫描 + 区间拷贝。
  */
 public func escapeAttribute(s: String): String {
     if (!needsAttrEscape(s)) {

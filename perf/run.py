@@ -296,7 +296,7 @@ def write_report(by_lib: dict[str, dict]) -> None:
     lines.append("")
     lines.append("- **tinyxml2** 作为成熟 C++ 库（原地分段 + 内存池 + strchr/SSE），"
                  "在各场景上是最快基线。")
-    lines.append("- **CangjieXML** 在 `-O2` 下相对 tinyxml2 的倍率落在 **约 1.5~16×**；"
+    lines.append("- **CangjieXML** 在 `-O2` 下相对 tinyxml2 的倍率落在 **约 1× ~ 9×**；"
                  "`serialize` / `traverse` 稳定**反超 Python `xml.etree`**，"
                  "`roundtrip` 在中大 fixture 上同样领先 Python。")
     lines.append("- **Python `xml.etree`** 在 `parse` 上仍因走 C 实现的 expat 占优；"
@@ -394,9 +394,10 @@ def write_report(by_lib: dict[str, dict]) -> None:
                  "做 size-class 池化。")
     lines.append("3. **streaming parse API**：跳过完整 DOM 构造、仅发事件回调，"
                  "覆盖\"扫一遍提取信息\"场景，理论吞吐可逼近 tinyxml2。")
-    lines.append("4. **`HashMap<String, XmlAttribute>` 在 ≤4 个属性的元素上"
-                 "退化为线性扫描**：典型业务文档每元素属性数 < 8，HashMap 的"
-                 "哈希计算 + 桶寻址在小 N 上反而比线性扫描慢。")
+    lines.append("")
+    lines.append("> 历史项已在仓内落地：实体解码字节扫描化、CDATA 拆分字节扫描化、"
+                 "`XmlElement` 属性容器懒建索引（≤ 8 个属性走线性扫描），"
+                 "上面的数据已包含这些改造的收益。")
     lines.append("")
     lines.append("---")
     lines.append("")

@@ -179,8 +179,11 @@ public func attributeAt(i: Int64): XmlAttribute
 - **同名覆盖**：`setAttribute` 对已存在属性覆盖值，**不**改变其顺序。
 - **同名不覆盖**：`tryAddAttribute` 仅在不存在同名属性时新增；返回 `false`
   即"重复属性"，调用方决定如何处理。相比 `hasAttribute(...) + setAttribute(...)`
-  的两次哈希查询路径，单次 `tryAddAttribute` 只做一次 lookup，是
-  parser 等"已知属性必须唯一"的高频路径首选入口。
+  的两次查询路径，单次 `tryAddAttribute` 只做一次 lookup，是 parser 等
+  "已知属性必须唯一"的高频路径首选入口。
+- **属性查找**：典型 XML 元素属性数 ≤ 8，库内对名称查找走纯线性扫描；
+  超过阈值后元素内部按需建立 `HashMap` 名称索引，使大批量属性场景仍保
+  持均摊 O(1)。这一切对调用方完全透明。
 - **索引访问**：`attributeAt(i)` 按插入顺序索引访问（0 ≤ `i` < `attributeCount()`）；
   越界抛 `IndexOutOfBoundsException`。提供索引访问的目的是给热路径（writer 序列化、
   批量诊断）一条不分配 `Iterator` 对象的遍历方式：
