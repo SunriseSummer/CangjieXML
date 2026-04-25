@@ -36,7 +36,7 @@ python3 perf/run.py
 2. `python3 fixtures/generate.py` —— 生成 9 份 fixture（catalog/config/deep ×
    small/medium/large）。
 3. `make -C tinyxml2_bench` —— 构建 C++ 探针（`g++ -O2 -DNDEBUG`）。
-4. `cjpm build` 构建仓颉探针。
+4. `cjpm build` 构建仓颉探针，`perf/cangjie_bench/cjpm.toml` 已显式配置 `-O2`。
 5. 串行跑三端探针 → 三份 JSON 计时。
 6. 汇总写入 `perf/report.md`。
 

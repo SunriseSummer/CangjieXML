@@ -6,7 +6,7 @@ perf 入口脚本——一键跑完三端基准并产出 `report.md`。
   1. 自动确保 `cjpm` 可用（必要时 source `/opt/cangjie/envsetup.sh`）
   2. `python3 fixtures/generate.py`        —— 生成九份典型 XML（3 形态 × 3 规模）
   3. `make -C tinyxml2_bench`              —— 构建 C++ 端探针（链接 .tinyxml2-11.0.0）
-  4. `cjpm build` (in cangjie_bench/)      —— 构建仓颉端探针
+  4. `cjpm build` (in cangjie_bench/)      —— 以 `-O2` 配置构建仓颉端探针
   5. 串行跑三端探针（共享同一份 `plan.json`）→ 三份 JSON 结果
   6. 汇总写入 `perf/report.md`
 
@@ -215,7 +215,7 @@ def write_report(by_lib: dict[str, dict]) -> None:
     lines.append("# CangjieXML / Python xml.etree / tinyxml2 性能对比")
     lines.append("")
     lines.append("> 本报告由 `perf/run.py` 自动生成；请勿手工修改。"
-                 "重新生成方法：`python3 perf/run.py`。")
+                 "重新生成方法：`python3 perf/run.py`。仓颉侧统一按 `-O2` 编译。")
     lines.append("")
     lines.append("## 测试方法")
     lines.append("")

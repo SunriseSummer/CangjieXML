@@ -34,7 +34,7 @@ python3 e2etest/xml/run.py
 
 脚本会：
 1. `python3 fixtures/generate.py` — 生成 10 份 `.xml`
-2. `cjpm build`（在 `cangjie_probe/` 下）— 构建仓颉 probe
+2. `cjpm build`（在 `cangjie_probe/` 下）— 构建仓颉 probe，`cjpm.toml` 已显式配置 `-O2`
 3. 分别跑 Python probe 与仓颉 probe → 两份 JSON
 4. `diff.py` 对比 → 全绿则 `[PASS] all 10 fixtures produce identical fingerprints`
 

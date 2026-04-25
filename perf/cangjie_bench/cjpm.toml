@@ -3,6 +3,7 @@
   name = "cangjie_bench"
   version = "0.1.0"
   output-type = "executable"
+  compile-option = "-O2"
   description = "Perf probe — bench cangjie_xml against tinyxml2 / python on shared fixtures."
   src-dir = "src"
   target-dir = "target"

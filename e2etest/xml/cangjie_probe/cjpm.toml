@@ -3,6 +3,7 @@
   name = "cangjie_probe"
   version = "0.1.0"
   output-type = "executable"
+  compile-option = "-O2"
   description = "E2E probe — parse fixtures with cangjie_xml and emit a fingerprint JSON for diff."
   src-dir = "src"
   target-dir = "target"
