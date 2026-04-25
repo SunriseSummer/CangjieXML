@@ -1,0 +1,13 @@
+[package]
+  cjc-version = "1.0.5"
+  name = "cangjie_bench"
+  version = "0.1.0"
+  output-type = "executable"
+  description = "Perf probe — bench cangjie_xml against tinyxml2 / python on shared fixtures."
+  src-dir = "src"
+  target-dir = "target"
+
+[dependencies]
+  cangjie_xml = { path = "../.." }
+
+[test-dependencies]
