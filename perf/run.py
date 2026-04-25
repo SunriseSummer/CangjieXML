@@ -401,7 +401,9 @@ def write_report(by_lib: dict[str, dict]) -> None:
                  "`XmlElement` 属性容器懒建索引（≤ 8 个属性走线性扫描）、"
                  "ASCII 输入下 `SourceCursor.sliceString` 直接走原 `String` 字节切片"
                  "（避免 `Array<Rune>` 切片 + UTF-8 重编码）、"
-                 "`trimLeft` / `isDeclarationPayload` / `collapseWhitespace` 字节扫描化，"
+                 "`trimLeft` / `isDeclarationPayload` / `collapseWhitespace` 字节扫描化、"
+                 "`query.builtin_codecs` 中 `trimAscii` / `lowerAscii` 字节扫描 + 零分配快路径、"
+                 "`visit.accept` 改走双向链表直访避免 per-element 迭代器分配，"
                  "上面的数据已包含这些改造的收益。")
     lines.append("")
     lines.append("---")

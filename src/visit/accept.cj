@@ -37,11 +37,14 @@ func acceptDocument(doc: XmlDocument, visitor: XmlVisitor): Bool {
         return true  // 剪枝：不进入子树，也不触发 visitExit
     }
     var keepGoing = true
-    for (child in doc.childNodes()) {
+    // 直接走双向链表，避免每次都构造 `childNodes()` 的迭代器对象。
+    var cur = doc.firstChild
+    while (let Some(child) <- cur) {
         if (!keepGoing) { break }
         if (!acceptImpl(child, visitor)) {
             keepGoing = false
         }
+        cur = child.nextSibling
     }
     let exitOk = visitor.visitExit(doc)
     keepGoing && exitOk
@@ -52,11 +55,13 @@ func acceptElement(el: XmlElement, visitor: XmlVisitor): Bool {
         return true
     }
     var keepGoing = true
-    for (child in el.childNodes()) {
+    var cur = el.firstChild
+    while (let Some(child) <- cur) {
         if (!keepGoing) { break }
         if (!acceptImpl(child, visitor)) {
             keepGoing = false
         }
+        cur = child.nextSibling
     }
     let exitOk = visitor.visitExit(el)
     keepGoing && exitOk

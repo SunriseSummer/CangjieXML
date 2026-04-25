@@ -270,11 +270,6 @@ class SourceCursor {
     }
 }
 
-/** XML 规范 §2.3 定义的空白字符集合。 */
-func isXmlWhitespace(r: Rune): Bool {
-    r == r' ' || r == r'\t' || r == CH_LF || r == r'\r'
-}
-
 /** 名称起始字符（XML 1.0 Name 子集：字母 / `_` / `:`）。 */
 func isNameStart(r: Rune): Bool {
     isAsciiLetter(r) || r == r'_' || r == r':'

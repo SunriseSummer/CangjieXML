@@ -1,7 +1,6 @@
 package cangjie_xml.query
 
 import std.convert.*
-import std.collection.*
 
 /**
  * 内置 `XmlValueCodec` 实现——覆盖 XML 文档中最常见的几个标量类型。
@@ -110,42 +109,58 @@ public let STRING_CODEC: StringCodec = StringCodec()
 
 // ----------------------------------------------------------------------
 // 内部字符串工具（保持 codec 自给自足，不依赖 internal 包）
+//
+// 解析路径上 trim / lower 都按字节扫描——`tryParse` 关心的所有字符
+// （ASCII 空白、`'0'..'9'`、`'A'..'F'`、`a..z`/`A..Z` 等）都是 ASCII 单字节，
+// UTF-8 多字节序列的所有续字节均 ≥ 0x80，按字节扫描结果与按 Rune 扫描完全
+// 一致；零分配快路径避免对"无需修改"输入的额外对象。
 // ----------------------------------------------------------------------
 
+private const WS_BYTE_SP: Byte = 0x20u8
+private const WS_BYTE_HT: Byte = 0x09u8
+private const WS_BYTE_LF: Byte = 0x0Au8
+private const WS_BYTE_CR: Byte = 0x0Du8
+
+private func isAsciiWhitespaceByte(b: Byte): Bool {
+    b == WS_BYTE_SP || b == WS_BYTE_HT || b == WS_BYTE_LF || b == WS_BYTE_CR
+}
+
 func trimAscii(s: String): String {
-    let rr = toRuneList(s)
+    let n = s.size
     var start = 0
-    var end = rr.size
-    while (start < end && isAsciiWhitespace(rr[start])) { start++ }
-    while (end > start && isAsciiWhitespace(rr[end - 1])) { end-- }
-    if (start == 0 && end == rr.size) { return s }
-    let sb = StringBuilder()
-    var i = start
-    while (i < end) {
-        sb.append(rr[i])
-        i++
-    }
-    sb.toString()
+    while (start < n && isAsciiWhitespaceByte(s[start])) { start++ }
+    var end = n
+    while (end > start && isAsciiWhitespaceByte(s[end - 1])) { end-- }
+    if (start == 0 && end == n) { return s }
+    if (start == end) { return String.empty }
+    s[start..end]
 }
 
 func lowerAscii(s: String): String {
+    let n = s.size
+    var i = 0
+    while (i < n) {
+        let b = s[i]
+        if (b >= 0x41u8 && b <= 0x5Au8) { break }
+        i++
+    }
+    if (i == n) { return s }
     let sb = StringBuilder()
-    for (r in s.runes()) {
-        if (r >= r'A' && r <= r'Z') {
-            sb.append(Rune(UInt32(r) + UInt32(r'a') - UInt32(r'A')))
+    if (i > 0) { sb.append(s[0..i]) }
+    while (i < n) {
+        let b = s[i]
+        if (b >= 0x41u8 && b <= 0x5Au8) {
+            sb.append(Rune(UInt32(b) + UInt32(0x20u8)))
         } else {
-            sb.append(r)
+            // 把直到下一个大写字母之间的字节段一次性 append。
+            let runStart = i
+            while (i < n && !(s[i] >= 0x41u8 && s[i] <= 0x5Au8)) {
+                i++
+            }
+            sb.append(s[runStart..i])
+            continue
         }
+        i++
     }
     sb.toString()
-}
-
-func isAsciiWhitespace(r: Rune): Bool {
-    r == r' ' || r == r'\t' || r == r'\n' || r == r'\r'
-}
-
-func toRuneList(s: String): Array<Rune> {
-    let list = ArrayList<Rune>()
-    for (r in s.runes()) { list.add(r) }
-    list.toArray()
 }
