@@ -351,6 +351,7 @@ XML，还包括 JSON / Protobuf / regex / template 等所有字节扫描场景�
 | Iterator 分配 | 已加 `attributeAt(i)` 索引访问绕开；childNodes 走链表直访 | 等 P2-1 |
 | 字节扫描 | 已字节级化，5-way 比较 ASCII 字符 | 等 P3-2（SIMD） |
 | HashMap | 已合并两次 lookup 为一次 | 等 P2-4 |
+| writer 布局决策 | compact 模式已短路为 inline，避免每个非空元素二次扫子链表 | 否 |
 | 输出零拷贝 | 已最小化中间副本，但末端 `toArray()` 无解 | 等 P3-1 |
 
 **结论**：常见的"算法 / 数据结构"维度优化已经做满；继续把 cangjie_xml 推到

@@ -9,7 +9,6 @@ import cangjie_xml.internal.*
 // ====================================================================
 
 public const DEFAULT_XML_DECLARATION_VALUE: String = "xml version=\"1.0\" encoding=\"UTF-8\""
-
 const TAG_OPEN: String = "<"
 const TAG_OPEN_SLASH: String = "</"
 const TAG_CLOSE: String = ">"
@@ -75,15 +74,14 @@ public class XmlWriter {
         }
     }
 
-
     private func writeNodeDispatch(node: XmlNode): Unit {
         match (node.kind()) {
-            case Document(_)    => ()
-            case Element(e)     => writeElementBlock(e)
-            case Text(t)        => writeTextNode(t)
-            case Comment(c)     => writeCommentNode(c)
+            case Document(_) => ()
+            case Element(e) => writeElementBlock(e)
+            case Text(t) => writeTextNode(t)
+            case Comment(c) => writeCommentNode(c)
             case Declaration(d) => writeDeclarationNode(d)
-            case Unknown(u)     => writeUnknownNode(u)
+            case Unknown(u) => writeUnknownNode(u)
         }
     }
 
@@ -120,7 +118,6 @@ public class XmlWriter {
         }
     }
 
-
     private func writeDeclarationNode(d: XmlDeclaration): Unit {
         indentIfNeeded()
         writePiRaw(d.value)
@@ -153,7 +150,6 @@ public class XmlWriter {
         writePiRaw(DEFAULT_XML_DECLARATION_VALUE)
         maybeNewline()
     }
-
 
     /** 块级模式写出元素；排版决策由 `chooseLayout` 给出，主流程分三态处理。 */
     private func writeElementBlock(el: XmlElement): Unit {
@@ -224,15 +220,14 @@ public class XmlWriter {
         sink.write(TAG_CLOSE)
     }
 
-
     private func writeNodeInline(node: XmlNode): Unit {
         match (node.kind()) {
-            case Document(_)    => ()
-            case Element(e)     => writeElementInline(e)
-            case Text(t)        => writeTextNode(t)
-            case Comment(c)     => writeCommentRaw(c.value)
+            case Document(_) => ()
+            case Element(e) => writeElementInline(e)
+            case Text(t) => writeTextNode(t)
+            case Comment(c) => writeCommentRaw(c.value)
             case Declaration(d) => writePiRaw(d.value)
-            case Unknown(u)     => writeUnknownRaw(u.value)
+            case Unknown(u) => writeUnknownRaw(u.value)
         }
     }
 
@@ -253,7 +248,6 @@ public class XmlWriter {
         writeCloseTag(el.name)
     }
 
-
     private func writePiRaw(value: String): Unit {
         sink.write(PI_OPEN)
         sink.write(value)
@@ -269,17 +263,27 @@ public class XmlWriter {
     private func writeUnknownRaw(value: String): Unit {
         // PI 形态（`?...?`）原样，bang markup 包 `<!...>`。
         if (value.startsWith("?")) {
-            sink.write(TAG_OPEN); sink.write(value); sink.write(TAG_CLOSE)
+            sink.write(TAG_OPEN);
+            sink.write(value);
+            sink.write(TAG_CLOSE)
         } else {
-            sink.write(UNKNOWN_OPEN); sink.write(value); sink.write(UNKNOWN_CLOSE)
+            sink.write(UNKNOWN_OPEN);
+            sink.write(value);
+            sink.write(UNKNOWN_CLOSE)
         }
     }
 
-
-    private static func chooseLayout(el: XmlElement): ElementLayout {
+    private func chooseLayout(el: XmlElement): ElementLayout {
         match (el.firstChild) {
             case None => SelfClosing
-            case Some(_) => if (hasTextChild(el)) { Inline } else { Block }
+            case Some(_) =>
+                // 紧凑模式没有缩进/换行语义，非空元素全部按 inline 写出即可
+                // 这样避免为每个元素二次扫描子链表判断是否含文本节点
+                if (opts.compact || hasTextChild(el)) {
+                    Inline
+                } else {
+                    Block
+                }
         }
     }
 

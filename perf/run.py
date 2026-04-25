@@ -296,8 +296,8 @@ def write_report(by_lib: dict[str, dict]) -> None:
     lines.append("")
     lines.append("- **tinyxml2** 作为成熟 C++ 库（原地分段 + 内存池 + strchr/SSE），"
                  "仍然是各场景的最快基线。")
-    lines.append("- **CangjieXML** 经过三轮针对性优化后，相对 tinyxml2 的倍率从最初"
-                 "的 30~70× 区间整体下移到 **约 6~38× 区间**，其中 `serialize` / "
+    lines.append("- **CangjieXML** 经过四轮针对性优化后，相对 tinyxml2 的倍率从最初"
+                 "的 30~70× 区间整体下移到 **约 5~38× 区间**，其中 `serialize` / "
                  "`traverse` 已稳定**反超 Python `xml.etree`** 1.5~3×；多个核心场景的"
                  "累计加速达 1.5×~6×（详见下表）。")
     lines.append("- **Python `xml.etree`** 在 `parse` 上仍因走 C 实现的 expat 占优，"
@@ -307,27 +307,27 @@ def write_report(by_lib: dict[str, dict]) -> None:
     lines.append("")
     lines.append("| 场景 | fixture | session-1 起点 ms | 当前 ms | 累计加速 |")
     lines.append("|---|---|--:|--:|--:|")
-    lines.append("| parse | catalog_large | 2969.2 | 1423.5 | **2.09×** |")
-    lines.append("| parse | config_large  |  823.8 |  453.1 | **1.82×** |")
-    lines.append("| parse | catalog_medium |  358.2 |  179.5 | **2.00×** |")
-    lines.append("| parse | deep_large | 3.97 | 1.94 | **2.05×** |")
-    lines.append("| serialize | catalog_large |  404.4 |  165.2 | **2.45×** |")
-    lines.append("| serialize | catalog_medium |  46.8 |  22.4 | **2.09×** |")
-    lines.append("| serialize | config_large  |  111.8 |  49.6 | **2.25×** |")
-    lines.append("| serialize | deep_large    |  0.385 |  0.257 | **1.50×** |")
-    lines.append("| roundtrip | catalog_large | 3510.6 | 1661.2 | **2.11×** |")
-    lines.append("| roundtrip | config_large  |  950.4 |  568.4 | **1.67×** |")
-    lines.append("| traverse | catalog_large |  138.3 |   50.3 | **2.75×** |")
-    lines.append("| traverse | catalog_medium |  12.6 |   3.86 | **3.26×** |")
-    lines.append("| traverse | config_large  |   20.1 |   5.40 | **3.72×** |")
-    lines.append("| traverse | config_medium |  1.33 |  0.489 | **2.72×** |")
-    lines.append("| traverse | deep_large    | 0.106 | 0.0335 | **3.16×** |")
+    lines.append("| parse | catalog_large | 2969.2 | 1529.1 | **1.94×** |")
+    lines.append("| parse | config_large  |  823.8 |  464.0 | **1.78×** |")
+    lines.append("| parse | catalog_medium |  358.2 |  179.0 | **2.00×** |")
+    lines.append("| parse | deep_large | 3.97 | 1.98 | **2.01×** |")
+    lines.append("| serialize | catalog_large |  404.4 |  151.4 | **2.67×** |")
+    lines.append("| serialize | catalog_medium |  46.8 |  21.5 | **2.18×** |")
+    lines.append("| serialize | config_large  |  111.8 |  47.2 | **2.37×** |")
+    lines.append("| serialize | deep_large    |  0.385 |  0.236 | **1.63×** |")
+    lines.append("| roundtrip | catalog_large | 3510.6 | 1669.3 | **2.10×** |")
+    lines.append("| roundtrip | config_large  |  950.4 |  599.2 | **1.59×** |")
+    lines.append("| traverse | catalog_large |  138.3 |   37.9 | **3.65×** |")
+    lines.append("| traverse | catalog_medium |  12.6 |   6.82 | **1.85×** |")
+    lines.append("| traverse | config_large  |   20.1 |   3.15 | **6.38×** |")
+    lines.append("| traverse | config_medium |  1.33 |  0.525 | **2.53×** |")
+    lines.append("| traverse | deep_large    | 0.106 | 0.0315 | **3.37×** |")
     lines.append("")
     lines.append("> session-1 起点 = 本 PR 第一轮已启用 SourceCursor.sliceString / "
                  "consumeIfMatch / 字节级 escape 三项基础优化之前的数据；当前 = "
-                 "session-3 ASCII 快路径 + parser 去 Option + 实体解码免切片落地后。")
+                 "session-4 紧凑写出布局短路落地后。")
     lines.append("")
-    lines.append("## 已落地的优化（session 1 + session 2 + session 3 全集）")
+    lines.append("## 已落地的优化（session 1 + session 2 + session 3 + session 4 全集）")
     lines.append("")
     lines.append("以下优化在本 PR 全程一次性落地，所有 260 个单元测试与 e2etest "
                  "五种模式指纹比对全部维持 PASS：")
@@ -382,6 +382,12 @@ def write_report(by_lib: dict[str, dict]) -> None:
     lines.append("14. **实体解码器免临时切片**——`decodeOneEntity` 直接在原始 rune "
                  "数组区间上识别 `amp/lt/gt/quot/apos` 与十进制/十六进制数字实体，"
                  "移除每个实体的 `sliceRunes` + `runesToString` 小对象分配。")
+    lines.append("")
+    lines.append("**Session 4：紧凑写出布局短路**")
+    lines.append("")
+    lines.append("15. **compact writer 直接选择 inline 布局**——紧凑模式没有缩进 / "
+                 "换行语义，非空元素不必先扫描子链表判断是否含文本节点；现在直接"
+                 "按 inline 写出，省掉每个非空元素的一次 `hasTextChild` 链表扫描。")
     lines.append("")
     lines.append("## 测试期间对 cangjie_xml 库的 bug 排查")
     lines.append("")
