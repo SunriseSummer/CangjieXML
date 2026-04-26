@@ -1,8 +1,8 @@
 package xlsx_to_csv
 
 import std.collection.*
-import cangjie_xml.dom.*
-import cangjie_xml.io.*
+import tinyxml2.dom.*
+import tinyxml2.io.*
 
 /**
  * `sheetN.xml` 的内存模型：二维 grid，按**原表格布局**保留行号 / 列号。

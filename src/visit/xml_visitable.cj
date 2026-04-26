@@ -1,11 +1,11 @@
-package cangjie_xml.visit
+package tinyxml2.visit
 
-import cangjie_xml.dom.*
+import tinyxml2.dom.*
 
 /**
  * `accept` / `walk` 作为 `XmlNode` 方法的接口契约。
  *
- * `import cangjie_xml.visit.*` 后即可写：
+ * `import tinyxml2.visit.*` 后即可写：
  *
  * ```cangjie
  * doc.accept(MyVisitor())

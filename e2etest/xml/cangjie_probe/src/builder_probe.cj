@@ -1,10 +1,10 @@
 package cangjie_probe
 
 import std.collection.*
-import cangjie_xml.dom.*
-import cangjie_xml.build.*
-import cangjie_xml.parser.*
-import cangjie_xml.writer.*
+import tinyxml2.dom.*
+import tinyxml2.build.*
+import tinyxml2.parser.*
+import tinyxml2.writer.*
 
 /**
  * Builder 端到端测试：在仓颉侧用 `XmlDocumentBuilder` **构造**一棵与

@@ -1,4 +1,4 @@
-package cangjie_xml.dom
+package tinyxml2.dom
 
 /**
  * XML 注释节点：`<!-- value -->`。

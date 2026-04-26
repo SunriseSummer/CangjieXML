@@ -1,7 +1,7 @@
-package cangjie_xml.parser
+package tinyxml2.parser
 
-import cangjie_xml.dom.*
-import cangjie_xml.error.*
+import tinyxml2.dom.*
+import tinyxml2.error.*
 
 // 结构性字面量常量，集中避免散落到多个函数。
 // 注意：以下 String 形式仅用于错误消息 / 静态结构；热路径上的前缀匹配使用

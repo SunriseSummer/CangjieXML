@@ -1,20 +1,20 @@
-package cangjie_xml.io
+package tinyxml2.io
 
 import std.fs.*
 import std.unittest.*
 import std.unittest.testmacro.*
-import cangjie_xml.dom.*
-import cangjie_xml.error.*
-import cangjie_xml.parser.*
-import cangjie_xml.writer.*
-import cangjie_xml.build.*
-import cangjie_xml.query.*
+import tinyxml2.dom.*
+import tinyxml2.error.*
+import tinyxml2.parser.*
+import tinyxml2.writer.*
+import tinyxml2.build.*
+import tinyxml2.query.*
 
 // ======================================================================
 // 测试夹具
 // ======================================================================
 
-const TMP_ROOT: String = "/tmp/cangjie_xml_io_tests"
+const TMP_ROOT: String = "/tmp/tinyxml2_io_tests"
 
 class TempFile {
     public let path: String
@@ -313,7 +313,7 @@ func testSaveXmlToFileAtomicOnSerializationFailureAvoidsPartialFile(): Unit {
     // `saveXmlToFile` 通过"先序列化到内存字节，再一次性写盘"的设计天然
     // 规避了"部分写入"。此测试钉死这条设计：对一份合法 doc，若目标路径
     // 所在目录不存在，我们应当抛 `XmlIoException`，并且不会创建任何副作用。
-    let bogusDir = "/nonexistent_cangjie_xml_dir_e7a3c/out.xml"
+    let bogusDir = "/nonexistent_tinyxml2_dir_e7a3c/out.xml"
     let doc = XmlDocument()
     doc.appendChild(doc.createElement("r"))
     var threw = false
@@ -402,7 +402,7 @@ func testFileXmlSinkConstructorFailureOnBadPath(): Unit {
     // 目标目录不存在 → 构造期捕获 FSException 映射为 XmlIoException
     var threw = false
     try {
-        FileXmlSink("/nonexistent_cangjie_xml_dir_9beef/out.xml")
+        FileXmlSink("/nonexistent_tinyxml2_dir_9beef/out.xml")
     } catch (e: XmlIoException) {
         if (let FileWriteFailed(_, _) <- e.error) { threw = true }
     }

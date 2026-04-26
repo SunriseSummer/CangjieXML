@@ -1,4 +1,4 @@
-package cangjie_xml.internal
+package tinyxml2.internal
 
 /**
  * XML 文本转义工具。属于 internal——XML 语法层细节，不对外公开。

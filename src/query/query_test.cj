@@ -1,9 +1,9 @@
-package cangjie_xml.query
+package tinyxml2.query
 
 import std.unittest.*
 import std.unittest.testmacro.*
-import cangjie_xml.dom.*
-import cangjie_xml.error.*
+import tinyxml2.dom.*
+import tinyxml2.error.*
 
 // ====================================================================
 // 内置 codec

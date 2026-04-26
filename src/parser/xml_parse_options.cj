@@ -1,4 +1,4 @@
-package cangjie_xml.parser
+package tinyxml2.parser
 
 /**
  * XML 空白处理策略。

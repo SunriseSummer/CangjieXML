@@ -1,6 +1,6 @@
-package cangjie_xml.visit
+package tinyxml2.visit
 
-import cangjie_xml.dom.*
+import tinyxml2.dom.*
 
 /**
  * 经典 OO 访问者接口。

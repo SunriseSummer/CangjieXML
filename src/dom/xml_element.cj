@@ -1,7 +1,7 @@
-package cangjie_xml.dom
+package tinyxml2.dom
 
 import std.collection.*
-import cangjie_xml.error.*
+import tinyxml2.error.*
 
 /**
  * XML 元素节点：`<name attr="...">...</name>`。

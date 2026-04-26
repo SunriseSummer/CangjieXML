@@ -1,4 +1,4 @@
-package cangjie_xml.error
+package tinyxml2.error
 
 /**
  * 解析期异常——携带一个 `XmlError`，便于调用方按枚举分支处理。

@@ -1,4 +1,4 @@
-package cangjie_xml.query
+package tinyxml2.query
 
 /**
  * 双向编解码协议：把任意 `T` ←→ `String` 的映射抽出来，让 Query 与 Build

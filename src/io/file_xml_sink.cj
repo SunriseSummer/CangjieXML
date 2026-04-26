@@ -1,9 +1,9 @@
-package cangjie_xml.io
+package tinyxml2.io
 
 import std.fs.*
 import std.io.*
-import cangjie_xml.error.*
-import cangjie_xml.writer.*
+import tinyxml2.error.*
+import tinyxml2.writer.*
 
 /**
  * 基于 `File` 的流式 `XmlSink`——把每次 `write(text)` 直接以 UTF-8 写入文件

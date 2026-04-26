@@ -1,7 +1,7 @@
-package cangjie_xml.writer
+package tinyxml2.writer
 
-import cangjie_xml.dom.*
-import cangjie_xml.internal.*
+import tinyxml2.dom.*
+import tinyxml2.internal.*
 
 /**
  * XML 写出器：把 DOM 子树序列化为 XML 文本并写入指定 `XmlSink`。

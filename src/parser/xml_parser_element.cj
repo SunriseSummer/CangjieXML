@@ -1,7 +1,7 @@
-package cangjie_xml.parser
+package tinyxml2.parser
 
-import cangjie_xml.dom.*
-import cangjie_xml.error.*
+import tinyxml2.dom.*
+import tinyxml2.error.*
 
 /**
  * `XmlParser` 的元素级解析：元素、属性、子节点扫描、文本、闭合标签。

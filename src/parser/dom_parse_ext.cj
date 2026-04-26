@@ -1,6 +1,6 @@
-package cangjie_xml.parser
+package tinyxml2.parser
 
-import cangjie_xml.dom.*
+import tinyxml2.dom.*
 
 /**
  * 顶层解析函数——与 `XmlDocument.parseString` 等价，专供跨包调用使用。

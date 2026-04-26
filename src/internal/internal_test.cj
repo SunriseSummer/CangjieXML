@@ -1,4 +1,4 @@
-package cangjie_xml.internal
+package tinyxml2.internal
 
 import std.unittest.*
 import std.unittest.testmacro.*

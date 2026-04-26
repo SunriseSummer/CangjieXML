@@ -1,10 +1,10 @@
-package cangjie_xml.parser
+package tinyxml2.parser
 
 import std.unittest.*
 import std.unittest.testmacro.*
-import cangjie_xml.dom.*
-import cangjie_xml.error.*
-import cangjie_xml.writer.*
+import tinyxml2.dom.*
+import tinyxml2.error.*
+import tinyxml2.writer.*
 
 // ====================================================================
 // Parser：顺路径行为测试。

@@ -1,4 +1,4 @@
-package cangjie_xml.dom
+package tinyxml2.dom
 
 /**
  * `XmlElement` 子节点 API：插入、删除、遍历、导航。

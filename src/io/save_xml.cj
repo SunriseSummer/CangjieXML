@@ -1,9 +1,9 @@
-package cangjie_xml.io
+package tinyxml2.io
 
 import std.fs.*
-import cangjie_xml.dom.*
-import cangjie_xml.error.*
-import cangjie_xml.writer.*
+import tinyxml2.dom.*
+import tinyxml2.error.*
+import tinyxml2.writer.*
 
 /**
  * 把 `XmlDocument` 序列化后写入目标文件。

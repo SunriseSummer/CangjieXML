@@ -11,7 +11,7 @@
 ### 手工
 
 ```cangjie
-import cangjie_xml.dom.*
+import tinyxml2.dom.*
 
 let doc = XmlDocument()
 doc.appendChild(doc.createDeclaration())
@@ -28,8 +28,8 @@ root.appendChild(book)
 ### Builder
 
 ```cangjie
-import cangjie_xml.dom.*
-import cangjie_xml.build.*
+import tinyxml2.dom.*
+import tinyxml2.build.*
 
 let doc = XmlDocumentBuilder()
     .declaration()
@@ -48,9 +48,9 @@ let doc = XmlDocumentBuilder()
 ## 2. Round-trip：解析 → 序列化 → 再解析
 
 ```cangjie
-import cangjie_xml.dom.*
-import cangjie_xml.parser.*
-import cangjie_xml.writer.*
+import tinyxml2.dom.*
+import tinyxml2.parser.*
+import tinyxml2.writer.*
 
 let src = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
           "<catalog><book id=\"1\">SICP</book></catalog>"
@@ -71,8 +71,8 @@ d2.rootElement.getOrThrow().requiredChildElement("book").textContent()   // "SIC
 ## 3. 空白折叠：从 pretty-printed 中提取语义值
 
 ```cangjie
-import cangjie_xml.dom.*
-import cangjie_xml.parser.*
+import tinyxml2.dom.*
+import tinyxml2.parser.*
 
 // 典型的被人工美化过的 XML
 let src = "<r>  a\n  b  </r>"
@@ -91,9 +91,9 @@ d2.rootElement.getOrThrow().textContent()    // "a b"
 ## 4. 类型化查询：一次拿到强类型业务值
 
 ```cangjie
-import cangjie_xml.dom.*
-import cangjie_xml.parser.*
-import cangjie_xml.query.*
+import tinyxml2.dom.*
+import tinyxml2.parser.*
+import tinyxml2.query.*
 
 let src = "<book id=\"42\" price=\"19.99\" avail=\"true\">SICP</book>"
 let book = parseXml(src).rootElement.getOrThrow()
@@ -113,9 +113,9 @@ book.attributeOr<Int64>("stock", INT64_CODEC, 0)     // 0
 ### walk 风格
 
 ```cangjie
-import cangjie_xml.dom.*
-import cangjie_xml.build.*
-import cangjie_xml.visit.*
+import tinyxml2.dom.*
+import tinyxml2.build.*
+import tinyxml2.visit.*
 import std.collection.*
 
 let doc = XmlDocumentBuilder()
@@ -140,8 +140,8 @@ walk(doc) { kind =>
 ### Visitor 风格
 
 ```cangjie
-import cangjie_xml.dom.*
-import cangjie_xml.visit.*
+import tinyxml2.dom.*
+import tinyxml2.visit.*
 import std.collection.*
 
 class BookCollector <: XmlVisitor {
@@ -165,9 +165,9 @@ doc.accept(c)
 ## 6. 文件 IO + 健壮错误处理
 
 ```cangjie
-import cangjie_xml.dom.*
-import cangjie_xml.io.*
-import cangjie_xml.error.*
+import tinyxml2.dom.*
+import tinyxml2.io.*
+import tinyxml2.error.*
 
 let path = "/tmp/catalog.xml"
 saveXmlToFile(doc, path)     // 先序列化到内存再一次写盘——失败不留半成品
@@ -191,9 +191,9 @@ let loaded = try {
 ## 7. 大文档：流式写盘
 
 ```cangjie
-import cangjie_xml.dom.*
-import cangjie_xml.writer.*
-import cangjie_xml.io.*
+import tinyxml2.dom.*
+import tinyxml2.writer.*
+import tinyxml2.io.*
 
 try (sink = FileXmlSink("/tmp/big.xml")) {
     let w = XmlWriter(sink)
@@ -209,7 +209,7 @@ try (sink = FileXmlSink("/tmp/big.xml")) {
 ## 8. 自定义 Sink：写到任意目的地
 
 ```cangjie
-import cangjie_xml.writer.*
+import tinyxml2.writer.*
 
 // 仅用作示范：把 XML 写到一个 StringBuilder，然后计算长度
 class CountingSink <: XmlSink {
@@ -229,8 +229,8 @@ w.writeDocument(doc)
 ## 9. CDATA：保留原文的文本
 
 ```cangjie
-import cangjie_xml.dom.*
-import cangjie_xml.writer.*
+import tinyxml2.dom.*
+import tinyxml2.writer.*
 
 let doc = XmlDocument()
 let r = doc.createElement("code")
@@ -249,7 +249,7 @@ doc.writeToString(XmlWriteOptions(writeDeclaration: false))
 > 的自动化断言范围内。生产实现需要谨慎处理 radix / 溢出 / 大小写等边界。
 
 ```cangjie
-import cangjie_xml.query.*
+import tinyxml2.query.*
 
 // 伪代码：用户按自己的格式化约定补齐 tryParse / format 两个方法即可。
 public class HexInt64Codec <: XmlValueCodec<Int64> {
@@ -267,7 +267,7 @@ public class HexInt64Codec <: XmlValueCodec<Int64> {
 ## 11. 版本探测
 
 ```cangjie
-import cangjie_xml.*
+import tinyxml2.*
 
 println(CANGJIE_XML_VERSION)    // "0.1.0"
 println(cangjieXmlVersion())    // "0.1.0"

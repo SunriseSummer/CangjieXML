@@ -1,4 +1,4 @@
-package cangjie_xml
+package tinyxml2
 
 /**
  * CangjieXML 库版本号。

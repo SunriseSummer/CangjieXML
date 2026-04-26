@@ -3,10 +3,10 @@ package cangjie_probe
 import std.collection.*
 import std.fs.*
 import std.sort.*
-import cangjie_xml.dom.*
-import cangjie_xml.io.*
-import cangjie_xml.parser.*
-import cangjie_xml.writer.*
+import tinyxml2.dom.*
+import tinyxml2.io.*
+import tinyxml2.parser.*
+import tinyxml2.writer.*
 
 /** Probe 的五种运行模式——影响 `loadForFingerprint` 走哪条库路径。 */
 enum ProbeMode {

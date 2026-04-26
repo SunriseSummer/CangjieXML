@@ -1,4 +1,4 @@
-package cangjie_xml.dom
+package tinyxml2.dom
 
 /**
  * XML 声明节点：`<?xml version="1.0" encoding="UTF-8"?>`。

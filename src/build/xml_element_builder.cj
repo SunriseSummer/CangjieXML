@@ -1,7 +1,7 @@
-package cangjie_xml.build
+package tinyxml2.build
 
-import cangjie_xml.dom.*
-import cangjie_xml.query.*
+import tinyxml2.dom.*
+import tinyxml2.query.*
 
 /**
  * 元素构建器。**不是** 并行的 DOM——`build()` 的产物仍是普通 `XmlElement`。
