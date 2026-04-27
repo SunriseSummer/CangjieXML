@@ -119,9 +119,9 @@ public let STRING_CODEC:  StringCodec
 
 ### 自定义 codec
 
-> **示意草图**：本片段演示如何扩展 `XmlValueCodec<T>`，**不**进入
-> `doc_examples_test.cj` 的自动化断言范围。生产实现需根据自身格式约定
-> 完整处理 radix / 大小写 / 溢出 / 前后空白等边界。
+下面是扩展 `XmlValueCodec<T>` 的示意草图，并未进入 `doc_examples_test.cj`
+的自动化断言范围；生产实现需根据自身格式约定完整处理 radix / 大小写 / 溢出 /
+前后空白等边界。
 
 ```cangjie
 public class HexInt64Codec <: XmlValueCodec<Int64> {
