@@ -45,9 +45,9 @@ cjpm build
 cjpm test
 ```
 
-## 快速上手
+## 使用示例
 
-### 构造 DOM 并序列化
+### 手工构造 DOM 并序列化
 
 ```cangjie
 import fastxml.dom.*
@@ -55,7 +55,7 @@ import fastxml.writer.*
 
 main() {
     let doc = XmlDocument()
-    doc.appendChild(doc.createDeclaration())
+    doc.appendChild(doc.createDeclaration())          // <?xml version="1.0" encoding="UTF-8"?>
 
     let root = doc.createElement("catalog")
     doc.appendChild(root)
@@ -65,14 +65,17 @@ main() {
     book.setTextContent("SICP")
     root.appendChild(book)
 
+    // 美化输出（默认）
     println(doc.writeToString())
     // <?xml version="1.0" encoding="UTF-8"?>
     // <catalog>
     //     <book id="1">SICP</book>
     // </catalog>
 
+    // 紧凑输出
     println(doc.writeToString(XmlWriteOptions.compactPreset()))
     // <?xml version="1.0" encoding="UTF-8"?><catalog><book id="1">SICP</book></catalog>
+
     0
 }
 ```
@@ -86,15 +89,17 @@ import fastxml.error.*
 
 main() {
     try {
-        let doc = parseXml("<catalog><book id=\"1\">SICP</book></catalog>")
-        let book = doc.rootElement.getOrThrow()
-                       .firstChildElement(name: Some("book")).getOrThrow()
-        println(book.textContent())   // SICP
+        let doc = parseXml(
+            "<catalog><book id=\"1\">SICP</book></catalog>")
+        println(doc.rootElement.getOrThrow().firstChildElement(name: Some("book"))
+                   .getOrThrow().textContent())
+        // SICP
 
         // Collapse 模式：折叠空白并删除纯空白文本节点
         let opts = XmlParseOptions(whitespace: Collapse)
         let doc2 = parseXml("<r>  a\n  b  </r>", opts)
-        println(doc2.rootElement.getOrThrow().textContent())   // "a b"
+        println(doc2.rootElement.getOrThrow().textContent())
+        // "a b"
     } catch (e: XmlParseException) {
         println("parse error: ${e.error}")
     }
@@ -102,7 +107,7 @@ main() {
 }
 ```
 
-### Builder DSL 与类型化查询
+### Builder DSL + 类型化查询
 
 ```cangjie
 import fastxml.dom.*
@@ -110,6 +115,7 @@ import fastxml.build.*
 import fastxml.query.*
 
 main() {
+    // 用 Builder 构造
     let doc = XmlDocumentBuilder()
         .declaration()
         .root("catalog") { r =>
@@ -121,15 +127,56 @@ main() {
         }
         .build()
 
-    let book = doc.rootElement.getOrThrow().requiredChildElement("book")
-    println(book.intAttribute("id"))      // Some(1)
-    println(book.boolAttribute("avail"))  // Some(true)
-    println(book.textContent())           // "SICP"
+    let root = doc.rootElement.getOrThrow()
+    let book = root.requiredChildElement("book")
+    println(book.intAttribute("id"))       // Some(1)
+    println(book.boolAttribute("avail"))   // Some(true)
+    println(book.textContent())            // "SICP"
+
+    // 缺失 / 解析失败时的统一处理
+    println(book.attributeOr<Int64>("missing", INT64_CODEC, 0))  // 0
     0
 }
 ```
 
-### 文件 IO
+### 遍历：函数式 walk 与经典 Visitor
+
+```cangjie
+import fastxml.dom.*
+import fastxml.visit.*
+
+main() {
+    let doc = /* ... */
+
+    // 函数式 walk：统计所有 <book> 元素数量
+    class Acc { public var n: Int64 = 0 }
+    let count = Acc()
+    walk(doc) { kind =>
+        match (kind) {
+            case Element(e) where e.name == "book" =>
+                count.n++
+                SkipChildren           // 不再进入 book 的子树
+            case _ => Continue
+        }
+    }
+    println(count.n)
+
+    // 经典 Visitor：对称的 enter / exit
+    class NamePrinter <: XmlVisitor {
+        public func visitEnter(element: XmlElement): Bool {
+            println("<${element.name}>")
+            true
+        }
+    }
+    doc.accept(NamePrinter())
+    0
+}
+```
+
+> **注意**：`walk` / `accept` 的回调是 lambda；cjc 1.0.5 禁止 lambda 捕获可变
+> `var`，聚合计数时请把状态封装进 `class`（如示例中的 `Acc`）。
+
+### 文件 / 字节 IO
 
 ```cangjie
 import fastxml.dom.*
@@ -139,8 +186,10 @@ import fastxml.error.*
 main() {
     let doc = /* ... build or parse ... */
 
+    // 一次性落盘：先序列化到内存再写文件，语义像事务（失败不留半成品）
     saveXmlToFile(doc, "/tmp/out.xml")
 
+    // 读回
     let back = try {
         loadXmlFromFile("/tmp/out.xml")
     } catch (e: XmlIoException) {
@@ -151,13 +200,21 @@ main() {
         }
     }
 
+    // 字节形态：HTTP body、JDBC BLOB …
     let bytes = writeXmlToBytes(doc)
     let fromBytes = parseXmlBytes(bytes)
+
+    // 大文档流式落盘：避免先把整个文档放进 StringBuilder
+    try (sink = FileXmlSink("/tmp/big.xml")) {
+        let w = XmlWriter(sink)
+        w.writeDocument(doc)
+    }
     0
 }
 ```
 
-更多示例（遍历、CDATA、流式 Sink、自定义 codec）见 [`doc/11-examples.md`](./doc/11-examples.md)。
+> **错误分层**：`XmlIoException` 只负责 IO 边界（文件不存在 / 磁盘错误 /
+> 非法 UTF-8）；落盘之后的语法错误原样以 `XmlParseException` 抛出，两者不互相嵌套。
 
 ## 模块结构
 

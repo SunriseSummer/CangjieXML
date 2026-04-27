@@ -14,6 +14,7 @@ from pathlib import Path
 PERF_DIR     = Path(__file__).resolve().parent
 FIXTURES_DIR = PERF_DIR / "fixtures"
 OUT_DIR      = PERF_DIR / "out"
+CHARTS_DIR   = PERF_DIR / "charts"
 REPORT_PATH  = PERF_DIR / "report.md"
 
 FIXTURE_ORDER = [
@@ -262,7 +263,11 @@ def render_report(by_lib: dict, iters: dict[str, int]) -> str:
         lines.append("")
         lines.append("> 倍率列以 `tinyxml2` 为 1×；数值越小越快。")
         lines.append("")
-        lines.append(build_svg_chart(scenario, indexed))
+        svg_path = CHARTS_DIR / f"{scenario}.svg"
+        svg_path.write_text(build_svg_chart(scenario, indexed), encoding="utf-8")
+        # 用相对路径引用，便于 GitHub / 本地预览均能正常渲染。
+        rel = svg_path.relative_to(PERF_DIR).as_posix()
+        lines.append(f"![{scenario} 场景对比直方图]({rel})")
         lines.append("")
 
     lines.append("---")
@@ -273,8 +278,10 @@ def render_report(by_lib: dict, iters: dict[str, int]) -> str:
 
 def main() -> int:
     by_lib, iters = load_inputs()
+    CHARTS_DIR.mkdir(parents=True, exist_ok=True)
     REPORT_PATH.write_text(render_report(by_lib, iters), encoding="utf-8")
     print(f"[report] 已写入 {REPORT_PATH}")
+    print(f"[report] SVG 图表写入 {CHARTS_DIR}")
     return 0
 
 
