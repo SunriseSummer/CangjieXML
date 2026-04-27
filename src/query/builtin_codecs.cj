@@ -1,4 +1,4 @@
-package cangjie_xml.query
+package tinyxml2.query
 
 import std.convert.*
 import std.collection.*

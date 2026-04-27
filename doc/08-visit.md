@@ -1,6 +1,6 @@
 # 08 — Visit
 
-包：`cangjie_xml.visit`
+包：`tinyxml2.visit`
 
 提供两种遍历范式，按风格任选：
 

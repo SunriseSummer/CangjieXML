@@ -1,4 +1,4 @@
-package cangjie_xml.writer
+package tinyxml2.writer
 
 /*
  * Writer 的语法片段常量与排版三态枚举。

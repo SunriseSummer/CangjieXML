@@ -1,4 +1,4 @@
-package cangjie_xml.dom
+package tinyxml2.dom
 
 /**
  * XML 节点种类。

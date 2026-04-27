@@ -1,4 +1,4 @@
-package cangjie_xml.dom
+package tinyxml2.dom
 
 /** 属性数量超过该阈值后，`XmlElement` 才会构建 `HashMap` 名称索引。 */
 const ATTR_INDEX_THRESHOLD: Int64 = 8

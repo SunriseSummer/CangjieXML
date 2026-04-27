@@ -1,7 +1,7 @@
-package cangjie_xml.parser
+package tinyxml2.parser
 
 import std.collection.*
-import cangjie_xml.error.*
+import tinyxml2.error.*
 
 // Parser 中常用的单字符 Rune 常量，集中声明便于复用。
 const CH_LT: Rune = r'<'

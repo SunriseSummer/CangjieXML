@@ -1,6 +1,6 @@
 # 03 — DOM
 
-包：`cangjie_xml.dom`
+包：`tinyxml2.dom`
 
 DOM 内核是 CangjieXML 的基石。所有其他子包——Parser、Writer、Query、Builder、
 Visit、IO——都围绕这份节点模型构建。
@@ -313,7 +313,7 @@ public const DEFAULT_DECLARATION_VALUE: String = "xml version=\"1.0\" encoding=\
 
 ## 错误类型
 
-DOM 手工构造时的非法操作会抛 `XmlException`（来自 `cangjie_xml.error`）。
+DOM 手工构造时的非法操作会抛 `XmlException`（来自 `tinyxml2.error`）。
 `XmlException` 是"**程序员错误**"——用户应修正代码，通常不需要 `catch`。
 
 详见 [10 — 错误模型](./10-errors.md)。

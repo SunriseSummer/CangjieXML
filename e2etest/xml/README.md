@@ -16,7 +16,7 @@ e2etest/
 ├── python_probe/
 │   └── probe.py             # Python 侧指纹 extractor
 ├── cangjie_probe/
-│   ├── cjpm.toml            # 依赖 cangjie_xml（path 依赖）
+│   ├── cjpm.toml            # 依赖 tinyxml2（path 依赖）
 │   └── src/
 │       ├── main.cj          # main：驱动扫描
 │       └── fingerprint.cj   # 指纹提取 + 手写 JSON 序列化
@@ -68,7 +68,7 @@ python3 e2etest/xml/run.py
 
 - **`path` 按"同名兄弟序号"生成**——稳定、两端都算得出、肉眼能读。
 - **`attrs` 字典序固定**——XML 属性在 DOM 里是有顺序的，但 XML 语义要求
-  "顺序不敏感"；做 e2e 时排序后比，避免 `ET` 与 `cangjie_xml` 在"保持源码顺序"
+  "顺序不敏感"；做 e2e 时排序后比，避免 `ET` 与 `tinyxml2` 在"保持源码顺序"
   上的细节抖动污染信号。
 - **`text` 只取"直接文本"**——即该元素自己名下的文本片段（Python 里是
   `el.text + 各孩子 .tail`；仓颉里是直接 `XmlText` 子节点的 value），
@@ -76,7 +76,7 @@ python3 e2etest/xml/run.py
   混合内容（`<p>Hello <b>bold</b> world.</p>`），又不会被"pretty-print 插入
   的换行 / 缩进"扰动。
 - **CDATA 归一为普通文本**——Python `xml.etree` 本来就只报告文本；
-  `cangjie_xml` 的 `XmlText` 无论 `isCdata` 都暴露同一个 `.value`。因此
+  `tinyxml2` 的 `XmlText` 无论 `isCdata` 都暴露同一个 `.value`。因此
   CDATA 区段的内容会以"原文"被对比上。
 
 ## 覆盖的 fixture
@@ -106,7 +106,7 @@ python3 e2etest/xml/run.py
 一次性重建。规则：**能不走 `Rune` 就不要走**——`Rune` 是按码点处理的，
 任何按字节扫描逻辑都不应反向重建 `Rune`。
 
-这个坑发生在 probe 自己，不是 `cangjie_xml` 主库 —— 但它恰好示范了
+这个坑发生在 probe 自己，不是 `tinyxml2` 主库 —— 但它恰好示范了
 "写 Unicode 相关代码时必须区分 byte 与 codepoint"的通用教训。
 主库自身通过 10/10 指纹一致证明了编码正确。
 
@@ -117,6 +117,6 @@ python3 e2etest/xml/run.py
 - `[FAIL] <file> total_elements`：两侧元素数不同——解析本身漏 / 多吃
   了节点；先肉眼看 `out/cangjie.json` 的 `elements` 是否截断。
 - `[FAIL] <file> elements[...].text` 带"乱码"：大概率是**编码**而不是
-  解析——先核对 probe 的字节/码点处理，再怀疑 `cangjie_xml`。
+  解析——先核对 probe 的字节/码点处理，再怀疑 `tinyxml2`。
 - `[FAIL] <file> elements[...].attrs`：属性值解码（含实体）偏差——
   查 `parser/entity_decoder.cj`。

@@ -1,4 +1,4 @@
-package cangjie_xml.error
+package tinyxml2.error
 
 /**
  * 表示源文本中的一个位置坐标。

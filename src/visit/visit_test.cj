@@ -1,10 +1,10 @@
-package cangjie_xml.visit
+package tinyxml2.visit
 
 import std.collection.*
 import std.unittest.*
 import std.unittest.testmacro.*
-import cangjie_xml.dom.*
-import cangjie_xml.build.*
+import tinyxml2.dom.*
+import tinyxml2.build.*
 
 // ======================================================================
 // 共享测试夹具

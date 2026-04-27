@@ -1,12 +1,12 @@
-package cangjie_xml.query
+package tinyxml2.query
 
-import cangjie_xml.dom.*
+import tinyxml2.dom.*
 
 /**
  * Query 扩展的接口契约。
  *
  * `query` 包通过 `extend XmlElement <: XmlQueryable` 植入下列方法；接口声明
- * 保证了"`import cangjie_xml.query.*` 后直接在 `XmlElement` 上调用"的跨包
+ * 保证了"`import tinyxml2.query.*` 后直接在 `XmlElement` 上调用"的跨包
  * 可见性。用户无需显式引用 `XmlQueryable`。
  */
 public interface XmlQueryable {

@@ -1,6 +1,6 @@
 # 04 — Parser
 
-包：`cangjie_xml.parser`
+包：`tinyxml2.parser`
 
 递归下降解析器。输入为仓颉 `String`，输出为 `XmlDocument`。所有结构性错误都
 通过 `XmlParseException`（携带 `XmlError` 与 `SourcePos`）抛出。
@@ -110,9 +110,9 @@ public const DEFAULT_MAX_ELEMENT_DEPTH: Int64 = 500
 ### 典型处理模式
 
 ```cangjie
-import cangjie_xml.dom.*
-import cangjie_xml.parser.*
-import cangjie_xml.error.*
+import tinyxml2.dom.*
+import tinyxml2.parser.*
+import tinyxml2.error.*
 
 try {
     let doc = parseXml("<r>  a\n  b  </r>",

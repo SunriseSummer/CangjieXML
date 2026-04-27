@@ -23,34 +23,34 @@
 | ------------------------------------------- | ------------------------- | ------------------------------------ |
 | [01 — 总览](./01-overview.md)                | —                         | 架构、包依赖、设计哲学               |
 | [02 — 快速上手](./02-getting-started.md)     | —                         | 环境、构建、第一个程序               |
-| [03 — DOM](./03-dom.md)                      | `cangjie_xml.dom`         | 节点模型、文档 / 元素 / 属性         |
-| [04 — Parser](./04-parser.md)                | `cangjie_xml.parser`      | 解析入口、选项、错误                 |
-| [05 — Writer](./05-writer.md)                | `cangjie_xml.writer`      | 序列化、`XmlWriteOptions`、`XmlSink` |
-| [06 — Query](./06-query.md)                  | `cangjie_xml.query`       | 类型化属性 / 子元素查询，codec       |
-| [07 — Builder](./07-builder.md)              | `cangjie_xml.build`       | `XmlDocumentBuilder` DSL             |
-| [08 — Visit](./08-visit.md)                  | `cangjie_xml.visit`       | `walk` 与 `XmlVisitor`               |
-| [09 — IO](./09-io.md)                        | `cangjie_xml.io`          | 文件 / 字节读写、流式 Sink           |
-| [10 — 错误模型](./10-errors.md)              | `cangjie_xml.error` 等    | 异常体系与错误分层                   |
+| [03 — DOM](./03-dom.md)                      | `tinyxml2.dom`         | 节点模型、文档 / 元素 / 属性         |
+| [04 — Parser](./04-parser.md)                | `tinyxml2.parser`      | 解析入口、选项、错误                 |
+| [05 — Writer](./05-writer.md)                | `tinyxml2.writer`      | 序列化、`XmlWriteOptions`、`XmlSink` |
+| [06 — Query](./06-query.md)                  | `tinyxml2.query`       | 类型化属性 / 子元素查询，codec       |
+| [07 — Builder](./07-builder.md)              | `tinyxml2.build`       | `XmlDocumentBuilder` DSL             |
+| [08 — Visit](./08-visit.md)                  | `tinyxml2.visit`       | `walk` 与 `XmlVisitor`               |
+| [09 — IO](./09-io.md)                        | `tinyxml2.io`          | 文件 / 字节读写、流式 Sink           |
+| [10 — 错误模型](./10-errors.md)              | `tinyxml2.error` 等    | 异常体系与错误分层                   |
 | [11 — 示例集](./11-examples.md)              | —                         | 端到端最佳实践与常见模式             |
 
 ---
 
 ## 命名与引入约定
 
-- **根包**：`cangjie_xml`，仅提供库版本号常量与函数。
+- **根包**：`tinyxml2`，仅提供库版本号常量与函数。
 - **子包一律按能力划分**：`dom` / `parser` / `writer` / `query` / `build` /
   `visit` / `io` / `error`。
 - 典型的"一次引入，全部可用"写法：
 
 ```cangjie
-import cangjie_xml.dom.*
-import cangjie_xml.parser.*
-import cangjie_xml.writer.*
-import cangjie_xml.query.*
-import cangjie_xml.build.*
-import cangjie_xml.visit.*
-import cangjie_xml.io.*
-import cangjie_xml.error.*
+import tinyxml2.dom.*
+import tinyxml2.parser.*
+import tinyxml2.writer.*
+import tinyxml2.query.*
+import tinyxml2.build.*
+import tinyxml2.visit.*
+import tinyxml2.io.*
+import tinyxml2.error.*
 ```
 
 子包之间的依赖方向是单向的（`dom → writer/parser/query/build/visit/io`），

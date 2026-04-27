@@ -1,6 +1,6 @@
 # 07 — Builder
 
-包：`cangjie_xml.build`
+包：`tinyxml2.build`
 
 提供 DSL 风格的构造入口，在保持 `XmlDocument` 语义完整的前提下，显著降低
 "手工 createElement + appendChild" 的噪音。
@@ -12,8 +12,8 @@
 ### 典型用法
 
 ```cangjie
-import cangjie_xml.dom.*
-import cangjie_xml.build.*
+import tinyxml2.dom.*
+import tinyxml2.build.*
 
 let doc = XmlDocumentBuilder()
     .declaration()
@@ -84,9 +84,9 @@ public class XmlElementBuilder {
 ### 小例：类型化属性
 
 ```cangjie
-import cangjie_xml.dom.*
-import cangjie_xml.build.*
-import cangjie_xml.query.*
+import tinyxml2.dom.*
+import tinyxml2.build.*
+import tinyxml2.query.*
 
 let doc = XmlDocumentBuilder()
     .declaration()

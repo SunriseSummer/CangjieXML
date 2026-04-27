@@ -1,19 +1,19 @@
-package cangjie_xml.doc_examples
+package tinyxml2.doc_examples
 
 import std.collection.*
 import std.unittest.*
 import std.unittest.testmacro.*
 import std.fs.*
 
-import cangjie_xml.*
-import cangjie_xml.dom.*
-import cangjie_xml.parser.*
-import cangjie_xml.writer.*
-import cangjie_xml.query.*
-import cangjie_xml.build.*
-import cangjie_xml.visit.*
-import cangjie_xml.io.*
-import cangjie_xml.error.*
+import tinyxml2.*
+import tinyxml2.dom.*
+import tinyxml2.parser.*
+import tinyxml2.writer.*
+import tinyxml2.query.*
+import tinyxml2.build.*
+import tinyxml2.visit.*
+import tinyxml2.io.*
+import tinyxml2.error.*
 
 // ======================================================================
 // 文档示例验证套件
@@ -443,7 +443,7 @@ func docVisitXmlVisitorCollectsTitles(): Unit {
 // ----------------------------------------------------------------------
 // 09 IO：文件 round-trip + 字节 round-trip
 // ----------------------------------------------------------------------
-const DOC_TMP_ROOT: String = "/tmp/cangjie_xml_doc_examples"
+const DOC_TMP_ROOT: String = "/tmp/tinyxml2_doc_examples"
 
 class DocTempFile {
     public let path: String

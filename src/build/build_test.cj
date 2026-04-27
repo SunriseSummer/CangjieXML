@@ -1,11 +1,11 @@
-package cangjie_xml.build
+package tinyxml2.build
 
 import std.unittest.*
 import std.unittest.testmacro.*
-import cangjie_xml.dom.*
-import cangjie_xml.query.*
-import cangjie_xml.writer.*
-import cangjie_xml.parser.*
+import tinyxml2.dom.*
+import tinyxml2.query.*
+import tinyxml2.writer.*
+import tinyxml2.parser.*
 
 // ====================================================================
 // XmlDocumentBuilder / XmlElementBuilder 基础

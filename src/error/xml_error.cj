@@ -1,4 +1,4 @@
-package cangjie_xml.error
+package tinyxml2.error
 
 /**
  * CangjieXML 库统一的错误类型。

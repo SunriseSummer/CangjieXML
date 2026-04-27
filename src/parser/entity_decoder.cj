@@ -1,6 +1,6 @@
-package cangjie_xml.parser
+package tinyxml2.parser
 
-import cangjie_xml.error.*
+import tinyxml2.error.*
 
 /**
  * XML 实体解码器。

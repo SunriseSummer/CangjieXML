@@ -1,6 +1,6 @@
-package cangjie_xml.writer
+package tinyxml2.writer
 
-import cangjie_xml.dom.*
+import tinyxml2.dom.*
 
 /**
  * 为 `XmlDocument` 与 `XmlElement` 增补 `writeToString(options:)` 便捷 API。
@@ -10,8 +10,8 @@ import cangjie_xml.dom.*
  * 可见性。
  *
  * ```cangjie
- * import cangjie_xml.dom.*
- * import cangjie_xml.writer.*
+ * import tinyxml2.dom.*
+ * import tinyxml2.writer.*
  *
  * let doc = XmlDocument()
  * // ...

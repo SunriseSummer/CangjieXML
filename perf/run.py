@@ -60,9 +60,9 @@ FIXTURE_ORDER = [
 ]
 
 SCENARIOS = ["parse", "serialize", "roundtrip", "traverse"]
-LIBS = ["cangjie_xml", "tinyxml2-11.0.0", "python_xml.etree"]
+LIBS = ["tinyxml2_cj", "tinyxml2-11.0.0", "python_xml.etree"]
 LIB_LABEL = {
-    "cangjie_xml":      "CangjieXML",
+    "tinyxml2_cj":      "CangjieXML",
     "tinyxml2-11.0.0":  "tinyxml2",
     "python_xml.etree": "Python xml.etree",
 }
@@ -158,7 +158,7 @@ def run_tinyxml2_bench() -> dict:
 
 
 def run_cangjie_bench() -> dict:
-    log("cangjie_xml bench")
+    log("tinyxml2 (Cangjie) bench")
     out = OUT_DIR / "cangjie.json"
     binary = find_cangjie_binary()
     # Cangjie 运行时默认堆较小（默认 256MB 量级，与 fixture 大小相比偏紧），
@@ -211,7 +211,7 @@ def fmt_ratio(value: float, baseline: float) -> str:
 def write_report(by_lib: dict[str, dict]) -> None:
     """一份 markdown，章节按场景，行按 fixture，列按库。"""
     lines: list[str] = []
-    cj_idx = index_results(by_lib["cangjie_xml"])
+    cj_idx = index_results(by_lib["tinyxml2_cj"])
     lines.append("# CangjieXML / Python xml.etree / tinyxml2 性能对比")
     lines.append("")
     lines.append("> 本报告由 `perf/run.py` 自动生成；请勿手工修改。"
@@ -302,7 +302,7 @@ def write_report(by_lib: dict[str, dict]) -> None:
     lines.append("- **Python `xml.etree`** 在 `parse` 上仍因走 C 实现的 expat 占优；"
                  "仓颉版的剩余差距集中在大文档解析与属性密集型遍历。")
     lines.append("")
-    lines.append("## 测试期间对 cangjie_xml 库的 bug 排查")
+    lines.append("## 测试期间对 tinyxml2（仓颉）库的 bug 排查")
     lines.append("")
     lines.append("性能测试本身是高强度负载（每个 fixture 跑数十到数百轮 parse / "
                  "serialize / roundtrip / traverse），既能暴露明显的 perf 瓶颈，"
@@ -357,7 +357,7 @@ def write_report(by_lib: dict[str, dict]) -> None:
     lines.append("DOM / parser / writer / escape 层面的算法优化已经基本榨干"
                  "（参考 tinyxml2 的实现思路：原地分段切片 / 零拷贝 sub-string / "
                  "内存池 / strchr-SSE 字节查找）。**剩余 6~35× 的差距，根因不在"
-                 " cangjie_xml 算法层，而落在仓颉编译器、运行时与标准库的通用"
+                 " tinyxml2（仓颉）算法层，而落在仓颉编译器、运行时与标准库的通用"
                  "性能特性上。**")
     lines.append("")
     lines.append("已在 `problem.md` 中按观察到的"
@@ -380,7 +380,7 @@ def write_report(by_lib: dict[str, dict]) -> None:
                  "只能逐字节 if-比较，对照 C 端的 `strchr` / `_mm_cmpestri` 有数量级差距。")
     lines.append("")
     lines.append("详见仓库根的 `problem.md`。这些项的修复或公开 API 暴露能让 "
-                 "cangjie_xml 进一步逼近 tinyxml2 量级，且会同时受益于其它字符密集"
+                 "tinyxml2（仓颉）进一步逼近 tinyxml2（C++）量级，且会同时受益于其它字符密集"
                  "型库（JSON / TOML / 协议解析等）。")
     lines.append("")
     lines.append("### 后续应用层可继续推进的优化（不依赖 SDK 修复）")
@@ -431,7 +431,7 @@ def main() -> int:
     by_lib = {
         "python_xml.etree": run_python_bench(),
         "tinyxml2-11.0.0":  run_tinyxml2_bench(),
-        "cangjie_xml":      run_cangjie_bench(),
+        "tinyxml2_cj":      run_cangjie_bench(),
     }
 
     log("5. 写 report.md")

@@ -1,6 +1,6 @@
 # 05 — Writer
 
-包：`cangjie_xml.writer`
+包：`tinyxml2.writer`
 
 把 `XmlDocument` / `XmlElement` 序列化为 XML 文本。无全局静态状态——所有
 行为由一份 `XmlWriteOptions` 完全决定。
@@ -169,7 +169,7 @@ public class StringXmlSink <: XmlSink {
 ```
 
 - `StringXmlSink`：最基础的内存 Sink。
-- **大文档 / 流式写盘**：见 `cangjie_xml.io.FileXmlSink`（[09 — IO](./09-io.md)）。
+- **大文档 / 流式写盘**：见 `tinyxml2.io.FileXmlSink`（[09 — IO](./09-io.md)）。
 - 自定义 Sink：实现 `XmlSink`，接入网络流、压缩、管道等任意目的地。
 
 ---

@@ -3,13 +3,13 @@ package cangjie_bench
 import std.collection.*
 import std.fs.*
 import std.time.*
-import cangjie_xml.dom.*
-import cangjie_xml.io.*
-import cangjie_xml.visit.*
-import cangjie_xml.writer.*
+import tinyxml2.dom.*
+import tinyxml2.io.*
+import tinyxml2.visit.*
+import tinyxml2.writer.*
 
 /**
- * cangjie_xml 端 perf 探针——与 python_bench / tinyxml2_bench 共用同一份 fixtures
+ * tinyxml2 端 perf 探针——与 python_bench / tinyxml2_bench 共用同一份 fixtures
  * + plan.json，输出与之结构一致的 JSON 到 stdout。
  *
  * 四个典型场景：
@@ -40,7 +40,7 @@ main(args: Array<String>): Int64 {
     let plan = parsePlan(File.readFrom(Path(planPath)))
 
     let json = StringBuilder()
-    json.append("{\n  \"library\": \"cangjie_xml\",\n  \"results\": [\n")
+    json.append("{\n  \"library\": \"tinyxml2\",\n  \"results\": [\n")
     var first = true
     for (entry in plan) {
         runOne(json, first, dir, entry)
