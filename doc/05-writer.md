@@ -145,9 +145,8 @@ d2.writeToString(XmlWriteOptions(writeDeclaration: false))
 
 ## 确定性契约
 
-> **相同 DOM + 相同 `XmlWriteOptions` → 逐字节一致的输出。**
-
-这是 Writer 的公开承诺，使 diff、缓存失效、签名校验等外围工程成为可能。
+相同 DOM + 相同 `XmlWriteOptions` 产出逐字节一致的输出。这是 Writer 的公开
+承诺，使 diff、缓存失效、签名校验等外围工程成为可能。
 
 ---
 

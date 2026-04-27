@@ -101,10 +101,10 @@ main(): Int64 {
 }
 ```
 
-> **跨包调用建议**：本示例使用 `parser` 包中的顶层函数 `parseXml(...)`。受 cjc 1.0.5
-> 扩展可见性限制，`XmlDocument.parseString(...)` 静态方法形式仅在同包调用时可见，
-> 在你的应用代码（与 `fastxml.parser` 不同包）中**应使用 `parseXml(...)`**。
-> 详细说明见 [04 — Parser](./04-parser.md#公共入口)。
+注意：本示例使用 `parser` 包中的顶层函数 `parseXml(...)`。受 cjc 1.0.5
+扩展可见性限制，`XmlDocument.parseString(...)` 静态方法形式仅在同包调用时
+可见，应用代码（与 `fastxml.parser` 不同包）中应使用 `parseXml(...)`。详见
+[04 — Parser](./04-parser.md#公共入口)。
 
 ---
 

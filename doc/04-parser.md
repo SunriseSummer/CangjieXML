@@ -75,17 +75,15 @@ public const DEFAULT_MAX_ELEMENT_DEPTH: Int64 = 500
 
 ## 解析覆盖范围
 
-| 语法                              | 支持                               |
-| --------------------------------- | ---------------------------------- |
-| XML 声明 `<?xml ... ?>`            | ✅ 保留为 `XmlDeclaration`         |
-| 注释 `<!-- ... -->`                | ✅ 保留为 `XmlComment`             |
-| CDATA 段 `<![CDATA[ ... ]]>`       | ✅ 保留为 `XmlText(isCdata=true)`  |
-| `<!DOCTYPE ...>` 等 `<!...>`       | ✅ 保留为 `XmlUnknown`             |
-| 元素开 / 闭 / 自闭合               | ✅                                 |
-| 属性（单引号 / 双引号）            | ✅                                 |
-| 内建实体 `&amp; &lt; &gt; &quot; &apos;` | ✅                           |
-| 数字实体 `&#NN; &#xNN;`            | ✅                                 |
-| 根元素唯一性 / 嵌套深度检查        | ✅                                 |
+- XML 声明 `<?xml ... ?>` — 保留为 `XmlDeclaration`
+- 注释 `<!-- ... -->` — 保留为 `XmlComment`
+- CDATA 段 `<![CDATA[ ... ]]>` — 保留为 `XmlText(isCdata=true)`
+- `<!DOCTYPE ...>` 等 `<!...>` — 保留为 `XmlUnknown`
+- 元素开 / 闭 / 自闭合
+- 属性（单引号 / 双引号）
+- 内建实体 `&amp; &lt; &gt; &quot; &apos;`
+- 数字实体 `&#NN; &#xNN;`
+- 根元素唯一性 / 嵌套深度检查
 
 ---
 
