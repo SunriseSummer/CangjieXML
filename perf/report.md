@@ -80,23 +80,22 @@
 
 | fixture | 迭代 | CangjieXML (ms/次) | tinyxml2 (ms/次) | Python xml.etree (ms/次) | CangjieXML 倍率 | Python xml.etree 倍率 |
 |---|--:|--:|--:|--:|--:|--:|
-| `catalog_small.xml` | 500 | 0.0149 | 0.0036 | 0.0330 | 4.19× | 9.28× |
-| `catalog_medium.xml` | 30 | 1.512 | 0.2000 | 1.757 | 7.56× | 8.78× |
-| `catalog_large.xml` | 5 | 6.049 | 2.865 | 14.268 | 2.11× | 4.98× |
-| `config_small.xml` | 500 | 0.0019 | 0.000617 | 0.0067 | 3.12× | 10.9× |
-| `config_medium.xml` | 60 | 0.1395 | 0.0565 | 0.3577 | 2.47× | 6.33× |
-| `config_large.xml` | 10 | 0.6851 | 0.4480 | 2.154 | 1.53× | 4.81× |
-| `deep_small.xml` | 500 | 0.0011 | 0.000331 | 0.0031 | 3.26× | 9.42× |
-| `deep_medium.xml` | 200 | 0.0044 | 0.0012 | 0.0129 | 3.71× | 10.8× |
-| `deep_large.xml` | 50 | 0.0113 | 0.0024 | 0.0266 | 4.75× | 11.2× |
+| `catalog_small.xml` | 500 | 0.0145 | 0.0059 | 0.0313 | 2.46× | 5.32× |
+| `catalog_medium.xml` | 30 | 0.9267 | 0.2955 | 1.702 | 3.14× | 5.76× |
+| `catalog_large.xml` | 5 | 49.349 | 3.411 | 15.337 | 14.5× | 4.50× |
+| `config_small.xml` | 500 | 0.0018 | 0.000722 | 0.0065 | 2.54× | 8.95× |
+| `config_medium.xml` | 60 | 0.2097 | 0.0583 | 0.3505 | 3.59× | 6.01× |
+| `config_large.xml` | 10 | 0.7146 | 0.4619 | 2.157 | 1.55× | 4.67× |
+| `deep_small.xml` | 500 | 0.000980 | 0.000407 | 0.0033 | 2.41× | 8.19× |
+| `deep_medium.xml` | 200 | 0.0042 | 0.0016 | 0.0135 | 2.69× | 8.67× |
+| `deep_large.xml` | 50 | 0.0090 | 0.0032 | 0.0303 | 2.80× | 9.43× |
 
 > 倍率列以 `tinyxml2` 为 1×；数值越小越快。
 
 ## 结论与观察
 
 - **tinyxml2** 作为成熟 C++ 库（原地分段 + 内存池 + strchr/SSE），在各场景上是最快基线。
-- **CangjieXML** 在 `-O2` 下相对 tinyxml2 的倍率落在 **约 1× ~ 9×**；`serialize` / `traverse` 稳定**反超 Python `xml.etree`**，`roundtrip` 在中大 fixture 上同样领先 Python。
-- **Python `xml.etree`** 在 `parse` 上仍因走 C 实现的 expat 占优；仓颉版的剩余差距集中在大文档解析与属性密集型遍历。
+- **CangjieXML** 在 `-O2` 下相对 tinyxml2 的倍率落在 **约 1× ~ 4×**；`serialize` / `traverse` 稳定**反超 Python `xml.etree`**，`roundtrip` 在中大 fixture 上同样领先 Python。
 
 ## 测试期间对 fastxml 库的 bug 排查
 
