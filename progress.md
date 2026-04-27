@@ -522,7 +522,7 @@ public class FileXmlSink <: XmlSink & Resource {
 
 **Bug**（**e2etest 自身**的 probe 代码，非主库）：`normalizeWhitespace` / `jsonEscape` 最初按字节遍历、把非特殊字节重造成 `Rune(UInt32(b))`，导致每个 UTF-8 续字节被当成独立码点，`算法导论` 被重写成 Latin-1 伪字符。**修复**：非特殊字节直接复制进 `ArrayList<Byte>`，最后 `String.fromUtf8` 一次性重建——通用规则：**按字节扫描的逻辑不应反向构造 `Rune`**。主库自身通过 10/10 指纹一致证明了 UTF-8 往返正确。
 
-**顺手修**：`src/io/file_xml_sink.cj` 的 `import cangjie_xml.dom.*` 属实未用，移除。
+**顺手修**：`src/io/file_xml_sink.cj` 的 `import fastxml.dom.*` 属实未用，移除。
 
 #### 5.8.4 最终质量门禁
 

@@ -1,4 +1,4 @@
-package cangjie_xml.visit
+package fastxml.visit
 
 /**
  * 函数式遍历的控制信号。

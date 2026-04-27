@@ -1,19 +1,19 @@
-package cangjie_xml.doc_examples
+package fastxml.doc_examples
 
 import std.collection.*
 import std.unittest.*
 import std.unittest.testmacro.*
 import std.fs.*
 
-import cangjie_xml.*
-import cangjie_xml.dom.*
-import cangjie_xml.parser.*
-import cangjie_xml.writer.*
-import cangjie_xml.query.*
-import cangjie_xml.build.*
-import cangjie_xml.visit.*
-import cangjie_xml.io.*
-import cangjie_xml.error.*
+import fastxml.*
+import fastxml.dom.*
+import fastxml.parser.*
+import fastxml.writer.*
+import fastxml.query.*
+import fastxml.build.*
+import fastxml.visit.*
+import fastxml.io.*
+import fastxml.error.*
 
 // ======================================================================
 // 文档示例验证套件
@@ -443,7 +443,7 @@ func docVisitXmlVisitorCollectsTitles(): Unit {
 // ----------------------------------------------------------------------
 // 09 IO：文件 round-trip + 字节 round-trip
 // ----------------------------------------------------------------------
-const DOC_TMP_ROOT: String = "/tmp/cangjie_xml_doc_examples"
+const DOC_TMP_ROOT: String = "/tmp/fastxml_doc_examples"
 
 class DocTempFile {
     public let path: String

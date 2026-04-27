@@ -1,11 +1,11 @@
-package cangjie_xml.build
+package fastxml.build
 
 import std.unittest.*
 import std.unittest.testmacro.*
-import cangjie_xml.dom.*
-import cangjie_xml.query.*
-import cangjie_xml.writer.*
-import cangjie_xml.parser.*
+import fastxml.dom.*
+import fastxml.query.*
+import fastxml.writer.*
+import fastxml.parser.*
 
 // ====================================================================
 // XmlDocumentBuilder / XmlElementBuilder 基础

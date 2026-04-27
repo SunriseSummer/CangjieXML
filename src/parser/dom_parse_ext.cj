@@ -1,6 +1,6 @@
-package cangjie_xml.parser
+package fastxml.parser
 
-import cangjie_xml.dom.*
+import fastxml.dom.*
 
 /**
  * 顶层解析函数——与 `XmlDocument.parseString` 等价，专供跨包调用使用。

@@ -1,9 +1,9 @@
-package cangjie_xml.io
+package fastxml.io
 
 import std.fs.*
-import cangjie_xml.dom.*
-import cangjie_xml.error.*
-import cangjie_xml.parser.*
+import fastxml.dom.*
+import fastxml.error.*
+import fastxml.parser.*
 
 /**
  * 从文件加载 XML 文档——对 `parseXml` 的 IO 侧封装。

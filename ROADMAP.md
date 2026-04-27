@@ -58,8 +58,8 @@ M8 回归 / 基准 / 文档 / v1.0 发布
 
 ### 交付物
 - `cjpm.toml`
-- `src/cangjie_xml/lib.cj`
-- `src/cangjie_xml/version.cj`
+- `src/lib.cj`
+- `src/version.cj`
 - `tests/smoke_test.cj`
 - `README.md` 初版
 - `.gitignore`
@@ -98,7 +98,7 @@ M8 回归 / 基准 / 文档 / v1.0 发布
 - `XmlUnknown`
 
 ### 交付物
-- `src/cangjie_xml/dom/` 下全部核心类型
+- `src/dom/` 下全部核心类型
 - 基础树操作：追加、前插、移除、兄弟导航、根元素定位
 - 属性管理：查找、设置、删除、枚举
 
@@ -132,9 +132,9 @@ M8 回归 / 基准 / 文档 / v1.0 发布
 - `XmlDocument.writeToString()`
 
 ### 交付物
-- `src/cangjie_xml/writer/xml_write_options.cj`
-- `src/cangjie_xml/writer/xml_writer.cj`
-- `src/cangjie_xml/internal/text_escape.cj`
+- `src/writer/xml_write_options.cj`
+- `src/writer/xml_writer.cj`
+- `src/internal/text_escape.cj`
 
 ### 测试重点
 - 空元素、自闭合元素、嵌套元素。
@@ -167,12 +167,12 @@ M8 回归 / 基准 / 文档 / v1.0 发布
 - `XmlError` 与 `SourcePos` 打通
 
 ### 交付物
-- `src/cangjie_xml/parser/xml_parse_options.cj`
-- `src/cangjie_xml/parser/xml_source.cj`
-- `src/cangjie_xml/parser/xml_parser.cj`
-- `src/cangjie_xml/internal/slice.cj`
-- `src/cangjie_xml/internal/normalized_buffer.cj`
-- `src/cangjie_xml/internal/entity_decoder.cj`
+- `src/parser/xml_parse_options.cj`
+- `src/parser/xml_source.cj`
+- `src/parser/xml_parser.cj`
+- `src/internal/slice.cj`
+- `src/internal/normalized_buffer.cj`
+- `src/internal/entity_decoder.cj`
 
 ### 测试重点
 - 元素 / 文本 / CDATA / 注释 / 声明 / 未知节点解析。
@@ -205,11 +205,11 @@ M8 回归 / 基准 / 文档 / v1.0 发布
 - 轻量 Builder DSL
 
 ### 交付物
-- `src/cangjie_xml/query/xml_element_query_ext.cj`
-- `src/cangjie_xml/query/xml_node_iter_ext.cj`
-- `src/cangjie_xml/query/xml_find_ext.cj`
-- `src/cangjie_xml/build/xml_document_builder.cj`
-- `src/cangjie_xml/build/xml_element_builder.cj`
+- `src/query/xml_element_query_ext.cj`
+- `src/query/xml_node_iter_ext.cj`
+- `src/query/xml_find_ext.cj`
+- `src/build/xml_document_builder.cj`
+- `src/build/xml_element_builder.cj`
 
 ### 测试重点
 - `intAttribute` / `boolAttribute` / `doubleAttribute` 等常见扩展。
@@ -239,8 +239,8 @@ M8 回归 / 基准 / 文档 / v1.0 发布
 - `accept(visitor)` 完整实现
 
 ### 交付物
-- `src/cangjie_xml/visit/xml_visitor.cj`
-- `src/cangjie_xml/visit/xml_walk.cj`
+- `src/visit/xml_visitor.cj`
+- `src/visit/xml_walk.cj`
 
 ### 测试重点
 - `visitEnter/visitExit` 调用顺序。
@@ -270,10 +270,10 @@ M8 回归 / 基准 / 文档 / v1.0 发布
 - 长格式错误说明
 
 ### 交付物
-- `src/cangjie_xml/error/source_pos.cj`
-- `src/cangjie_xml/error/xml_error.cj`
-- `src/cangjie_xml/io/xml_loader.cj`
-- `src/cangjie_xml/io/xml_saver.cj`
+- `src/error/source_pos.cj`
+- `src/error/xml_error.cj`
+- `src/io/xml_loader.cj`
+- `src/io/xml_saver.cj`
 
 ### 测试重点
 - 文件不存在、读写失败。
@@ -302,7 +302,7 @@ M8 回归 / 基准 / 文档 / v1.0 发布
 - 只读 DOM 并行消费示例
 
 ### 交付物
-- `src/cangjie_xml/batch/xml_batch_parser.cj`（如决定采用独立包）
+- `src/batch/xml_batch_parser.cj`（如决定采用独立包）
 - 并发测试与示例
 
 ### 测试重点

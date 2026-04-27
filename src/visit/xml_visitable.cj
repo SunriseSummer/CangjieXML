@@ -1,11 +1,11 @@
-package cangjie_xml.visit
+package fastxml.visit
 
-import cangjie_xml.dom.*
+import fastxml.dom.*
 
 /**
  * `accept` / `walk` 作为 `XmlNode` 方法的接口契约。
  *
- * `import cangjie_xml.visit.*` 后即可写：
+ * `import fastxml.visit.*` 后即可写：
  *
  * ```cangjie
  * doc.accept(MyVisitor())

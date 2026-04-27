@@ -1,6 +1,6 @@
-package cangjie_xml.visit
+package fastxml.visit
 
-import cangjie_xml.dom.*
+import fastxml.dom.*
 
 /**
  * 按 `XmlVisitor` 协议，前序 + 后序派发访问 `node` 及其后代。

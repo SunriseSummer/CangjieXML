@@ -179,50 +179,49 @@ CangjieXML 的设计以五个目标为最高优先级：
 CangjieXML/
 ├─ cjpm.toml
 ├─ src/
-│  └─ cangjie_xml/
-│     ├─ lib.cj
-│     ├─ version.cj
-│     ├─ error/
-│     │  ├─ source_pos.cj
-│     │  └─ xml_error.cj
-│     ├─ dom/
-│     │  ├─ xml_node.cj
-│     │  ├─ xml_node_kind.cj
-│     │  ├─ xml_document.cj
-│     │  ├─ xml_element.cj
-│     │  ├─ xml_attribute.cj
-│     │  ├─ xml_text.cj
-│     │  ├─ xml_comment.cj
-│     │  ├─ xml_declaration.cj
-│     │  └─ xml_unknown.cj
-│     ├─ parser/
-│     │  ├─ xml_parser.cj
-│     │  ├─ xml_parse_options.cj
-│     │  └─ xml_source.cj
-│     ├─ writer/
-│     │  ├─ xml_writer.cj
-│     │  └─ xml_write_options.cj
-│     ├─ query/
-│     │  ├─ xml_element_query_ext.cj
-│     │  ├─ xml_node_iter_ext.cj
-│     │  └─ xml_find_ext.cj
-│     ├─ build/
-│     │  ├─ xml_document_builder.cj
-│     │  └─ xml_element_builder.cj
-│     ├─ visit/
-│     │  ├─ xml_visitor.cj
-│     │  └─ xml_walk.cj
-│     ├─ io/
-│     │  ├─ xml_loader.cj
-│     │  └─ xml_saver.cj
-│     ├─ batch/                      # 可选：批量解析与并发能力
-│     │  └─ xml_batch_parser.cj
-│     └─ internal/
-│        ├─ slice.cj
-│        ├─ normalized_buffer.cj
-│        ├─ entity_decoder.cj
-│        ├─ utf8.cj
-│        └─ text_escape.cj
+│  ├─ lib.cj                       # package fastxml
+│  ├─ version.cj
+│  ├─ error/                       # package fastxml.error
+│  │  ├─ source_pos.cj
+│  │  └─ xml_error.cj
+│  ├─ dom/                         # package fastxml.dom
+│  │  ├─ xml_node.cj
+│  │  ├─ xml_node_kind.cj
+│  │  ├─ xml_document.cj
+│  │  ├─ xml_element.cj
+│  │  ├─ xml_attribute.cj
+│  │  ├─ xml_text.cj
+│  │  ├─ xml_comment.cj
+│  │  ├─ xml_declaration.cj
+│  │  └─ xml_unknown.cj
+│  ├─ parser/                      # package fastxml.parser
+│  │  ├─ xml_parser.cj
+│  │  ├─ xml_parse_options.cj
+│  │  └─ xml_source.cj
+│  ├─ writer/                      # package fastxml.writer
+│  │  ├─ xml_writer.cj
+│  │  └─ xml_write_options.cj
+│  ├─ query/                       # package fastxml.query
+│  │  ├─ xml_element_query_ext.cj
+│  │  ├─ xml_node_iter_ext.cj
+│  │  └─ xml_find_ext.cj
+│  ├─ build/                       # package fastxml.build
+│  │  ├─ xml_document_builder.cj
+│  │  └─ xml_element_builder.cj
+│  ├─ visit/                       # package fastxml.visit
+│  │  ├─ xml_visitor.cj
+│  │  └─ xml_walk.cj
+│  ├─ io/                          # package fastxml.io
+│  │  ├─ xml_loader.cj
+│  │  └─ xml_saver.cj
+│  ├─ batch/                       # 可选：批量解析与并发能力
+│  │  └─ xml_batch_parser.cj
+│  └─ internal/                    # package fastxml.internal
+│     ├─ slice.cj
+│     ├─ normalized_buffer.cj
+│     ├─ entity_decoder.cj
+│     ├─ utf8.cj
+│     └─ text_escape.cj
 ├─ tests/
 ├─ resources/
 ├─ examples/
@@ -413,8 +412,8 @@ public class XmlUnknown <: XmlNode {
 ### 6.5 使用示例
 
 ```cangjie
-import cangjie_xml.*
-import cangjie_xml.query.*
+import fastxml.*
+import fastxml.query.*
 
 main() {
     let doc = XmlDocument.parseString(
@@ -798,7 +797,7 @@ XML DOM 的核心价值是**结构清晰与确定性**，不是高并发读写�
 并发不放入 `dom`，而放在独立的辅助层，例如：
 
 ```text
-cangjie_xml/batch/
+src/batch/                      # package fastxml.batch
 ├─ xml_batch_parser.cj
 └─ xml_batch_result.cj
 ```

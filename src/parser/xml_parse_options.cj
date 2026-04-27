@@ -1,4 +1,4 @@
-package cangjie_xml.parser
+package fastxml.parser
 
 /**
  * XML 空白处理策略。

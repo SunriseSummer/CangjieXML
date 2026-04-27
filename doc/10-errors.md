@@ -1,6 +1,6 @@
 # 10 — 错误模型
 
-包：`cangjie_xml.error`（以及各子包内的专属异常）
+包：`fastxml.error`（以及各子包内的专属异常）
 
 CangjieXML 对错误采取**分层 + 枚举**的设计：用枚举携带语义信息，用异常类型
 区分错误边界（程序员错误、解析错误、IO 错误），避免 tinyxml2 那种"一个整数错
@@ -147,10 +147,10 @@ try {
 ## 典型处理模板
 
 ```cangjie
-import cangjie_xml.dom.*
-import cangjie_xml.io.*
-import cangjie_xml.parser.*
-import cangjie_xml.error.*
+import fastxml.dom.*
+import fastxml.io.*
+import fastxml.parser.*
+import fastxml.error.*
 
 func load(path: String): ?XmlDocument {
     try {

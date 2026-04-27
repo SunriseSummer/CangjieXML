@@ -1,4 +1,4 @@
-package cangjie_xml.writer
+package fastxml.writer
 
 /*
  * Writer 的语法片段常量与排版三态枚举。

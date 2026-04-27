@@ -2,8 +2,8 @@ package xlsx_to_csv
 
 import std.collection.*
 import std.fs.*
-import cangjie_xml.dom.*
-import cangjie_xml.io.*
+import fastxml.dom.*
+import fastxml.io.*
 
 /**
  * 把 `xl/sharedStrings.xml` 整体装进内存，返回按索引访问的字符串表。

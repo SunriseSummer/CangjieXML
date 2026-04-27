@@ -1,8 +1,8 @@
-package cangjie_xml.dom
+package fastxml.dom
 
 import std.unittest.*
 import std.unittest.testmacro.*
-import cangjie_xml.error.*
+import fastxml.error.*
 
 // ====================================================================
 // XmlElement 行为测试：子节点 / 属性 / 文本内容 / 遍历。

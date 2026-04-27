@@ -1,6 +1,6 @@
 [package]
   cjc-version = "1.0.5"
-  name = "cangjie_xml"
+  name = "fastxml"
   version = "0.1.0"
   output-type = "static"
   compile-option = "-O2"

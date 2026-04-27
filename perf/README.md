@@ -17,7 +17,7 @@ perf/
 │   ├── bench.cpp          # C++ 端探针，链接 .tinyxml2-11.0.0/tinyxml2.{cpp,h}
 │   └── Makefile           # g++ -O2 -DNDEBUG
 ├── cangjie_bench/
-│   ├── cjpm.toml          # path 依赖 cangjie_xml
+│   ├── cjpm.toml          # path 依赖 fastxml
 │   └── src/main.cj        # 仓颉端探针
 ├── run.py                 # 入口：source SDK → 生成 → 构建 → 跑 → 出报告
 ├── out/                   # 运行时产出：plan.json 与 三份 raw JSON
@@ -73,7 +73,7 @@ iter / walk lambda），把"主路径里的纯访问成本"测出来比"闭门�
 ### 为什么平均 N 次而不是 min？
 
 工程基准里 `min` 适合表达"硬件上限"，平均更贴近"实际工程吞吐"。
-本 perf 的目标读者是评估"我的项目用 cangjie_xml 跑业务时的耗时分布"，
+本 perf 的目标读者是评估"我的项目用 fastxml 跑业务时的耗时分布"，
 平均更有信号价值。每个单元跑足够多次（迭代次数与字节量负相关，目标单元
 落在 0.05 ~ 5s 区间），噪声已被稀释，结果稳定。
 
@@ -93,7 +93,7 @@ iter / walk lambda），把"主路径里的纯访问成本"测出来比"闭门�
 
 ```json
 {
-  "library": "cangjie_xml",
+  "library": "fastxml",
   "results": [
     { "scenario": "parse", "fixture": "catalog_small.xml",
       "iterations": 500, "elapsed_ms_total": 3209.85,

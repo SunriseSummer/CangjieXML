@@ -1,7 +1,7 @@
-package cangjie_xml.parser
+package fastxml.parser
 
-import cangjie_xml.dom.*
-import cangjie_xml.error.*
+import fastxml.dom.*
+import fastxml.error.*
 
 /**
  * `XmlParser` 的文档级与非元素节点解析逻辑。

@@ -1,10 +1,10 @@
-package cangjie_xml.visit
+package fastxml.visit
 
 import std.collection.*
 import std.unittest.*
 import std.unittest.testmacro.*
-import cangjie_xml.dom.*
-import cangjie_xml.build.*
+import fastxml.dom.*
+import fastxml.build.*
 
 // ======================================================================
 // 共享测试夹具

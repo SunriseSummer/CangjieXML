@@ -1,4 +1,4 @@
-package cangjie_xml.dom
+package fastxml.dom
 
 /**
  * XML 未知节点：承载解析器无法分类但仍需保留的内容。

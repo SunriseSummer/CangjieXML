@@ -9,7 +9,7 @@
   target-dir = "target"
 
 [dependencies]
-  cangjie_xml = { path = "../.." }
+  fastxml = { path = "../.." }
 
 [test-dependencies]
 

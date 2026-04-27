@@ -1,6 +1,6 @@
-package cangjie_xml.parser
+package fastxml.parser
 
-import cangjie_xml.error.*
+import fastxml.error.*
 
 /**
  * XML 实体解码器。

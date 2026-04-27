@@ -1,8 +1,8 @@
-package cangjie_xml.dom
+package fastxml.dom
 
 import std.unittest.*
 import std.unittest.testmacro.*
-import cangjie_xml.error.*
+import fastxml.error.*
 
 // =====================================================================
 // DOM 不变量回归测试：

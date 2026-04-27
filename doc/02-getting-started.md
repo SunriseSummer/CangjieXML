@@ -22,7 +22,7 @@ my_app/
 ```
 
 在 `cjpm.toml` 中声明依赖（具体依赖声明语法以 `cjpm` 当前版本为准）后，即可
-通过 `import cangjie_xml.*` / `import cangjie_xml.dom.*` 等方式引入。
+通过 `import fastxml.*` / `import fastxml.dom.*` 等方式引入。
 
 ---
 
@@ -45,8 +45,8 @@ cjpm test
 ## 第一个程序：构造并打印一棵 XML
 
 ```cangjie
-import cangjie_xml.dom.*
-import cangjie_xml.writer.*
+import fastxml.dom.*
+import fastxml.writer.*
 
 main(): Int64 {
     let doc = XmlDocument()
@@ -89,8 +89,8 @@ println(doc.writeToString(XmlWriteOptions.compactPreset()))
 ## 第一个程序：解析 XML 字符串
 
 ```cangjie
-import cangjie_xml.dom.*
-import cangjie_xml.parser.*
+import fastxml.dom.*
+import fastxml.parser.*
 
 main(): Int64 {
     let doc = parseXml("<catalog><book id=\"1\">SICP</book></catalog>")
@@ -103,7 +103,7 @@ main(): Int64 {
 
 > **跨包调用建议**：本示例使用 `parser` 包中的顶层函数 `parseXml(...)`。受 cjc 1.0.5
 > 扩展可见性限制，`XmlDocument.parseString(...)` 静态方法形式仅在同包调用时可见，
-> 在你的应用代码（与 `cangjie_xml.parser` 不同包）中**应使用 `parseXml(...)`**。
+> 在你的应用代码（与 `fastxml.parser` 不同包）中**应使用 `parseXml(...)`**。
 > 详细说明见 [04 — Parser](./04-parser.md#公共入口)。
 
 ---

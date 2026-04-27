@@ -1,9 +1,9 @@
-package cangjie_xml.writer
+package fastxml.writer
 
 import std.unittest.*
 import std.unittest.testmacro.*
-import cangjie_xml.dom.*
-import cangjie_xml.internal.*
+import fastxml.dom.*
+import fastxml.internal.*
 
 // ======================================================================
 // Writer：行为测试
@@ -356,7 +356,7 @@ func testWriteAttributeValueEscapesQuote(): Unit {
 @Test
 func testXmlWritableIsAPublicInterface(): Unit {
     // 回归测试：`writeToString` 必须经由 `XmlWritable` 接口声明，才能在
-    // `import cangjie_xml.writer.*` 后被跨包调用方看到。
+    // `import fastxml.writer.*` 后被跨包调用方看到。
     let doc = XmlDocument()
     let el = doc.createElement("r")
     doc.appendChild(el)

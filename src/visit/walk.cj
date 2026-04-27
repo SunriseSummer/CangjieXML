@@ -1,6 +1,6 @@
-package cangjie_xml.visit
+package fastxml.visit
 
-import cangjie_xml.dom.*
+import fastxml.dom.*
 
 /**
  * 按 `XmlNodeKind` 派发，前序（pre-order）遍历 `node` 及其所有后代。

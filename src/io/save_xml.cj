@@ -1,9 +1,9 @@
-package cangjie_xml.io
+package fastxml.io
 
 import std.fs.*
-import cangjie_xml.dom.*
-import cangjie_xml.error.*
-import cangjie_xml.writer.*
+import fastxml.dom.*
+import fastxml.error.*
+import fastxml.writer.*
 
 /**
  * 把 `XmlDocument` 序列化后写入目标文件。
