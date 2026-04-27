@@ -1,8 +1,8 @@
-package cangjie_xml.dom
+package fastxml.dom
 
 import std.unittest.*
 import std.unittest.testmacro.*
-import cangjie_xml.error.*
+import fastxml.error.*
 
 // ====================================================================
 // XmlDocument 行为测试：顶层节点约束、工厂、clear。

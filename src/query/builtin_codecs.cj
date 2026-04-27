@@ -1,4 +1,4 @@
-package cangjie_xml.query
+package fastxml.query
 
 import std.convert.*
 import std.collection.*

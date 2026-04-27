@@ -179,7 +179,7 @@ CangjieXML 的设计以五个目标为最高优先级：
 CangjieXML/
 ├─ cjpm.toml
 ├─ src/
-│  └─ cangjie_xml/
+│  └─ fastxml/
 │     ├─ lib.cj
 │     ├─ version.cj
 │     ├─ error/
@@ -413,8 +413,8 @@ public class XmlUnknown <: XmlNode {
 ### 6.5 使用示例
 
 ```cangjie
-import cangjie_xml.*
-import cangjie_xml.query.*
+import fastxml.*
+import fastxml.query.*
 
 main() {
     let doc = XmlDocument.parseString(
@@ -798,7 +798,7 @@ XML DOM 的核心价值是**结构清晰与确定性**，不是高并发读写�
 并发不放入 `dom`，而放在独立的辅助层，例如：
 
 ```text
-cangjie_xml/batch/
+fastxml/batch/
 ├─ xml_batch_parser.cj
 └─ xml_batch_result.cj
 ```

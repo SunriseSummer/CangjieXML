@@ -1,10 +1,10 @@
-package cangjie_xml.parser
+package fastxml.parser
 
 import std.unittest.*
 import std.unittest.testmacro.*
-import cangjie_xml.dom.*
-import cangjie_xml.error.*
-import cangjie_xml.writer.*
+import fastxml.dom.*
+import fastxml.error.*
+import fastxml.writer.*
 
 // ====================================================================
 // Parser：顺路径行为测试。

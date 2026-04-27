@@ -1,4 +1,4 @@
-package cangjie_xml.dom
+package fastxml.dom
 
 /**
  * XML DOM 的统一节点基类。

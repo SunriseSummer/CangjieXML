@@ -1,8 +1,8 @@
 package xlsx_to_csv
 
 import std.collection.*
-import cangjie_xml.dom.*
-import cangjie_xml.io.*
+import fastxml.dom.*
+import fastxml.io.*
 
 /**
  * 从 workbook 里读取 sheet 列表（名称 + 实际路径），顺序严格按 `<sheets>` 子

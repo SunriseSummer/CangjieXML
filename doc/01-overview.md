@@ -22,7 +22,7 @@ CangjieXML 是一个**纯仓颉语言实现**的 XML 处理库。它以 tinyxml2
 ## 包结构
 
 ```
-cangjie_xml/                 # 根包，仅含版本号
+fastxml/                 # 根包，仅含版本号
 ├── dom/                     # DOM 节点模型
 ├── parser/                  # 递归下降解析器
 ├── writer/                  # 序列化器、XmlSink、XmlWriteOptions

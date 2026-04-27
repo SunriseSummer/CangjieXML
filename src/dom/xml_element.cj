@@ -1,7 +1,7 @@
-package cangjie_xml.dom
+package fastxml.dom
 
 import std.collection.*
-import cangjie_xml.error.*
+import fastxml.error.*
 
 /**
  * XML 元素节点：`<name attr="...">...</name>`。

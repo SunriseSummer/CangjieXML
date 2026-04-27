@@ -1,6 +1,6 @@
-package cangjie_xml.build
+package fastxml.build
 
-import cangjie_xml.dom.*
+import fastxml.dom.*
 
 /**
  * 文档构建器——提供自顶向下的 DSL 式构造入口。

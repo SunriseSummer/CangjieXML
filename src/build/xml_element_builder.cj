@@ -1,7 +1,7 @@
-package cangjie_xml.build
+package fastxml.build
 
-import cangjie_xml.dom.*
-import cangjie_xml.query.*
+import fastxml.dom.*
+import fastxml.query.*
 
 /**
  * 元素构建器。**不是** 并行的 DOM——`build()` 的产物仍是普通 `XmlElement`。

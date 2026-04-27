@@ -1,4 +1,4 @@
-package cangjie_xml.writer
+package fastxml.writer
 
 /**
  * XML 写出选项。

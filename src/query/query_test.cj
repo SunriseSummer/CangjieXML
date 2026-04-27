@@ -1,9 +1,9 @@
-package cangjie_xml.query
+package fastxml.query
 
 import std.unittest.*
 import std.unittest.testmacro.*
-import cangjie_xml.dom.*
-import cangjie_xml.error.*
+import fastxml.dom.*
+import fastxml.error.*
 
 // ====================================================================
 // 内置 codec

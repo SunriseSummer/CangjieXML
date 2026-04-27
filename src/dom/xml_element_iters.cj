@@ -1,4 +1,4 @@
-package cangjie_xml.dom
+package fastxml.dom
 
 /**
  * `XmlElement` 子节点迭代器：服务于 `childNodes()` / `childElements()`。

@@ -1,4 +1,4 @@
-package cangjie_xml.dom
+package fastxml.dom
 
 /**
  * XML 属性：挂在 `XmlElement` 上的名称/值对。

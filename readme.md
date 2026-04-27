@@ -75,8 +75,8 @@ cjpm test
 ### 手工构造 DOM 并序列化
 
 ```cangjie
-import cangjie_xml.dom.*
-import cangjie_xml.writer.*
+import fastxml.dom.*
+import fastxml.writer.*
 
 main() {
     let doc = XmlDocument()
@@ -108,9 +108,9 @@ main() {
 ### 解析 XML 字符串
 
 ```cangjie
-import cangjie_xml.dom.*
-import cangjie_xml.parser.*
-import cangjie_xml.error.*
+import fastxml.dom.*
+import fastxml.parser.*
+import fastxml.error.*
 
 main() {
     try {
@@ -135,9 +135,9 @@ main() {
 ### Builder DSL + 类型化查询
 
 ```cangjie
-import cangjie_xml.dom.*
-import cangjie_xml.build.*
-import cangjie_xml.query.*
+import fastxml.dom.*
+import fastxml.build.*
+import fastxml.query.*
 
 main() {
     // 用 Builder 构造
@@ -167,8 +167,8 @@ main() {
 ### 遍历：函数式 walk 与经典 Visitor
 
 ```cangjie
-import cangjie_xml.dom.*
-import cangjie_xml.visit.*
+import fastxml.dom.*
+import fastxml.visit.*
 
 main() {
     let doc = /* ... */
@@ -204,9 +204,9 @@ main() {
 ### 文件 / 字节 IO
 
 ```cangjie
-import cangjie_xml.dom.*
-import cangjie_xml.io.*
-import cangjie_xml.error.*
+import fastxml.dom.*
+import fastxml.io.*
+import fastxml.error.*
 
 main() {
     let doc = /* ... build or parse ... */
@@ -245,14 +245,14 @@ main() {
 
 ## 模块概览
 
-### `cangjie_xml`（根包）
+### `fastxml`（根包）
 
 | 符号                            | 说明                |
 | ------------------------------- | ------------------- |
 | `CANGJIE_XML_VERSION: String`   | 编译期版本号常量    |
 | `cangjieXmlVersion(): String`   | 运行时版本探测函数  |
 
-### `cangjie_xml.error`
+### `fastxml.error`
 
 | 类型            | 说明                                                                                       |
 | --------------- | ------------------------------------------------------------------------------------------ |
@@ -260,7 +260,7 @@ main() {
 | `XmlError`      | 库级错误枚举，共 14 个构造器，覆盖 DOM / 解析 / IO 三类场景，实现 `ToString`。             |
 | `XmlException`  | 不可预期的 API 误用异常（例如成环、跨文档插入）。                                          |
 
-### `cangjie_xml.dom` —— DOM 内核
+### `fastxml.dom` —— DOM 内核
 
 #### 类型总览
 
@@ -340,7 +340,7 @@ match (node.kind()) {
 
 轻量数据类，字段均可变。`XmlText` 额外带 `isCdata: Bool` 用以标记 CDATA 段。
 
-### `cangjie_xml.writer` —— 序列化
+### `fastxml.writer` —— 序列化
 
 #### 公共入口
 

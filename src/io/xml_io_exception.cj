@@ -1,6 +1,6 @@
-package cangjie_xml.io
+package fastxml.io
 
-import cangjie_xml.error.*
+import fastxml.error.*
 
 /**
  * IO 期异常——读取 / 写入失败时抛出，携带一个 `XmlError`。

@@ -1,4 +1,4 @@
-package cangjie_xml.error
+package fastxml.error
 
 import std.unittest.*
 import std.unittest.testmacro.*

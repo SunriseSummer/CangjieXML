@@ -1,4 +1,4 @@
-package cangjie_xml.error
+package fastxml.error
 
 /**
  * CangjieXML 库统一的错误类型。

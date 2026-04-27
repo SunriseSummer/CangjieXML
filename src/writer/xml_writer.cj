@@ -1,7 +1,7 @@
-package cangjie_xml.writer
+package fastxml.writer
 
-import cangjie_xml.dom.*
-import cangjie_xml.internal.*
+import fastxml.dom.*
+import fastxml.internal.*
 
 /**
  * XML 写出器：把 DOM 子树序列化为 XML 文本并写入指定 `XmlSink`。

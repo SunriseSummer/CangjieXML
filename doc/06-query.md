@@ -1,11 +1,11 @@
 # 06 — Query
 
-包：`cangjie_xml.query`
+包：`fastxml.query`
 
 为 `XmlElement` 补齐**类型化查询**能力——属性 / 子元素的读取带自动解码，
 缺失 / 解析失败有清晰的 `Option` 语义与必填语义分层。
 
-引入：`import cangjie_xml.query.*`。用户**无需**显式引用 `XmlQueryable` 接口，
+引入：`import fastxml.query.*`。用户**无需**显式引用 `XmlQueryable` 接口，
 方法已通过 `extend` 挂在 `XmlElement` 上。
 
 ---

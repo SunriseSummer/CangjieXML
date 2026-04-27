@@ -1,4 +1,4 @@
-package cangjie_xml.internal
+package fastxml.internal
 
 import std.unittest.*
 import std.unittest.testmacro.*

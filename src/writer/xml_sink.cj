@@ -1,4 +1,4 @@
-package cangjie_xml.writer
+package fastxml.writer
 
 /**
  * 字符串输出汇聚点。`XmlWriter` 通过 `XmlSink` 与真正的目的地（字符串缓冲区、

@@ -1,4 +1,4 @@
-package cangjie_xml.dom
+package fastxml.dom
 
 /**
  * XML 文档：整棵 DOM 树的根容器。

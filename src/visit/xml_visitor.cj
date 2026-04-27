@@ -1,6 +1,6 @@
-package cangjie_xml.visit
+package fastxml.visit
 
-import cangjie_xml.dom.*
+import fastxml.dom.*
 
 /**
  * 经典 OO 访问者接口。

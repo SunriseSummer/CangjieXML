@@ -1,14 +1,14 @@
-package cangjie_xml.query
+package fastxml.query
 
 import std.collection.*
-import cangjie_xml.dom.*
-import cangjie_xml.error.*
+import fastxml.dom.*
+import fastxml.error.*
 
 /**
  * `XmlElement` 的查询便利扩展——属性访问、必填语义、子元素按名字定位。
  *
  * 通过 `<: XmlQueryable` 满足跨包扩展可见性要求，让 `import
- * cangjie_xml.query.*` 后即可直接在 `XmlElement` 上使用本节方法。
+ * fastxml.query.*` 后即可直接在 `XmlElement` 上使用本节方法。
  */
 extend XmlElement <: XmlQueryable {
 

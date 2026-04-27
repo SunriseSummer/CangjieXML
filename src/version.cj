@@ -1,4 +1,4 @@
-package cangjie_xml
+package fastxml
 
 /**
  * CangjieXML 库版本号。
