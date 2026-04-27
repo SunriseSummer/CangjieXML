@@ -1,22 +1,18 @@
-# CangjieXML / Python xml.etree / tinyxml2 性能对比
+# 性能对比：CangjieXML / tinyxml2 / Python xml.etree
 
-> 本报告由 `perf/run.py` 自动生成；请勿手工修改。重新生成方法：`python3 perf/run.py`。仓颉侧统一按 `-O2` 编译。
+> 由 `perf/report.py` 自动生成，请勿手工修改。
+> 重新生成：先 `python3 perf/bench.py` 跑基准，再 `python3 perf/report.py` 出报告。
 
 ## 测试方法
 
-- **三端共享同一份 fixtures**（`perf/fixtures/`）：Python `xml.sax.saxutils` 写出的紧凑 UTF-8 XML，三种典型形态：目录型 `catalog`、属性密集型 `config`、深嵌套 `deep`，每种 small / medium / large 三档共 9 个 fixture。
-- **四个典型场景**：
-  1. `parse`     — 把字节解析为 DOM。
-  2. `serialize` — 把 DOM 序列化为字节（紧凑模式）。
-  3. `roundtrip` — `parse` 后立刻 `serialize`，体现读写完整闭环。
-  4. `traverse`  — 深度遍历整棵 DOM，统计元素与属性数量。
-- **计时**：单调时钟（C++ `steady_clock` / Python `perf_counter_ns` / Cangjie `MonoTime`），单位毫秒。
-- **每个单元跑 N 次取平均**，N 由 fixture 字节量决定，目标单元总耗时落在 0.05 ~ 5s 区间，稀释噪声同时控制总时长。
-- **库版本**：CangjieXML（本仓库）、Python `xml.etree.ElementTree`（系统 Python）、tinyxml2 11.0.0（仓内 `.tinyxml2-11.0.0/`，`-O2 -DNDEBUG` 编译）。
+- 三端共享同一组 fixture（`perf/fixtures/`）：紧凑 UTF-8 XML，覆盖目录型 / 属性密集型 / 深嵌套三种形态，每种 small / medium / large 三档共 9 份。
+- 四个场景：`parse` 解析为 DOM、`serialize` 序列化为字节、`roundtrip` 解析后立即序列化、`traverse` 深度遍历整棵 DOM。
+- 计时：单调时钟（C++ `steady_clock` / Python `perf_counter_ns` / 仓颉 `MonoTime`），单位毫秒；每个单元跑 N 次取平均，N 由 fixture 字节量决定，目标单元总耗时落在 0.05 ~ 5s 区间。
+- 库版本：CangjieXML（本仓库，`-O2`）、tinyxml2 11.0.0（`-O2 -DNDEBUG`）、Python `xml.etree.ElementTree`（系统 Python）。
 
 ## fixture 概况
 
-| fixture | 字节数 | 形态说明 |
+| fixture | 字节数 | 形态 |
 |---|--:|---|
 | `catalog_small.xml` | 16,233 | 目录/条目/属性/文本（最常见的业务文档） |
 | `catalog_medium.xml` | 831,828 | 目录/条目/属性/文本（最常见的业务文档） |
@@ -32,137 +28,74 @@
 
 | fixture | 迭代 | CangjieXML (ms/次) | tinyxml2 (ms/次) | Python xml.etree (ms/次) | CangjieXML 倍率 | Python xml.etree 倍率 |
 |---|--:|--:|--:|--:|--:|--:|
-| `catalog_small.xml` | 500 | 0.2438 | 0.2096 | 0.2677 | 1.16× | 1.28× |
-| `catalog_medium.xml` | 30 | 11.133 | 10.882 | 16.687 | 1.02× | 1.53× |
-| `catalog_large.xml` | 5 | 95.380 | 68.900 | 109.5 | 1.38× | 1.59× |
-| `config_small.xml` | 500 | 0.0559 | 0.0384 | 0.1300 | 1.46× | 3.39× |
-| `config_medium.xml` | 60 | 3.509 | 1.910 | 6.598 | 1.84× | 3.45× |
-| `config_large.xml` | 10 | 23.982 | 12.230 | 45.934 | 1.96× | 3.76× |
-| `deep_small.xml` | 500 | 0.0125 | 0.0126 | 0.0354 | 0.99× | 2.81× |
-| `deep_medium.xml` | 200 | 0.0520 | 0.0714 | 0.1350 | 0.73× | 1.89× |
-| `deep_large.xml` | 50 | 0.1069 | 0.1947 | 0.3338 | 0.55× | 1.71× |
+| `catalog_small.xml` | 500 | 0.2435 | 0.1932 | 0.2649 | 1.26× | 1.37× |
+| `catalog_medium.xml` | 30 | 13.913 | 10.480 | 16.780 | 1.33× | 1.60× |
+| `catalog_large.xml` | 5 | 125.2 | 63.414 | 109.2 | 1.97× | 1.72× |
+| `config_small.xml` | 500 | 0.0561 | 0.0387 | 0.1302 | 1.45× | 3.36× |
+| `config_medium.xml` | 60 | 3.144 | 1.916 | 6.421 | 1.64× | 3.35× |
+| `config_large.xml` | 10 | 22.757 | 13.035 | 46.686 | 1.75× | 3.58× |
+| `deep_small.xml` | 500 | 0.0129 | 0.0130 | 0.0351 | 0.99× | 2.71× |
+| `deep_medium.xml` | 200 | 0.0528 | 0.0709 | 0.1350 | 0.74× | 1.90× |
+| `deep_large.xml` | 50 | 0.1107 | 0.1937 | 0.3360 | 0.57× | 1.73× |
 
 > 倍率列以 `tinyxml2` 为 1×；数值越小越快。
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 592" role="img" aria-label="parse 场景对比直方图" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="11"><text x="170" y="16" font-size="13" font-weight="600">场景：parse（条长按 fixture 内最大值归一，尾部为实际 ms/次）</text><rect x="170" y="21" width="12" height="10" fill="#2F7DC1"/><text x="186" y="30">CangjieXML</text><rect x="274" y="21" width="12" height="10" fill="#7AAE5E"/><text x="290" y="30">tinyxml2</text><rect x="362" y="21" width="12" height="10" fill="#D08C3F"/><text x="378" y="30">Python xml.etree</text><rect x="170" y="36" width="460" height="526" fill="#fafafa" stroke="#e0e0e0"/><text x="162" y="63.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">catalog_small.xml</text><rect x="170" y="36" width="422.76" height="14" fill="#2F7DC1"/><text x="596.76" y="47" fill="#333">0.2435</text><rect x="170" y="52" width="335.48" height="14" fill="#7AAE5E"/><text x="509.48" y="63" fill="#333">0.1932</text><rect x="170" y="68" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="79" fill="#333">0.2649</text><text x="162" y="123.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">catalog_medium.xml</text><rect x="170" y="96" width="381.40" height="14" fill="#2F7DC1"/><text x="555.40" y="107" fill="#333">13.913</text><rect x="170" y="112" width="287.29" height="14" fill="#7AAE5E"/><text x="461.29" y="123" fill="#333">10.480</text><rect x="170" y="128" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="139" fill="#333">16.780</text><text x="162" y="183.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">catalog_large.xml</text><rect x="170" y="156" width="460.00" height="14" fill="#2F7DC1"/><text x="634.00" y="167" fill="#333">125.2</text><rect x="170" y="172" width="233.08" height="14" fill="#7AAE5E"/><text x="407.08" y="183" fill="#333">63.414</text><rect x="170" y="188" width="401.42" height="14" fill="#D08C3F"/><text x="575.42" y="199" fill="#333">109.2</text><text x="162" y="243.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">config_small.xml</text><rect x="170" y="216" width="198.27" height="14" fill="#2F7DC1"/><text x="372.27" y="227" fill="#333">0.0561</text><rect x="170" y="232" width="136.73" height="14" fill="#7AAE5E"/><text x="310.73" y="243" fill="#333">0.0387</text><rect x="170" y="248" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="259" fill="#333">0.1302</text><text x="162" y="303.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">config_medium.xml</text><rect x="170" y="276" width="225.26" height="14" fill="#2F7DC1"/><text x="399.26" y="287" fill="#333">3.144</text><rect x="170" y="292" width="137.25" height="14" fill="#7AAE5E"/><text x="311.25" y="303" fill="#333">1.916</text><rect x="170" y="308" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="319" fill="#333">6.421</text><text x="162" y="363.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">config_large.xml</text><rect x="170" y="336" width="224.22" height="14" fill="#2F7DC1"/><text x="398.22" y="347" fill="#333">22.757</text><rect x="170" y="352" width="128.43" height="14" fill="#7AAE5E"/><text x="302.43" y="363" fill="#333">13.035</text><rect x="170" y="368" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="379" fill="#333">46.686</text><text x="162" y="423.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">deep_small.xml</text><rect x="170" y="396" width="168.58" height="14" fill="#2F7DC1"/><text x="342.58" y="407" fill="#333">0.0129</text><rect x="170" y="412" width="169.68" height="14" fill="#7AAE5E"/><text x="343.68" y="423" fill="#333">0.0130</text><rect x="170" y="428" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="439" fill="#333">0.0351</text><text x="162" y="483.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">deep_medium.xml</text><rect x="170" y="456" width="179.84" height="14" fill="#2F7DC1"/><text x="353.84" y="467" fill="#333">0.0528</text><rect x="170" y="472" width="241.62" height="14" fill="#7AAE5E"/><text x="415.62" y="483" fill="#333">0.0709</text><rect x="170" y="488" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="499" fill="#333">0.1350</text><text x="162" y="543.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">deep_large.xml</text><rect x="170" y="516" width="151.55" height="14" fill="#2F7DC1"/><text x="325.55" y="527" fill="#333">0.1107</text><rect x="170" y="532" width="265.14" height="14" fill="#7AAE5E"/><text x="439.14" y="543" fill="#333">0.1937</text><rect x="170" y="548" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="559" fill="#333">0.3360</text></svg>
 
 ## 场景：`serialize`
 
 | fixture | 迭代 | CangjieXML (ms/次) | tinyxml2 (ms/次) | Python xml.etree (ms/次) | CangjieXML 倍率 | Python xml.etree 倍率 |
 |---|--:|--:|--:|--:|--:|--:|
-| `catalog_small.xml` | 500 | 0.1703 | 0.0484 | 1.023 | 3.52× | 21.1× |
-| `catalog_medium.xml` | 30 | 9.401 | 3.298 | 49.881 | 2.85× | 15.1× |
-| `catalog_large.xml` | 5 | 63.780 | 16.989 | 302.0 | 3.75× | 17.8× |
-| `config_small.xml` | 500 | 0.0616 | 0.0187 | 0.4043 | 3.29× | 21.6× |
-| `config_medium.xml` | 60 | 3.402 | 0.9249 | 18.922 | 3.68× | 20.5× |
-| `config_large.xml` | 10 | 22.410 | 5.735 | 113.0 | 3.91× | 19.7× |
-| `deep_small.xml` | 500 | 0.0149 | 0.0048 | 0.1286 | 3.14× | 27.1× |
-| `deep_medium.xml` | 200 | 0.0579 | 0.0194 | 0.6749 | 2.99× | 34.8× |
-| `deep_large.xml` | 50 | 0.1164 | 0.0386 | 1.312 | 3.01× | 34.0× |
+| `catalog_small.xml` | 500 | 0.1958 | 0.0466 | 1.051 | 4.21× | 22.6× |
+| `catalog_medium.xml` | 30 | 9.460 | 3.278 | 51.089 | 2.89× | 15.6× |
+| `catalog_large.xml` | 5 | 61.348 | 16.236 | 307.7 | 3.78× | 19.0× |
+| `config_small.xml` | 500 | 0.0616 | 0.0186 | 0.4097 | 3.31× | 22.0× |
+| `config_medium.xml` | 60 | 3.539 | 0.9217 | 19.403 | 3.84× | 21.1× |
+| `config_large.xml` | 10 | 20.879 | 5.888 | 116.0 | 3.55× | 19.7× |
+| `deep_small.xml` | 500 | 0.0151 | 0.0049 | 0.1325 | 3.08× | 27.1× |
+| `deep_medium.xml` | 200 | 0.0582 | 0.0195 | 0.6938 | 2.99× | 35.6× |
+| `deep_large.xml` | 50 | 0.1161 | 0.0398 | 1.343 | 2.92× | 33.8× |
 
 > 倍率列以 `tinyxml2` 为 1×；数值越小越快。
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 592" role="img" aria-label="serialize 场景对比直方图" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="11"><text x="170" y="16" font-size="13" font-weight="600">场景：serialize（条长按 fixture 内最大值归一，尾部为实际 ms/次）</text><rect x="170" y="21" width="12" height="10" fill="#2F7DC1"/><text x="186" y="30">CangjieXML</text><rect x="274" y="21" width="12" height="10" fill="#7AAE5E"/><text x="290" y="30">tinyxml2</text><rect x="362" y="21" width="12" height="10" fill="#D08C3F"/><text x="378" y="30">Python xml.etree</text><rect x="170" y="36" width="460" height="526" fill="#fafafa" stroke="#e0e0e0"/><text x="162" y="63.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">catalog_small.xml</text><rect x="170" y="36" width="85.69" height="14" fill="#2F7DC1"/><text x="259.69" y="47" fill="#333">0.1958</text><rect x="170" y="52" width="20.37" height="14" fill="#7AAE5E"/><text x="194.37" y="63" fill="#333">0.0466</text><rect x="170" y="68" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="79" fill="#333">1.051</text><text x="162" y="123.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">catalog_medium.xml</text><rect x="170" y="96" width="85.18" height="14" fill="#2F7DC1"/><text x="259.18" y="107" fill="#333">9.460</text><rect x="170" y="112" width="29.51" height="14" fill="#7AAE5E"/><text x="203.51" y="123" fill="#333">3.278</text><rect x="170" y="128" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="139" fill="#333">51.089</text><text x="162" y="183.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">catalog_large.xml</text><rect x="170" y="156" width="91.70" height="14" fill="#2F7DC1"/><text x="265.70" y="167" fill="#333">61.348</text><rect x="170" y="172" width="24.27" height="14" fill="#7AAE5E"/><text x="198.27" y="183" fill="#333">16.236</text><rect x="170" y="188" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="199" fill="#333">307.7</text><text x="162" y="243.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">config_small.xml</text><rect x="170" y="216" width="69.21" height="14" fill="#2F7DC1"/><text x="243.21" y="227" fill="#333">0.0616</text><rect x="170" y="232" width="20.93" height="14" fill="#7AAE5E"/><text x="194.93" y="243" fill="#333">0.0186</text><rect x="170" y="248" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="259" fill="#333">0.4097</text><text x="162" y="303.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">config_medium.xml</text><rect x="170" y="276" width="83.91" height="14" fill="#2F7DC1"/><text x="257.91" y="287" fill="#333">3.539</text><rect x="170" y="292" width="21.85" height="14" fill="#7AAE5E"/><text x="195.85" y="303" fill="#333">0.9217</text><rect x="170" y="308" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="319" fill="#333">19.403</text><text x="162" y="363.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">config_large.xml</text><rect x="170" y="336" width="82.79" height="14" fill="#2F7DC1"/><text x="256.79" y="347" fill="#333">20.879</text><rect x="170" y="352" width="23.35" height="14" fill="#7AAE5E"/><text x="197.35" y="363" fill="#333">5.888</text><rect x="170" y="368" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="379" fill="#333">116.0</text><text x="162" y="423.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">deep_small.xml</text><rect x="170" y="396" width="52.36" height="14" fill="#2F7DC1"/><text x="226.36" y="407" fill="#333">0.0151</text><rect x="170" y="412" width="16.97" height="14" fill="#7AAE5E"/><text x="190.97" y="423" fill="#333">0.0049</text><rect x="170" y="428" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="439" fill="#333">0.1325</text><text x="162" y="483.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">deep_medium.xml</text><rect x="170" y="456" width="38.59" height="14" fill="#2F7DC1"/><text x="212.59" y="467" fill="#333">0.0582</text><rect x="170" y="472" width="12.91" height="14" fill="#7AAE5E"/><text x="186.91" y="483" fill="#333">0.0195</text><rect x="170" y="488" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="499" fill="#333">0.6938</text><text x="162" y="543.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">deep_large.xml</text><rect x="170" y="516" width="39.77" height="14" fill="#2F7DC1"/><text x="213.77" y="527" fill="#333">0.1161</text><rect x="170" y="532" width="13.63" height="14" fill="#7AAE5E"/><text x="187.63" y="543" fill="#333">0.0398</text><rect x="170" y="548" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="559" fill="#333">1.343</text></svg>
 
 ## 场景：`roundtrip`
 
 | fixture | 迭代 | CangjieXML (ms/次) | tinyxml2 (ms/次) | Python xml.etree (ms/次) | CangjieXML 倍率 | Python xml.etree 倍率 |
 |---|--:|--:|--:|--:|--:|--:|
-| `catalog_small.xml` | 500 | 0.3137 | 0.2887 | 1.337 | 1.09× | 4.63× |
-| `catalog_medium.xml` | 30 | 20.946 | 14.334 | 64.273 | 1.46× | 4.48× |
-| `catalog_large.xml` | 5 | 205.8 | 89.304 | 412.0 | 2.30× | 4.61× |
-| `config_small.xml` | 500 | 0.1215 | 0.0599 | 0.5586 | 2.03× | 9.33× |
-| `config_medium.xml` | 60 | 7.221 | 2.906 | 25.271 | 2.48× | 8.70× |
-| `config_large.xml` | 10 | 47.732 | 25.772 | 157.3 | 1.85× | 6.10× |
-| `deep_small.xml` | 500 | 0.0279 | 0.0176 | 0.1739 | 1.58× | 9.88× |
-| `deep_medium.xml` | 200 | 0.1114 | 0.0913 | 0.8767 | 1.22× | 9.60× |
-| `deep_large.xml` | 50 | 0.2300 | 0.2343 | 1.692 | 0.98× | 7.22× |
+| `catalog_small.xml` | 500 | 0.3604 | 0.2697 | 1.330 | 1.34× | 4.93× |
+| `catalog_medium.xml` | 30 | 20.790 | 13.802 | 66.459 | 1.51× | 4.82× |
+| `catalog_large.xml` | 5 | 190.2 | 86.930 | 417.3 | 2.19× | 4.80× |
+| `config_small.xml` | 500 | 0.1260 | 0.0592 | 0.5597 | 2.13× | 9.46× |
+| `config_medium.xml` | 60 | 7.345 | 2.943 | 25.638 | 2.50× | 8.71× |
+| `config_large.xml` | 10 | 50.720 | 26.859 | 159.2 | 1.89× | 5.93× |
+| `deep_small.xml` | 500 | 0.0279 | 0.0180 | 0.1743 | 1.55× | 9.70× |
+| `deep_medium.xml` | 200 | 0.1120 | 0.0913 | 0.8975 | 1.23× | 9.83× |
+| `deep_large.xml` | 50 | 0.2221 | 0.2338 | 1.741 | 0.95× | 7.45× |
 
 > 倍率列以 `tinyxml2` 为 1×；数值越小越快。
+
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 592" role="img" aria-label="roundtrip 场景对比直方图" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="11"><text x="170" y="16" font-size="13" font-weight="600">场景：roundtrip（条长按 fixture 内最大值归一，尾部为实际 ms/次）</text><rect x="170" y="21" width="12" height="10" fill="#2F7DC1"/><text x="186" y="30">CangjieXML</text><rect x="274" y="21" width="12" height="10" fill="#7AAE5E"/><text x="290" y="30">tinyxml2</text><rect x="362" y="21" width="12" height="10" fill="#D08C3F"/><text x="378" y="30">Python xml.etree</text><rect x="170" y="36" width="460" height="526" fill="#fafafa" stroke="#e0e0e0"/><text x="162" y="63.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">catalog_small.xml</text><rect x="170" y="36" width="124.63" height="14" fill="#2F7DC1"/><text x="298.63" y="47" fill="#333">0.3604</text><rect x="170" y="52" width="93.26" height="14" fill="#7AAE5E"/><text x="267.26" y="63" fill="#333">0.2697</text><rect x="170" y="68" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="79" fill="#333">1.330</text><text x="162" y="123.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">catalog_medium.xml</text><rect x="170" y="96" width="143.90" height="14" fill="#2F7DC1"/><text x="317.90" y="107" fill="#333">20.790</text><rect x="170" y="112" width="95.53" height="14" fill="#7AAE5E"/><text x="269.53" y="123" fill="#333">13.802</text><rect x="170" y="128" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="139" fill="#333">66.459</text><text x="162" y="183.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">catalog_large.xml</text><rect x="170" y="156" width="209.70" height="14" fill="#2F7DC1"/><text x="383.70" y="167" fill="#333">190.2</text><rect x="170" y="172" width="95.82" height="14" fill="#7AAE5E"/><text x="269.82" y="183" fill="#333">86.930</text><rect x="170" y="188" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="199" fill="#333">417.3</text><text x="162" y="243.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">config_small.xml</text><rect x="170" y="216" width="103.53" height="14" fill="#2F7DC1"/><text x="277.53" y="227" fill="#333">0.1260</text><rect x="170" y="232" width="48.64" height="14" fill="#7AAE5E"/><text x="222.64" y="243" fill="#333">0.0592</text><rect x="170" y="248" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="259" fill="#333">0.5597</text><text x="162" y="303.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">config_medium.xml</text><rect x="170" y="276" width="131.79" height="14" fill="#2F7DC1"/><text x="305.79" y="287" fill="#333">7.345</text><rect x="170" y="292" width="52.80" height="14" fill="#7AAE5E"/><text x="226.80" y="303" fill="#333">2.943</text><rect x="170" y="308" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="319" fill="#333">25.638</text><text x="162" y="363.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">config_large.xml</text><rect x="170" y="336" width="146.57" height="14" fill="#2F7DC1"/><text x="320.57" y="347" fill="#333">50.720</text><rect x="170" y="352" width="77.62" height="14" fill="#7AAE5E"/><text x="251.62" y="363" fill="#333">26.859</text><rect x="170" y="368" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="379" fill="#333">159.2</text><text x="162" y="423.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">deep_small.xml</text><rect x="170" y="396" width="73.60" height="14" fill="#2F7DC1"/><text x="247.60" y="407" fill="#333">0.0279</text><rect x="170" y="412" width="47.40" height="14" fill="#7AAE5E"/><text x="221.40" y="423" fill="#333">0.0180</text><rect x="170" y="428" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="439" fill="#333">0.1743</text><text x="162" y="483.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">deep_medium.xml</text><rect x="170" y="456" width="57.40" height="14" fill="#2F7DC1"/><text x="231.40" y="467" fill="#333">0.1120</text><rect x="170" y="472" width="46.82" height="14" fill="#7AAE5E"/><text x="220.82" y="483" fill="#333">0.0913</text><rect x="170" y="488" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="499" fill="#333">0.8975</text><text x="162" y="543.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">deep_large.xml</text><rect x="170" y="516" width="58.68" height="14" fill="#2F7DC1"/><text x="232.68" y="527" fill="#333">0.2221</text><rect x="170" y="532" width="61.78" height="14" fill="#7AAE5E"/><text x="235.78" y="543" fill="#333">0.2338</text><rect x="170" y="548" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="559" fill="#333">1.741</text></svg>
 
 ## 场景：`traverse`
 
 | fixture | 迭代 | CangjieXML (ms/次) | tinyxml2 (ms/次) | Python xml.etree (ms/次) | CangjieXML 倍率 | Python xml.etree 倍率 |
 |---|--:|--:|--:|--:|--:|--:|
-| `catalog_small.xml` | 500 | 0.0145 | 0.0059 | 0.0313 | 2.46× | 5.32× |
-| `catalog_medium.xml` | 30 | 0.9267 | 0.2955 | 1.702 | 3.14× | 5.76× |
-| `catalog_large.xml` | 5 | 49.349 | 3.411 | 15.337 | 14.5× | 4.50× |
-| `config_small.xml` | 500 | 0.0018 | 0.000722 | 0.0065 | 2.54× | 8.95× |
-| `config_medium.xml` | 60 | 0.2097 | 0.0583 | 0.3505 | 3.59× | 6.01× |
-| `config_large.xml` | 10 | 0.7146 | 0.4619 | 2.157 | 1.55× | 4.67× |
-| `deep_small.xml` | 500 | 0.000980 | 0.000407 | 0.0033 | 2.41× | 8.19× |
-| `deep_medium.xml` | 200 | 0.0042 | 0.0016 | 0.0135 | 2.69× | 8.67× |
-| `deep_large.xml` | 50 | 0.0090 | 0.0032 | 0.0303 | 2.80× | 9.43× |
+| `catalog_small.xml` | 500 | 0.0146 | 0.0035 | 0.0334 | 4.15× | 9.48× |
+| `catalog_medium.xml` | 30 | 0.8036 | 0.2058 | 1.774 | 3.90× | 8.62× |
+| `catalog_large.xml` | 5 | 6.272 | 3.039 | 15.730 | 2.06× | 5.18× |
+| `config_small.xml` | 500 | 0.0020 | 0.000627 | 0.0070 | 3.20× | 11.1× |
+| `config_medium.xml` | 60 | 0.1027 | 0.0696 | 0.3672 | 1.48× | 5.28× |
+| `config_large.xml` | 10 | 4.095 | 0.4705 | 2.196 | 8.70× | 4.67× |
+| `deep_small.xml` | 500 | 0.0011 | 0.000345 | 0.0032 | 3.26× | 9.20× |
+| `deep_medium.xml` | 200 | 0.0042 | 0.0013 | 0.0129 | 3.36× | 10.3× |
+| `deep_large.xml` | 50 | 0.0089 | 0.0024 | 0.0272 | 3.69× | 11.3× |
 
 > 倍率列以 `tinyxml2` 为 1×；数值越小越快。
 
-## 结论与观察
-
-- **tinyxml2** 作为成熟 C++ 库（原地分段 + 内存池 + strchr/SSE），在各场景上是最快基线。
-- **CangjieXML** 在 `-O2` 下相对 tinyxml2 的倍率落在 **约 1× ~ 4×**；`serialize` / `traverse` 稳定**反超 Python `xml.etree`**，`roundtrip` 在中大 fixture 上同样领先 Python。
-
-## 测试期间对 fastxml 库的 bug 排查
-
-性能测试本身是高强度负载（每个 fixture 跑数十到数百轮 parse / serialize / roundtrip / traverse），既能暴露明显的 perf 瓶颈，也会触发不少边界路径。**结论：未发现功能性 bug**，详细排查记录如下。
-
-### ✅ 排查 1：roundtrip 字节级一致性
-
-把 9 份 fixture 各自做 `parse → writeXmlToBytes(compactPreset)` 并与原始字节做 byte-by-byte 比对：
-
-| fixture | 字节差异数 | 大小变化 |
-|---|--:|--:|
-| `catalog_small.xml` | 0 | 0 |
-| `catalog_medium.xml` | 0 | 0 |
-| `catalog_large.xml` | 0 | 0 |
-| `config_small.xml` | 0 | 0 |
-| `config_medium.xml` | 0 | 0 |
-| `config_large.xml` | 0 | 0 |
-| `deep_small.xml` | 0 | 0 |
-| `deep_medium.xml` | 0 | 0 |
-| `deep_large.xml` | 0 | 0 |
-
-9/9 完全一致。**结论：parse / writer 在生产口径下无信息丢失。**
-
-### ✅ 排查 2：边界 / 棘手语法
-
-额外构造了一份覆盖 "难写" 语法的 XML 做 roundtrip：
-
-- 五种实体引用混合（`&amp; &lt; &gt; &quot;` + `&#xNNNN;`）；
-- CDATA 段嵌入 `]]>` 序列（需触发 `]]><![CDATA[` 拆分语义）；
-- 注释紧邻 CDATA 紧邻自闭合元素；
-- 空属性值、命名空间属性、属性带特殊字符。
-
-唯一的字节差异来自 `&#x4E2D;&#x6587;` → `中文`——数值字符引用被解码为字面量。**该行为与 tinyxml2 / Python `xml.etree` 完全一致**（XML 语义等价），不是 bug。其余复杂路径（包括 CDATA 拆分编码 `]]]]><![CDATA[>`）roundtrip 字节级一致。
-
-### ✅ 排查 3：现有 260 个单元测试全部通过
-
-`cjpm test` 全量绿（`PASSED: 260, SKIPPED: 0, FAILED: 0`），包括 dom / parser / writer / io / visit / query / build / doc_examples 等所有包；e2etest/xml 五种模式（parse / roundtrip-pretty / roundtrip-compact / bytes / builder）全部 PASS。
-
-### ⚠️ 观察 4：解析器内存峰值偏高（perf 特性，非 bug）
-
-解析 5 MB fixture 时 Cangjie 默认 heap（约 256 MB）会触发 `Out of memory`——`run.py` 通过设置 `cjHeapSize=4GB` 规避。根因在 `SourceCursor` 一次性把整段输入物化为 `Array<Rune>`（每码点 4 字节，5 MB ASCII → ~20 MB rune 数组 ×ArrayList 扩容副本 ≈ 40 MB 即时占用），叠加 DOM 节点本身的小对象开销与 GC 暂未及时回收，迭代叠加触发 OOM。
-
-### 剩余差距溯源 → 仓颉编译器 / 运行时 / 标准库
-
-DOM / parser / writer / escape 层面的算法优化已经基本榨干（参考 tinyxml2 的实现思路：原地分段切片 / 零拷贝 sub-string / 内存池 / strchr-SSE 字节查找）。**剩余 6~35× 的差距，根因不在 fastxml 算法层，而落在仓颉编译器、运行时与标准库的通用性能特性上。**
-
-已在 `problem.md` 中按观察到的影响维度记录了 **8 个具体的低效实现**（含复现路径、估算量化影响、对照实现），可作为反馈给 Cangjie SDK 团队的素材：
-
-1. P1：`String` 内部 UTF-8 但 `Rune` 解码到 4-byte——parser 必须前置物化 `Array<Rune>`，5 MB ASCII 输入即耗 ~20 MB。
-2. P1：闭包参数 `(T) -> R` 触发堆分配——XML 闭包密集场景的 GC 压力源，逼迫库代码用宏式特化 workaround（已在 `SourceCursor` 里手动展开 `skipNameChars` / `skipUntilLt` / `skipAttrValueChars`）。
-3. P2：`Iterable<T>` / `Iterator<T>` 接口虚分发 + Option 装箱——writer 索引迭代成为唯一性能可接受的方案。
-4. P2：`String.runes()` 没有零开销 `forEachByte` 等价物。
-5. P2：`StringBuilder` 缺公开容量预分配 API（构造器只接受空 / 字符串）。
-6. P2：`HashMap<String, V>` 哈希函数对短键也走全字节扫描，无 inline cache。
-7. P3：`String → Array<Byte>` 与 `StringBuilder → Array<Byte>` 路径重复做一次 UTF-8 编码，没有零拷贝出口。
-8. P3：缺乏 SIMD/intrinsic：字节扫描特殊字符 (`<` `&` `"`) 只能逐字节 if-比较，对照 C 端的 `strchr` / `_mm_cmpestri` 有数量级差距。
-
-详见仓库根的 `problem.md`。这些项的修复或公开 API 暴露能让 fastxml 进一步逼近 tinyxml2 量级，且会同时受益于其它字符密集型库（JSON / TOML / 协议解析等）。
-
-### 后续应用层可继续推进的优化（不依赖 SDK 修复）
-
-1. **`SourceCursor` 完全字节流扫描化**：当前 ASCII 输入下 `sliceString` 已经直接走原 `String` 字节切片，但 `runes` 仍被完整物化（用于 `peek` / `advance` 等热路径上的码点等值比较）。下一步可彻底废弃整体 `Array<Rune>` 前置物化，改为 UTF-8 字节流 + 按需解码；理论上 parse 内存峰值再降 ~4×，属结构性改动需独立 PR 推进。
-2. **DOM 节点对象池**：现在每个 `XmlElement` / `XmlText` / `XmlAttribute` 都是单独 class 实例，5 MB fixture 解析过程中会产生 ~50 万个小对象触发 GC 抖动；可参考 tinyxml2 的 MemPool 做 size-class 池化。
-3. **streaming parse API**：跳过完整 DOM 构造、仅发事件回调，覆盖"扫一遍提取信息"场景，理论吞吐可逼近 tinyxml2。
-
-> 历史项已在仓内落地：实体解码字节扫描化、CDATA 拆分字节扫描化、`XmlElement` 属性容器懒建索引（≤ 8 个属性走线性扫描）、ASCII 输入下 `SourceCursor.sliceString` 直接走原 `String` 字节切片（避免 `Array<Rune>` 切片 + UTF-8 重编码）、`trimLeft` / `isDeclarationPayload` / `collapseWhitespace` 字节扫描化，上面的数据已包含这些改造的收益。
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 592" role="img" aria-label="traverse 场景对比直方图" font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" font-size="11"><text x="170" y="16" font-size="13" font-weight="600">场景：traverse（条长按 fixture 内最大值归一，尾部为实际 ms/次）</text><rect x="170" y="21" width="12" height="10" fill="#2F7DC1"/><text x="186" y="30">CangjieXML</text><rect x="274" y="21" width="12" height="10" fill="#7AAE5E"/><text x="290" y="30">tinyxml2</text><rect x="362" y="21" width="12" height="10" fill="#D08C3F"/><text x="378" y="30">Python xml.etree</text><rect x="170" y="36" width="460" height="526" fill="#fafafa" stroke="#e0e0e0"/><text x="162" y="63.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">catalog_small.xml</text><rect x="170" y="36" width="201.16" height="14" fill="#2F7DC1"/><text x="375.16" y="47" fill="#333">0.0146</text><rect x="170" y="52" width="48.51" height="14" fill="#7AAE5E"/><text x="222.51" y="63" fill="#333">0.0035</text><rect x="170" y="68" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="79" fill="#333">0.0334</text><text x="162" y="123.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">catalog_medium.xml</text><rect x="170" y="96" width="208.36" height="14" fill="#2F7DC1"/><text x="382.36" y="107" fill="#333">0.8036</text><rect x="170" y="112" width="53.37" height="14" fill="#7AAE5E"/><text x="227.37" y="123" fill="#333">0.2058</text><rect x="170" y="128" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="139" fill="#333">1.774</text><text x="162" y="183.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">catalog_large.xml</text><rect x="170" y="156" width="183.42" height="14" fill="#2F7DC1"/><text x="357.42" y="167" fill="#333">6.272</text><rect x="170" y="172" width="88.86" height="14" fill="#7AAE5E"/><text x="262.86" y="183" fill="#333">3.039</text><rect x="170" y="188" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="199" fill="#333">15.730</text><text x="162" y="243.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">config_small.xml</text><rect x="170" y="216" width="132.10" height="14" fill="#2F7DC1"/><text x="306.10" y="227" fill="#333">0.0020</text><rect x="170" y="232" width="41.26" height="14" fill="#7AAE5E"/><text x="215.26" y="243" fill="#333">0.000627</text><rect x="170" y="248" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="259" fill="#333">0.0070</text><text x="162" y="303.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">config_medium.xml</text><rect x="170" y="276" width="128.69" height="14" fill="#2F7DC1"/><text x="302.69" y="287" fill="#333">0.1027</text><rect x="170" y="292" width="87.15" height="14" fill="#7AAE5E"/><text x="261.15" y="303" fill="#333">0.0696</text><rect x="170" y="308" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="319" fill="#333">0.3672</text><text x="162" y="363.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">config_large.xml</text><rect x="170" y="336" width="460.00" height="14" fill="#2F7DC1"/><text x="634.00" y="347" fill="#333">4.095</text><rect x="170" y="352" width="52.85" height="14" fill="#7AAE5E"/><text x="226.85" y="363" fill="#333">0.4705</text><rect x="170" y="368" width="246.70" height="14" fill="#D08C3F"/><text x="420.70" y="379" fill="#333">2.196</text><text x="162" y="423.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">deep_small.xml</text><rect x="170" y="396" width="162.90" height="14" fill="#2F7DC1"/><text x="336.90" y="407" fill="#333">0.0011</text><rect x="170" y="412" width="50.00" height="14" fill="#7AAE5E"/><text x="224.00" y="423" fill="#333">0.000345</text><rect x="170" y="428" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="439" fill="#333">0.0032</text><text x="162" y="483.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">deep_medium.xml</text><rect x="170" y="456" width="150.10" height="14" fill="#2F7DC1"/><text x="324.10" y="467" fill="#333">0.0042</text><rect x="170" y="472" width="44.72" height="14" fill="#7AAE5E"/><text x="218.72" y="483" fill="#333">0.0013</text><rect x="170" y="488" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="499" fill="#333">0.0129</text><text x="162" y="543.0" text-anchor="end" font-family="ui-monospace,Menlo,Consolas,monospace">deep_large.xml</text><rect x="170" y="516" width="150.17" height="14" fill="#2F7DC1"/><text x="324.17" y="527" fill="#333">0.0089</text><rect x="170" y="532" width="40.67" height="14" fill="#7AAE5E"/><text x="214.67" y="543" fill="#333">0.0024</text><rect x="170" y="548" width="460.00" height="14" fill="#D08C3F"/><text x="634.00" y="559" fill="#333">0.0272</text></svg>
 
 ---
 
-原始 JSON 数据：`perf/out/{cangjie,tinyxml2,python}.json`。
+原始 JSON：`perf/out/{cangjie,tinyxml2,python}.json`。
