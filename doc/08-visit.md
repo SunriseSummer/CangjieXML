@@ -70,8 +70,8 @@ walk(doc) { kind =>
 println(count.n)
 ```
 
-> **注意**：`walk` 的回调是 lambda；cjc 1.0.5 禁止 lambda 捕获可变 `var`，
-> 聚合计数时需要把状态封装进 `class`（如 `Acc`）。
+注意：`walk` 的回调是 lambda；cjc 1.0.5 禁止 lambda 捕获可变 `var`，
+聚合计数时需要把状态封装进 `class`（如 `Acc`）。
 
 ---
 
