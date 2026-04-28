@@ -26,6 +26,11 @@ const MAX_NUMERIC_ENTITY_DIGITS: Int64 = 8 // U+10FFFF 用 6 位十六进制足�
 private const ENTITY_AMP: Byte = 0x26u8 // '&'
 private const ENTITY_SEMI: Byte = 0x3Bu8 // ';'
 private const ENTITY_HASH: Byte = 0x23u8 // '#'
+private const ENTITY_NAME_LT: String = "lt"
+private const ENTITY_NAME_GT: String = "gt"
+private const ENTITY_NAME_AMP: String = "amp"
+private const ENTITY_NAME_QUOT: String = "quot"
+private const ENTITY_NAME_APOS: String = "apos"
 
 /**
  * 解码含实体的字符串；若无 `&` 则走快路径直接返回原串。
@@ -102,24 +107,23 @@ func decodeOneEntity(s: String, start: Int64, out: StringBuilder, pos: SourcePos
 }
 
 private func appendNamedEntity(s: String, start: Int64, end: Int64, out: StringBuilder, pos: SourcePos): Unit {
-    let len = end - start
-    if (len == 2 && s[start] == b'l' && s[start + 1] == b't') {
+    if (matchesEntityName(s, start, end, ENTITY_NAME_LT)) {
         out.append(r'<')
         return
     }
-    if (len == 2 && s[start] == b'g' && s[start + 1] == b't') {
+    if (matchesEntityName(s, start, end, ENTITY_NAME_GT)) {
         out.append(r'>')
         return
     }
-    if (len == 3 && s[start] == b'a' && s[start + 1] == b'm' && s[start + 2] == b'p') {
+    if (matchesEntityName(s, start, end, ENTITY_NAME_AMP)) {
         out.append(r'&')
         return
     }
-    if (len == 4 && s[start] == b'q' && s[start + 1] == b'u' && s[start + 2] == b'o' && s[start + 3] == b't') {
+    if (matchesEntityName(s, start, end, ENTITY_NAME_QUOT)) {
         out.append(r'"')
         return
     }
-    if (len == 4 && s[start] == b'a' && s[start + 1] == b'p' && s[start + 2] == b'o' && s[start + 3] == b's') {
+    if (matchesEntityName(s, start, end, ENTITY_NAME_APOS)) {
         out.append(r'\'')
         return
     }
@@ -193,6 +197,21 @@ private func hexDigitValueByte(bv: Byte): Int64 {
         return Int64(bv - b'A') + 10
     }
     -1
+}
+
+private func matchesEntityName(s: String, start: Int64, end: Int64, expected: String): Bool {
+    let expectedSize = expected.size
+    if (end - start != expectedSize) {
+        return false
+    }
+    var offset = 0
+    while (offset < expectedSize) {
+        if (s[start + offset] != expected[offset]) {
+            return false
+        }
+        offset++
+    }
+    true
 }
 
 private func isValidXmlCodepoint(cp: Int64): Bool {
