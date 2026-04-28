@@ -23,9 +23,27 @@ public class XmlWriter {
     var depth: Int64 = 0
     var atLineStart: Bool = true
 
+    // Fast path: 当 sink 是 `StringXmlSink` 时，直接拿到其 `StringBuilder`，
+    // 绕过 `XmlSink.write` 的接口分派。CangjiePerf 显示 `string_concat`
+    // (StringBuilder) 不是仓颉强项；减少接口分派可在热路径上显著降低
+    // 单次 append 的固定开销。
+    private let directBuf: ?StringBuilder
+
     public init(sink: XmlSink, options!: XmlWriteOptions = XmlWriteOptions.default_()) {
         this.sink = sink
         this.opts = options
+        this.directBuf = match (sink) {
+            case s: StringXmlSink => Some(s.buffer)
+            case _ => None
+        }
+    }
+
+    /** 唯一的字节出口；fast-path 直写 builder，否则走 sink 接口。 */
+    private func emit(text: String): Unit {
+        match (directBuf) {
+            case Some(b) => b.append(text)
+            case None => sink.write(text)
+        }
     }
 
     public func writeDocument(doc: XmlDocument): Unit {
@@ -60,7 +78,7 @@ public class XmlWriter {
 
     private func writeBomIfNeeded(doc: XmlDocument): Unit {
         if (opts.writeBom || doc.writeBom) {
-            sink.write(UTF8_BOM_STRING)
+            emit(UTF8_BOM_STRING)
         }
     }
 
@@ -112,9 +130,9 @@ public class XmlWriter {
     private func writeTextNode(t: XmlText): Unit {
         // 文本节点的缩进策略由上层元素决定；此处只负责内容本身。
         if (t.isCdata) {
-            sink.write(escapeCdata(t.value))
+            emit(escapeCdata(t.value))
         } else {
-            sink.write(escapeText(t.value))
+            emit(escapeText(t.value))
         }
     }
 
@@ -137,12 +155,12 @@ public class XmlWriter {
     }
 
     private func finishSelfClosing(): Unit {
-        sink.write(TAG_SELF_CLOSE)
+        emit(TAG_SELF_CLOSE)
         maybeNewline()
     }
 
     private func finishAsInline(el: XmlElement): Unit {
-        sink.write(TAG_CLOSE)
+        emit(TAG_CLOSE)
         // 直接走链表，避免每次都构造迭代器对象。
         var cur = el.firstChild
         while (let Some(child) <- cur) {
@@ -154,7 +172,7 @@ public class XmlWriter {
     }
 
     private func finishAsBlock(el: XmlElement): Unit {
-        sink.write(TAG_CLOSE)
+        emit(TAG_CLOSE)
         maybeNewline()
         depth++
         var cur = el.firstChild
@@ -169,26 +187,26 @@ public class XmlWriter {
     }
 
     private func writeOpenTagWithAttrs(el: XmlElement): Unit {
-        sink.write(TAG_OPEN)
-        sink.write(el.name)
+        emit(TAG_OPEN)
+        emit(el.name)
         // 索引迭代避免为每个属性构造一个 `ArrayList.Iterator` 对象。
         let n = el.attributeCount()
         var i = 0
         while (i < n) {
             let a = el.attributeAt(i)
-            sink.write(ATTR_SPACE)
-            sink.write(a.name)
-            sink.write(ATTR_EQUALS_QUOTE)
-            sink.write(escapeAttribute(a.value))
-            sink.write(ATTR_CLOSE_QUOTE)
+            emit(ATTR_SPACE)
+            emit(a.name)
+            emit(ATTR_EQUALS_QUOTE)
+            emit(escapeAttribute(a.value))
+            emit(ATTR_CLOSE_QUOTE)
             i++
         }
     }
 
     private func writeCloseTag(name: String): Unit {
-        sink.write(TAG_OPEN_SLASH)
-        sink.write(name)
-        sink.write(TAG_CLOSE)
+        emit(TAG_OPEN_SLASH)
+        emit(name)
+        emit(TAG_CLOSE)
     }
 
     private func writeNodeInline(node: XmlNode): Unit {
@@ -206,11 +224,11 @@ public class XmlWriter {
         writeOpenTagWithAttrs(el)
         match (el.firstChild) {
             case None =>
-                sink.write(TAG_SELF_CLOSE)
+                emit(TAG_SELF_CLOSE)
                 return
             case Some(_) => ()
         }
-        sink.write(TAG_CLOSE)
+        emit(TAG_CLOSE)
         var cur = el.firstChild
         while (let Some(child) <- cur) {
             writeNodeInline(child)
@@ -220,27 +238,27 @@ public class XmlWriter {
     }
 
     private func writePiRaw(value: String): Unit {
-        sink.write(PI_OPEN)
-        sink.write(value)
-        sink.write(PI_CLOSE)
+        emit(PI_OPEN)
+        emit(value)
+        emit(PI_CLOSE)
     }
 
     private func writeCommentRaw(value: String): Unit {
-        sink.write(COMMENT_OPEN)
-        sink.write(value)
-        sink.write(COMMENT_CLOSE)
+        emit(COMMENT_OPEN)
+        emit(value)
+        emit(COMMENT_CLOSE)
     }
 
     private func writeUnknownRaw(value: String): Unit {
         // PI 形态（`?...?`）原样输出，bang markup 包 `<!...>`。
         if (value.startsWith("?")) {
-            sink.write(TAG_OPEN);
-            sink.write(value);
-            sink.write(TAG_CLOSE)
+            emit(TAG_OPEN);
+            emit(value);
+            emit(TAG_CLOSE)
         } else {
-            sink.write(UNKNOWN_OPEN);
-            sink.write(value);
-            sink.write(UNKNOWN_CLOSE)
+            emit(UNKNOWN_OPEN);
+            emit(value);
+            emit(UNKNOWN_CLOSE)
         }
     }
 
@@ -275,7 +293,7 @@ public class XmlWriter {
         }
         var i = 0
         while (i < depth) {
-            sink.write(opts.indent)
+            emit(opts.indent)
             i++
         }
         atLineStart = false
@@ -285,7 +303,7 @@ public class XmlWriter {
         if (opts.compact) {
             return
         }
-        sink.write(opts.lineEnd)
+        emit(opts.lineEnd)
         atLineStart = true
     }
 }

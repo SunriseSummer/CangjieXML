@@ -32,6 +32,9 @@ PLAN_PATH    = OUT_DIR / "plan.json"
 
 # 各 fixture 的迭代次数——根据字节量与单次耗时调出来的，
 # 目标：每个 (lib, scenario, fixture) 单元跑 0.05 ~ 5 秒之间。
+# 大语料的迭代数被下调以控制总时长；如果要规避 GC pause / OS 抖动对
+# 单次结果的拉偏，请把对应行的迭代数再调高（仓颉 GC 在 5MB 级 DOM 上
+# 偶发的 majorGC 会让单次 traverse 飙到 20+ms）。
 ITERATIONS = {
     "catalog_small.xml":  500,
     "config_small.xml":   500,
@@ -39,8 +42,8 @@ ITERATIONS = {
     "catalog_medium.xml": 30,
     "config_medium.xml":  60,
     "deep_medium.xml":    200,
-    "catalog_large.xml":  5,
-    "config_large.xml":   10,
+    "catalog_large.xml":  20,
+    "config_large.xml":   20,
     "deep_large.xml":     50,
 }
 

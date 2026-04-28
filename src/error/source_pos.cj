@@ -3,9 +3,9 @@ package fastxml.error
 /**
  * 表示源文本中的一个位置坐标。
  *
- * - `offset`：从文档起始（忽略 BOM 之后）算起的位置。`XmlDocument.parseString`
- *   产出的 `SourcePos.offset` 是 **Rune（码点）索引**，而非字节偏移，与
- *   `line` / `column` 以码点计数保持一致。
+ * - `offset`：从文档起始（忽略 BOM 之后）算起的 **字节偏移**。
+ *   纯 ASCII 输入下与"码点偏移"完全一致；含多字节 UTF-8 时按字节计。
+ *   定位用 `line` / `column` 更直观；`offset` 主要用于错误信息呈现。
  * - `line`：行号，1 起。
  * - `column`：列号（以 UTF-8 码点计），1 起。
  */
