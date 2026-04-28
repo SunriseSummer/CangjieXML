@@ -157,8 +157,7 @@ class SourceCursor {
         let inputSize = input.size
         var bomSeen = false
         var startByte = 0
-        let hasUtf8Bom = inputSize >= BOM_BYTE_COUNT && input[0] == BOM_BYTE_0 && input[1] == BOM_BYTE_1 && input[2] ==
-            BOM_BYTE_2
+        let hasUtf8Bom = inputSize >= BOM_BYTE_COUNT && hasUtf8BomPrefix(input)
         if (hasUtf8Bom) {
             if (!acceptBom) {
                 throw XmlParseException(InvalidEncoding(SourcePos(0, 1, 1), "unexpected UTF-8 BOM (acceptBom = false)"))
@@ -512,4 +511,8 @@ func isAsciiDigitByte(b: Byte): Bool {
 
 func isUtf8ContinuationByte(b: Byte): Bool {
     (b & UTF8_CONT_MASK) == UTF8_CONT_PREFIX
+}
+
+func hasUtf8BomPrefix(input: String): Bool {
+    input[0] == BOM_BYTE_0 && input[1] == BOM_BYTE_1 && input[2] == BOM_BYTE_2
 }

@@ -197,8 +197,10 @@ private func hexDigitValueByte(bv: Byte): Int64 {
 
 private func isValidXmlCodepoint(cp: Int64): Bool {
     // XML 1.0 §2.2 Char：0x9 | 0xA | 0xD | [0x20-0xD7FF] | [0xE000-0xFFFD] | [0x10000-0x10FFFF]
-    cp == 0x9 || cp == 0xA || cp == 0xD || (cp >= 0x20 && cp <= 0xD7FF) || (cp >= 0xE000 && cp <= 0xFFFD) || (cp >=
-        0x10000 && cp <= 0x10FFFF)
+    let isXmlControlWhitespace = cp == 0x9 || cp == 0xA || cp == 0xD
+    let isBmpTextCodepoint = (cp >= 0x20 && cp <= 0xD7FF) || (cp >= 0xE000 && cp <= 0xFFFD)
+    let isSupplementaryTextCodepoint = cp >= 0x10000 && cp <= 0x10FFFF
+    isXmlControlWhitespace || isBmpTextCodepoint || isSupplementaryTextCodepoint
 }
 
 private func min(a: Int64, b: Int64): Int64 {
