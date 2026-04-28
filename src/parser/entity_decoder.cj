@@ -77,28 +77,28 @@ func decodeEntities(s: String, pos: SourcePos): String {
 func decodeOneEntity(s: String, start: Int64, out: StringBuilder, pos: SourcePos): Int64 {
     let n = s.size
     let endLimit = min(start + MAX_ENTITY_NAME_LEN + MAX_NUMERIC_ENTITY_DIGITS + 2, n)
-    var semi = -1
-    var j = start + 1
-    while (j < endLimit) {
-        if (s[j] == ENTITY_SEMI) {
-            semi = j
+    var semicolonIndex = -1
+    var scanIndex = start + 1
+    while (scanIndex < endLimit) {
+        if (s[scanIndex] == ENTITY_SEMI) {
+            semicolonIndex = scanIndex
             break
         }
-        j++
+        scanIndex++
     }
-    if (semi < 0) {
+    if (semicolonIndex < 0) {
         throw XmlParseException(InvalidText(pos, "unterminated entity reference starting at index ${start}"))
     }
     let bodyStart = start + 1
-    if (bodyStart == semi) {
+    if (bodyStart == semicolonIndex) {
         throw XmlParseException(InvalidText(pos, "empty entity reference"))
     }
     if (s[bodyStart] == ENTITY_HASH) {
-        appendNumericEntity(s, bodyStart + 1, semi, out, pos)
+        appendNumericEntity(s, bodyStart + 1, semicolonIndex, out, pos)
     } else {
-        appendNamedEntity(s, bodyStart, semi, out, pos)
+        appendNamedEntity(s, bodyStart, semicolonIndex, out, pos)
     }
-    semi + 1
+    semicolonIndex + 1
 }
 
 private func appendNamedEntity(s: String, start: Int64, end: Int64, out: StringBuilder, pos: SourcePos): Unit {
@@ -115,13 +115,11 @@ private func appendNamedEntity(s: String, start: Int64, end: Int64, out: StringB
         out.append(r'&')
         return
     }
-    if (len == 4 && s[start] == b'q' && s[start + 1] == b'u' && s[start + 2] == b'o' &&
-        s[start + 3] == b't') {
+    if (len == 4 && s[start] == b'q' && s[start + 1] == b'u' && s[start + 2] == b'o' && s[start + 3] == b't') {
         out.append(r'"')
         return
     }
-    if (len == 4 && s[start] == b'a' && s[start + 1] == b'p' && s[start + 2] == b'o' &&
-        s[start + 3] == b's') {
+    if (len == 4 && s[start] == b'a' && s[start + 1] == b'p' && s[start + 2] == b'o' && s[start + 3] == b's') {
         out.append(r'\'')
         return
     }
@@ -199,10 +197,14 @@ private func hexDigitValueByte(bv: Byte): Int64 {
 
 private func isValidXmlCodepoint(cp: Int64): Bool {
     // XML 1.0 §2.2 Char：0x9 | 0xA | 0xD | [0x20-0xD7FF] | [0xE000-0xFFFD] | [0x10000-0x10FFFF]
-    cp == 0x9 || cp == 0xA || cp == 0xD || (cp >= 0x20 && cp <= 0xD7FF) || (cp >= 0xE000 && cp <= 0xFFFD) ||
-        (cp >= 0x10000 && cp <= 0x10FFFF)
+    cp == 0x9 || cp == 0xA || cp == 0xD || (cp >= 0x20 && cp <= 0xD7FF) || (cp >= 0xE000 && cp <= 0xFFFD) || (cp >=
+        0x10000 && cp <= 0x10FFFF)
 }
 
 private func min(a: Int64, b: Int64): Int64 {
-    if (a < b) { a } else { b }
+    if (a < b) {
+        a
+    } else {
+        b
+    }
 }

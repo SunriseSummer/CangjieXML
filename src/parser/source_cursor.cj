@@ -20,34 +20,34 @@ const RUNE_BOM: Rune = '\u{FEFF}'
  * 与 `CH_*: Rune` 对齐的字节常量，热路径上按字节比较即可，
  * 避免 `Rune == Rune` 带来的码点装箱比较。
  */
-const BY_LT: Byte = 0x3Cu8       // '<'
-const BY_GT: Byte = 0x3Eu8       // '>'
-const BY_AMP: Byte = 0x26u8      // '&'
-const BY_QUOT: Byte = 0x22u8     // '"'
-const BY_APOS: Byte = 0x27u8     // '\''
-const BY_SLASH: Byte = 0x2Fu8    // '/'
+const BY_LT: Byte = 0x3Cu8 // '<'
+const BY_GT: Byte = 0x3Eu8 // '>'
+const BY_AMP: Byte = 0x26u8 // '&'
+const BY_QUOT: Byte = 0x22u8 // '"'
+const BY_APOS: Byte = 0x27u8 // '\''
+const BY_SLASH: Byte = 0x2Fu8 // '/'
 const BY_QUESTION: Byte = 0x3Fu8 // '?'
-const BY_BANG: Byte = 0x21u8     // '!'
-const BY_EQUALS: Byte = 0x3Du8   // '='
-const BY_LF: Byte = 0x0Au8       // '\n'
-const BY_CR: Byte = 0x0Du8       // '\r'
-const BY_TAB: Byte = 0x09u8      // '\t'
-const BY_SP: Byte = 0x20u8       // ' '
-const BY_LBRACK: Byte = 0x5Bu8   // '['
-const BY_RBRACK: Byte = 0x5Du8   // ']'
+const BY_BANG: Byte = 0x21u8 // '!'
+const BY_EQUALS: Byte = 0x3Du8 // '='
+const BY_LF: Byte = 0x0Au8 // '\n'
+const BY_CR: Byte = 0x0Du8 // '\r'
+const BY_TAB: Byte = 0x09u8 // '\t'
+const BY_SP: Byte = 0x20u8 // ' '
+const BY_LBRACK: Byte = 0x5Bu8 // '['
+const BY_RBRACK: Byte = 0x5Du8 // ']'
 const BY_UNDERSCORE: Byte = 0x5Fu8 // '_'
-const BY_COLON: Byte = 0x3Au8    // ':'
-const BY_HYPHEN: Byte = 0x2Du8   // '-'
-const BY_DOT: Byte = 0x2Eu8      // '.'
-const BY_0: Byte = 0x30u8        // '0'
-const BY_9: Byte = 0x39u8        // '9'
-const BY_A_UPPER: Byte = 0x41u8  // 'A'
-const BY_Z_UPPER: Byte = 0x5Au8  // 'Z'
-const BY_A_LOWER: Byte = 0x61u8  // 'a'
-const BY_Z_LOWER: Byte = 0x7Au8  // 'z'
-const BY_C_UPPER: Byte = 0x43u8  // 'C'
-const BY_D_UPPER: Byte = 0x44u8  // 'D'
-const BY_T_UPPER: Byte = 0x54u8  // 'T'
+const BY_COLON: Byte = 0x3Au8 // ':'
+const BY_HYPHEN: Byte = 0x2Du8 // '-'
+const BY_DOT: Byte = 0x2Eu8 // '.'
+const BY_0: Byte = 0x30u8 // '0'
+const BY_9: Byte = 0x39u8 // '9'
+const BY_A_UPPER: Byte = 0x41u8 // 'A'
+const BY_Z_UPPER: Byte = 0x5Au8 // 'Z'
+const BY_A_LOWER: Byte = 0x61u8 // 'a'
+const BY_Z_LOWER: Byte = 0x7Au8 // 'z'
+const BY_C_UPPER: Byte = 0x43u8 // 'C'
+const BY_D_UPPER: Byte = 0x44u8 // 'D'
+const BY_T_UPPER: Byte = 0x54u8 // 'T'
 
 /** ASCII 边界：`b < ASCII_LIMIT_BYTE` 即纯 ASCII 字节。 */
 const ASCII_LIMIT_BYTE: Byte = 0x80u8
@@ -115,8 +115,8 @@ const UTF8_REPLACEMENT_CODEPOINT: UInt32 = 0xFFFDu32
  * 因此按字节比较与按 Rune 比较结果一致，但完全避免码点解码。
  */
 let BYTES_COMMENT_OPEN_DASHES: Array<Byte> = [BY_HYPHEN, BY_HYPHEN]
-let BYTES_CDATA_PROLOGUE: Array<Byte> =
-    [BY_LBRACK, BY_C_UPPER, BY_D_UPPER, BY_A_UPPER, BY_T_UPPER, BY_A_UPPER, BY_LBRACK] // "[CDATA["
+let BYTES_CDATA_PROLOGUE: Array<Byte> = [BY_LBRACK, BY_C_UPPER, BY_D_UPPER, BY_A_UPPER, BY_T_UPPER, BY_A_UPPER,
+    BY_LBRACK] // "[CDATA["
 let BYTES_COMMENT_EPILOGUE: Array<Byte> = [BY_HYPHEN, BY_HYPHEN, BY_GT]
 let BYTES_CDATA_EPILOGUE: Array<Byte> = [BY_RBRACK, BY_RBRACK, BY_GT]
 
@@ -157,8 +157,9 @@ class SourceCursor {
         let inputSize = input.size
         var bomSeen = false
         var startByte = 0
-        if (inputSize >= BOM_BYTE_COUNT
-            && input[0] == BOM_BYTE_0 && input[1] == BOM_BYTE_1 && input[2] == BOM_BYTE_2) {
+        let hasUtf8Bom = inputSize >= BOM_BYTE_COUNT && input[0] == BOM_BYTE_0 && input[1] == BOM_BYTE_1 && input[2] ==
+            BOM_BYTE_2
+        if (hasUtf8Bom) {
             if (!acceptBom) {
                 throw XmlParseException(InvalidEncoding(SourcePos(0, 1, 1), "unexpected UTF-8 BOM (acceptBom = false)"))
             }
@@ -193,7 +194,11 @@ class SourceCursor {
      * 是非法字符，可安全用作"无字节"哨兵值；供需要"无 EOF 检查"的等值比较使用。
      */
     func currentByteOr0(): Byte {
-        if (idx < limit) { source[idx] } else { NO_BYTE }
+        if (idx < limit) {
+            source[idx]
+        } else {
+            NO_BYTE
+        }
     }
 
     /**
@@ -201,8 +206,12 @@ class SourceCursor {
      * 一个 ASCII 分隔符（如 `?>`、`</`）。
      */
     func byteAtOffset(k: Int64): Byte {
-        let p = idx + k
-        if (p >= 0 && p < limit) { source[p] } else { NO_BYTE }
+        let bytePos = idx + k
+        if (bytePos >= 0 && bytePos < limit) {
+            source[bytePos]
+        } else {
+            NO_BYTE
+        }
     }
 
     /**
@@ -228,7 +237,9 @@ class SourceCursor {
 
     /** 当前字符是否等于 `ch`；EOF 时返回 false。 */
     func matches(ch: Rune): Bool {
-        if (eof()) { return false }
+        if (eof()) {
+            return false
+        }
         let cp = UInt32(ch)
         if (cp < UInt32(ASCII_LIMIT_BYTE)) {
             return source[idx] == UInt8(cp)
@@ -240,8 +251,8 @@ class SourceCursor {
     func matchesAt(k: Int64, ch: Rune): Bool {
         // 全部调用点的 ch 都是 ASCII 分隔符（'/'、'>'）。
         let cp = UInt32(ch)
-        let p = idx + k
-        p >= 0 && p < limit && source[p] == UInt8(cp)
+        let bytePos = idx + k
+        bytePos >= 0 && bytePos < limit && source[bytePos] == UInt8(cp)
     }
 
     /** 消费一个字符并返回；到达 EOF 返回 None。 */
@@ -293,11 +304,7 @@ class SourceCursor {
     func skipNameChars(): Unit {
         while (idx < limit) {
             let b = source[idx]
-            if ((b >= BY_A_LOWER && b <= BY_Z_LOWER)
-                || (b >= BY_A_UPPER && b <= BY_Z_UPPER)
-                || (b >= BY_0 && b <= BY_9)
-                || b == BY_UNDERSCORE || b == BY_COLON
-                || b == BY_HYPHEN || b == BY_DOT) {
+            if (isNameCharByte(b)) {
                 idx++
                 column++
             } else {
@@ -413,8 +420,9 @@ class SourceCursor {
         if ((b0 & UTF8_LEAD2_MASK) == UTF8_LEAD2_PREFIX && byteIndex + 1 < limit) {
             let b1 = source[byteIndex + 1]
             if ((b1 & UTF8_CONT_MASK) == UTF8_CONT_PREFIX) {
-                let cp = (UInt32(b0 & UTF8_LEAD2_PAYLOAD_MASK) << UTF8_CONT_BITS)
-                    | UInt32(b1 & UTF8_CONT_PAYLOAD_MASK)
+                let leadPayload = UInt32(b0 & UTF8_LEAD2_PAYLOAD_MASK) << UTF8_CONT_BITS
+                let tailPayload = UInt32(b1 & UTF8_CONT_PAYLOAD_MASK)
+                let cp = leadPayload | tailPayload
                 return Utf8Decoded(Rune(cp), UTF8_LEN_2)
             }
         }
@@ -422,11 +430,12 @@ class SourceCursor {
         if ((b0 & UTF8_LEAD3_MASK) == UTF8_LEAD3_PREFIX && byteIndex + 2 < limit) {
             let b1 = source[byteIndex + 1]
             let b2 = source[byteIndex + 2]
-            if ((b1 & UTF8_CONT_MASK) == UTF8_CONT_PREFIX
-                && (b2 & UTF8_CONT_MASK) == UTF8_CONT_PREFIX) {
-                let cp = (UInt32(b0 & UTF8_LEAD3_PAYLOAD_MASK) << (UTF8_CONT_BITS * 2))
-                    | (UInt32(b1 & UTF8_CONT_PAYLOAD_MASK) << UTF8_CONT_BITS)
-                    | UInt32(b2 & UTF8_CONT_PAYLOAD_MASK)
+            let hasValidTwoByteTail = isUtf8ContinuationByte(b1) && isUtf8ContinuationByte(b2)
+            if (hasValidTwoByteTail) {
+                let leadPayload = UInt32(b0 & UTF8_LEAD3_PAYLOAD_MASK) << (UTF8_CONT_BITS * 2)
+                let middlePayload = UInt32(b1 & UTF8_CONT_PAYLOAD_MASK) << UTF8_CONT_BITS
+                let tailPayload = UInt32(b2 & UTF8_CONT_PAYLOAD_MASK)
+                let cp = leadPayload | middlePayload | tailPayload
                 return Utf8Decoded(Rune(cp), UTF8_LEN_3)
             }
         }
@@ -435,13 +444,14 @@ class SourceCursor {
             let b1 = source[byteIndex + 1]
             let b2 = source[byteIndex + 2]
             let b3 = source[byteIndex + 3]
-            if ((b1 & UTF8_CONT_MASK) == UTF8_CONT_PREFIX
-                && (b2 & UTF8_CONT_MASK) == UTF8_CONT_PREFIX
-                && (b3 & UTF8_CONT_MASK) == UTF8_CONT_PREFIX) {
-                let cp = (UInt32(b0 & UTF8_LEAD4_PAYLOAD_MASK) << (UTF8_CONT_BITS * 3))
-                    | (UInt32(b1 & UTF8_CONT_PAYLOAD_MASK) << (UTF8_CONT_BITS * 2))
-                    | (UInt32(b2 & UTF8_CONT_PAYLOAD_MASK) << UTF8_CONT_BITS)
-                    | UInt32(b3 & UTF8_CONT_PAYLOAD_MASK)
+            let hasValidThreeByteTail = isUtf8ContinuationByte(b1) && isUtf8ContinuationByte(b2) &&
+                isUtf8ContinuationByte(b3)
+            if (hasValidThreeByteTail) {
+                let leadPayload = UInt32(b0 & UTF8_LEAD4_PAYLOAD_MASK) << (UTF8_CONT_BITS * 3)
+                let upperMiddlePayload = UInt32(b1 & UTF8_CONT_PAYLOAD_MASK) << (UTF8_CONT_BITS * 2)
+                let lowerMiddlePayload = UInt32(b2 & UTF8_CONT_PAYLOAD_MASK) << UTF8_CONT_BITS
+                let tailPayload = UInt32(b3 & UTF8_CONT_PAYLOAD_MASK)
+                let cp = leadPayload | upperMiddlePayload | lowerMiddlePayload | tailPayload
                 return Utf8Decoded(Rune(cp), UTF8_LEN_4)
             }
         }
@@ -485,7 +495,21 @@ func isAsciiDigit(r: Rune): Bool {
 
 /** 字节版本：仅 ASCII 名称起始字符。 */
 func isNameStartByte(b: Byte): Bool {
-    (b >= BY_A_LOWER && b <= BY_Z_LOWER)
-        || (b >= BY_A_UPPER && b <= BY_Z_UPPER)
-        || b == BY_UNDERSCORE || b == BY_COLON
+    isAsciiLetterByte(b) || b == BY_UNDERSCORE || b == BY_COLON
+}
+
+func isNameCharByte(b: Byte): Bool {
+    isNameStartByte(b) || isAsciiDigitByte(b) || b == BY_HYPHEN || b == BY_DOT
+}
+
+func isAsciiLetterByte(b: Byte): Bool {
+    (b >= BY_A_LOWER && b <= BY_Z_LOWER) || (b >= BY_A_UPPER && b <= BY_Z_UPPER)
+}
+
+func isAsciiDigitByte(b: Byte): Bool {
+    b >= BY_0 && b <= BY_9
+}
+
+func isUtf8ContinuationByte(b: Byte): Bool {
+    (b & UTF8_CONT_MASK) == UTF8_CONT_PREFIX
 }

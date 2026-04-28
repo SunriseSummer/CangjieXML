@@ -24,18 +24,18 @@ const CDATA_OPEN: String = "<![CDATA["
 const CDATA_CLOSE: String = "]]>"
 const CDATA_TERMINATOR: String = "]]>"
 const CDATA_TERMINATOR_LEN: Int64 = 3
-/** 拆分后在 `]]` 与 `>` 之间插入的分隔段，使两半分别落入相邻 CDATA。 */
+// 拆分后在 `]]` 与 `>` 之间插入的分隔段，使两半分别落入相邻 CDATA。
 const CDATA_REOPEN_AFTER_BRACKETS: String = "]]><![CDATA["
-
 const BOM_BYTE_0: Byte = 0xEFu8
 const BOM_BYTE_1: Byte = 0xBBu8
 const BOM_BYTE_2: Byte = 0xBFu8
 
 // 转义触发字节——以字节常量声明，避免在热路径上每次比较都做 `Rune → UInt8` 转换。
 private const ESCAPE_AMP: Byte = 0x26u8 // '&'
-private const ESCAPE_LT: Byte = 0x3Cu8  // '<'
-private const ESCAPE_GT: Byte = 0x3Eu8  // '>'
+private const ESCAPE_LT: Byte = 0x3Cu8 // '<'
+private const ESCAPE_GT: Byte = 0x3Eu8 // '>'
 private const ESCAPE_QUOT: Byte = 0x22u8 // '"'
+private const ESCAPE_RBRACK: Byte = 0x5Du8 // ']'
 
 /**
  * 把文本内容（PCDATA）按 XML 规则转义。
@@ -58,21 +58,29 @@ public func escapeText(s: String): String {
     while (i < n) {
         let b = s[i]
         if (b == ESCAPE_AMP) {
-            if (i > lastEmit) { sb.append(s[lastEmit..i]) }
+            if (i > lastEmit) {
+                sb.append(s[lastEmit..i])
+            }
             sb.append("&amp;")
             lastEmit = i + 1
         } else if (b == ESCAPE_LT) {
-            if (i > lastEmit) { sb.append(s[lastEmit..i]) }
+            if (i > lastEmit) {
+                sb.append(s[lastEmit..i])
+            }
             sb.append("&lt;")
             lastEmit = i + 1
         } else if (b == ESCAPE_GT) {
-            if (i > lastEmit) { sb.append(s[lastEmit..i]) }
+            if (i > lastEmit) {
+                sb.append(s[lastEmit..i])
+            }
             sb.append("&gt;")
             lastEmit = i + 1
         }
         i++
     }
-    if (lastEmit < n) { sb.append(s[lastEmit..n]) }
+    if (lastEmit < n) {
+        sb.append(s[lastEmit..n])
+    }
     sb.toString()
 }
 
@@ -93,25 +101,35 @@ public func escapeAttribute(s: String): String {
     while (i < n) {
         let b = s[i]
         if (b == ESCAPE_AMP) {
-            if (i > lastEmit) { sb.append(s[lastEmit..i]) }
+            if (i > lastEmit) {
+                sb.append(s[lastEmit..i])
+            }
             sb.append("&amp;")
             lastEmit = i + 1
         } else if (b == ESCAPE_LT) {
-            if (i > lastEmit) { sb.append(s[lastEmit..i]) }
+            if (i > lastEmit) {
+                sb.append(s[lastEmit..i])
+            }
             sb.append("&lt;")
             lastEmit = i + 1
         } else if (b == ESCAPE_GT) {
-            if (i > lastEmit) { sb.append(s[lastEmit..i]) }
+            if (i > lastEmit) {
+                sb.append(s[lastEmit..i])
+            }
             sb.append("&gt;")
             lastEmit = i + 1
         } else if (b == ESCAPE_QUOT) {
-            if (i > lastEmit) { sb.append(s[lastEmit..i]) }
+            if (i > lastEmit) {
+                sb.append(s[lastEmit..i])
+            }
             sb.append("&quot;")
             lastEmit = i + 1
         }
         i++
     }
-    if (lastEmit < n) { sb.append(s[lastEmit..n]) }
+    if (lastEmit < n) {
+        sb.append(s[lastEmit..n])
+    }
     sb.toString()
 }
 
@@ -138,8 +156,10 @@ public func escapeCdata(s: String): String {
     sb.toString()
 }
 
-/** CDATA 内容中遇到 `]]>` 的分段处理：以字节扫描定位 `]]>`（全 ASCII，UTF-8
- *  多字节序列的所有字节均 ≥ 0x80）；命中时把 `]]` 与 `>` 分入相邻 CDATA 段。 */
+/*
+ * CDATA 内容中遇到 `]]>` 的分段处理：以字节扫描定位 `]]>`（全 ASCII，UTF-8
+ * 多字节序列的所有字节均 ≥ 0x80）；命中时把 `]]` 与 `>` 分入相邻 CDATA 段。
+ */
 func appendWithCdataSplit(sb: StringBuilder, s: String): Unit {
     let n = s.size
     var i = 0
@@ -164,12 +184,12 @@ func appendWithCdataSplit(sb: StringBuilder, s: String): Unit {
     }
 }
 
-/** 判断 `s[i..i+3]` 是否为 ASCII 字节 `]]>`。 */
+// 判断 `s[i..i+3]` 是否为 ASCII 字节 `]]>`。
 func isCdataTerminatorAt(s: String, i: Int64, n: Int64): Bool {
-    i + CDATA_TERMINATOR_LEN <= n
-        && s[i] == 0x5Du8 // ']'
-        && s[i + 1] == 0x5Du8
-        && s[i + 2] == 0x3Eu8 // '>'
+    if (i + CDATA_TERMINATOR_LEN > n) {
+        return false
+    }
+    s[i] == ESCAPE_RBRACK && s[i + 1] == ESCAPE_RBRACK && s[i + 2] == ESCAPE_GT
 }
 
 /** UTF-8 BOM 字节序列：EF BB BF。 */
@@ -190,7 +210,9 @@ func needsTextEscape(s: String): Bool {
     var i = 0
     while (i < n) {
         let b = s[i]
-        if (b == ESCAPE_AMP || b == ESCAPE_LT || b == ESCAPE_GT) { return true }
+        if (b == ESCAPE_AMP || b == ESCAPE_LT || b == ESCAPE_GT) {
+            return true
+        }
         i++
     }
     false
