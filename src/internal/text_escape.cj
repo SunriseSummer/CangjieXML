@@ -25,6 +25,7 @@ const CDATA_CLOSE: String = "]]>"
 const CDATA_TERMINATOR: String = "]]>"
 const CDATA_TERMINATOR_LEN: Int64 = 3
 // 拆分后在 `]]` 与 `>` 之间插入的分隔段，使两半分别落入相邻 CDATA。
+
 const CDATA_REOPEN_AFTER_BRACKETS: String = "]]><![CDATA["
 const BOM_BYTE_0: Byte = 0xEFu8
 const BOM_BYTE_1: Byte = 0xBBu8

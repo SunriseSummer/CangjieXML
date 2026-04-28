@@ -450,8 +450,7 @@ class SourceCursor {
             let b1 = source[byteIndex + 1]
             let b2 = source[byteIndex + 2]
             let b3 = source[byteIndex + 3]
-            let hasValidThreeByteTail = isUtf8ContinuationByte(b1) && isUtf8ContinuationByte(b2) &&
-                isUtf8ContinuationByte(b3)
+            let hasValidThreeByteTail = hasUtf8ContinuationByteTriplet(b1, b2, b3)
             if (hasValidThreeByteTail) {
                 let leadPayload = UInt32(b0 & UTF8_LEAD4_PAYLOAD_MASK) << (UTF8_CONT_BITS * 3)
                 let upperMiddlePayload = UInt32(b1 & UTF8_CONT_PAYLOAD_MASK) << (UTF8_CONT_BITS * 2)
@@ -518,6 +517,10 @@ func isAsciiDigitByte(b: Byte): Bool {
 
 func isUtf8ContinuationByte(b: Byte): Bool {
     (b & UTF8_CONT_MASK) == UTF8_CONT_PREFIX
+}
+
+func hasUtf8ContinuationByteTriplet(b1: Byte, b2: Byte, b3: Byte): Bool {
+    isUtf8ContinuationByte(b1) && isUtf8ContinuationByte(b2) && isUtf8ContinuationByte(b3)
 }
 
 func hasUtf8BomPrefix(input: String, inputSize: Int64): Bool {
