@@ -19,7 +19,7 @@ enum ProbeMode {
 
 /**
  * 把单个 fixture 的指纹写进 `out`。JSON 形状与 `python_probe/probe.py` 完全一致
- * ——两端任何字段顺序 / 键名 / 文本规范化规则的偏差都会被 diff 立刻炸出。
+ * ——两端任何字段顺序 / 键名 / 文本规范化规则的偏差都会被 diff 立刻炸出
  */
 func writeFileFingerprint(out: StringBuilder, dir: String, name: String, mode: ProbeMode): Unit {
     let path = "${dir}/${name}"
@@ -33,7 +33,7 @@ func writeFileFingerprint(out: StringBuilder, dir: String, name: String, mode: P
 
     // `declaration_present` 永远按原始字节判定；roundtrip 写出的 XML 即便丢了
     // declaration（compact + writeDeclaration=true 保留；pretty 默认也保留），
-    // 也不应改变"原文件指纹"的该字段——否则 diff 反而会误报。
+    // 也不应改变"原文件指纹"的该字段——否则 diff 反而会误报
     let declPresent = hasXmlDeclaration(path)
     let rootName = match (doc.rootElement) {
         case Some(r) => r.name
@@ -50,25 +50,25 @@ func loadDocForMode(path: String, mode: ProbeMode): XmlDocument {
         case ModeRoundTripPretty => roundTrip(loadXmlFromFile(path), XmlWriteOptions.default_())
         case ModeRoundTripCompact => roundTrip(loadXmlFromFile(path), XmlWriteOptions.compactPreset())
         case ModeBytesRoundTrip =>
-            // 走 bytes 专用 API：parseXmlBytes → writeXmlToBytes → parseXmlBytes。
+            // 走 bytes 专用 API：parseXmlBytes → writeXmlToBytes → parseXmlBytes
             // 和 `roundtrip-*` 的区别在于两端都用字节 API——覆盖 io 包里从
-            // `Array<Byte>` 进出的路径（HTTP / DB / 嵌入资源场景）。
+            // `Array<Byte>` 进出的路径（HTTP / DB / 嵌入资源场景）
             let raw = File.readFrom(Path(path))
             let parsed = parseXmlBytes(raw)
             let serialized = writeXmlToBytes(parsed, XmlWriteOptions.compactPreset())
             parseXmlBytes(serialized)
         case ModeBuilder =>
-            // `builder` 模式不应通过本函数——由 `renderBuilderFixtures` 直接调用。
+            // `builder` 模式不应通过本函数——由 `renderBuilderFixtures` 直接调用
             throw Exception("loadDocForMode called with ModeBuilder (internal error)")
     }
 }
 
 /**
- * parse → write（以 `opts` 排版）→ parse，返回新 Document。
+ * parse → write（以 `opts` 排版）→ parse，返回新 Document
  *
  * 用 `doc.writeToString(opts)` 而非手动构造 `XmlWriter`——这条路径走的是
  * `writer.XmlWritable` 接口的跨包扩展方法，顺带作为"跨包可见性"的回归
- * 保障：如果 `writeToString` 又被写成脱离接口的扩展，e2e 立刻挂。
+ * 保障：如果 `writeToString` 又被写成脱离接口的扩展，e2e 立刻挂
  */
 func roundTrip(doc: XmlDocument, opts: XmlWriteOptions): XmlDocument {
     parseXml(doc.writeToString(opts))
@@ -132,7 +132,7 @@ func writeElementRecord(out: StringBuilder, r: ElementRecord): Unit {
 
 /**
  * 与 Python 侧 `visit` 严格对齐：对每个元素按"同名兄弟序号"生成 `path`，
- * 并把自身记录追加到扁平列表，再递归孩子。
+ * 并把自身记录追加到扁平列表，再递归孩子
  */
 func visitElement(
     el: XmlElement, parentPath: String,
@@ -175,9 +175,9 @@ func directText(el: XmlElement): String {
 
 /** 与 Python 侧的 `normalize_text` 等价：内部连续空白折叠为单空格，两端 strip。
  *
- *  实现要点：按**字节**扫描，但非空白字节原样复制到输出（不经过 `Rune`）。
+ *  实现要点：按**字节**扫描，但非空白字节原样复制到输出（不经过 `Rune`）
  *  否则 `Rune(UInt32(b))` 会把每个 UTF-8 续字节当成独立码点，中文 / emoji
- *  会被拆散再重组为伪 Latin-1 字符串，导致与 Python 侧 diff 不上。
+ *  会被拆散再重组为伪 Latin-1 字符串，导致与 Python 侧 diff 不上
  */
 func normalizeWhitespace(s: String): String {
     let bytes = s.toArray()
@@ -238,7 +238,7 @@ func hasXmlDeclaration(path: String): Bool {
 /** JSON 字符串转义——只处理必须转义的 ASCII 控制字符；其它 UTF-8 字节原样复制。
  *
  *  与 `normalizeWhitespace` 同理：非特殊字节绝不走 `Rune` 构造，否则会把 UTF-8
- *  续字节当独立码点、重新编码成乱码。
+ *  续字节当独立码点、重新编码成乱码
  */
 func jsonEscape(s: String): String {
     let bytes = s.toArray()

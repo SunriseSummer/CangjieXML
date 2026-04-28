@@ -57,14 +57,14 @@ extend XmlParser {
         if (cur.eof()) {
             throw XmlParseException(InvalidText(startPos, "unexpected EOF after '<'"))
         }
-        let b = cur.currentByte()
-        if (b == BY_QUESTION) {
+        let currentByte = cur.currentByte()
+        if (currentByte == BY_QUESTION) {
             return parsePiOrDeclarationTop(startPos)
         }
-        if (b == BY_BANG) {
+        if (currentByte == BY_BANG) {
             return parseBangMarkup(startPos, atTop: true)
         }
-        if (b == BY_SLASH) {
+        if (currentByte == BY_SLASH) {
             throw XmlParseException(MismatchedElement("(none)", peekSkippedName(), startPos))
         }
         if (rootSeenAlready) {
@@ -150,16 +150,16 @@ extend XmlParser {
 
     // 只用于错误消息：读取 `</name>` 里 `/` 后的名字片段
     public func peekSkippedName(): String {
-        let sb = StringBuilder()
+        let buffer = StringBuilder()
         cur.advance() // skip '/'
         while (let Some(r) <- cur.peek()) {
             if (isNameChar(r) || isNameStart(r)) {
-                sb.append(r)
+                buffer.append(r)
                 cur.advance()
             } else {
                 break
             }
         }
-        sb.toString()
+        buffer.toString()
     }
 }

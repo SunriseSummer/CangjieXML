@@ -8,24 +8,24 @@ import fastxml.error.*
 // DOM 不变量回归测试：
 // 1. 属性名不可就地修改（`XmlAttribute.name` 为 `let`）；
 // 2. `XmlDeclaration` 必须是文档首个顶层节点；
-// 3. 插非 Declaration 到首个 Declaration 之前被拒绝。
+// 3. 插非 Declaration 到首个 Declaration 之前被拒绝
 //
-// 这三条对应 DESIGN 与各自源码里注释过、但曾经未强制的契约。
+// 这三条对应 DESIGN 与各自源码里注释过、但曾经未强制的契约
 // =====================================================================
 
 @Test
 func testAttributeNameIsImmutable(): Unit {
-    // 锁死编译期契约：若有人把 `name` 改回 `var`，编译期检查会失败。
-    // 这里反向验证：创建后再通过 setAttribute 改名，旧名不可再索引到值。
+    // 锁死编译期契约：若有人把 `name` 改回 `var`，编译期检查会失败
+    // 这里反向验证：创建后再通过 setAttribute 改名，旧名不可再索引到值
     let doc = XmlDocument()
     let el = doc.createElement("x")
     el.setAttribute("id", "1")
-    // 用户正确的改名路径：remove + set。
+    // 用户正确的改名路径：remove + set
     el.removeAttribute("id")
     el.setAttribute("ident", "1")
     @Expect(el.attribute("id").isNone(), true)
     @Expect(el.attribute("ident") ?? "", "1")
-    // 属性顺序仍被维护（只剩新名）。
+    // 属性顺序仍被维护（只剩新名）
     let names: Array<String> = collectAttrNames(el)
     @Expect(names.size, 1)
     @Expect(names[0], "ident")
@@ -33,7 +33,7 @@ func testAttributeNameIsImmutable(): Unit {
 
 @Test
 func testAppendDeclarationRequiresEmptyDocument(): Unit {
-    // 在有非 decl 节点后 appendChild(decl) 必须抛。
+    // 在有非 decl 节点后 appendChild(decl) 必须抛
     let doc = XmlDocument()
     doc.appendChild(doc.createComment("hi"))
     var threw = false
@@ -47,12 +47,12 @@ func testAppendDeclarationRequiresEmptyDocument(): Unit {
 
 @Test
 func testPrependDeclarationIntoNonEmptyDocumentAllowed(): Unit {
-    // 反向：prependChild(decl) 是合法的——它会成为新的 head。
+    // 反向：prependChild(decl) 是合法的——它会成为新的 head
     let doc = XmlDocument()
     doc.appendChild(doc.createComment("hi"))
     doc.prependChild(doc.createDeclaration())
     @Expect(doc.declaration.isSome(), true)
-    // 验证顺序：decl 在前，comment 在后。
+    // 验证顺序：decl 在前，comment 在后
     var kinds: Array<String> = collectTopLevelKindNames(doc)
     @Expect(kinds[0], "Declaration")
     @Expect(kinds[1], "Comment")
@@ -60,7 +60,7 @@ func testPrependDeclarationIntoNonEmptyDocumentAllowed(): Unit {
 
 @Test
 func testCannotPrependBeforeDeclaration(): Unit {
-    // 已存在 decl 作为 head 时，任何非 decl 的 prepend 都要被拒。
+    // 已存在 decl 作为 head 时，任何非 decl 的 prepend 都要被拒
     let doc = XmlDocument()
     doc.appendChild(doc.createDeclaration())
     var threw = false
@@ -70,7 +70,7 @@ func testCannotPrependBeforeDeclaration(): Unit {
         threw = true
     }
     @Expect(threw, true)
-    // Declaration 仍是首节点。
+    // Declaration 仍是首节点
     let kinds = collectTopLevelKindNames(doc)
     @Expect(kinds[0], "Declaration")
     @Expect(kinds.size, 1)
@@ -78,7 +78,7 @@ func testCannotPrependBeforeDeclaration(): Unit {
 
 @Test
 func testAppendCommentAfterDeclarationAllowed(): Unit {
-    // 常规合法路径：先 decl 再 comment 再 root。
+    // 常规合法路径：先 decl 再 comment 再 root
     let doc = XmlDocument()
     doc.appendChild(doc.createDeclaration())
     doc.appendChild(doc.createComment("c"))
@@ -115,7 +115,7 @@ func collectTopLevelKindNames(doc: XmlDocument): Array<String> {
 
 /**
  * 本测试自用的"只追加不预知大小"的小容器——`Array<String>(n, repeat: "")`
- * 要求先算总数，`ArrayList` 又要 import 成本；保持测试文件极简。
+ * 要求先算总数，`ArrayList` 又要 import 成本；保持测试文件极简
  */
 class ArrayOf<T> {
     private var buf: Array<T> = Array<T>()

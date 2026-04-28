@@ -114,8 +114,8 @@ public class XmlDocument <: XmlNode {
 
     // 创建 XML 声明节点，`value` 省略时使用默认声明：`xml version="1.0" encoding="UTF-8"`
     public func createDeclaration(value!: ?String = None): XmlDeclaration {
-        let v = value ?? DEFAULT_DECLARATION_VALUE
-        XmlDeclaration(this, v)
+        let resolvedValue = value ?? DEFAULT_DECLARATION_VALUE
+        XmlDeclaration(this, resolvedValue)
     }
 
     // 创建未知节点（用于 `<!DOCTYPE ...>` 等）

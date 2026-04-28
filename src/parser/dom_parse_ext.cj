@@ -15,8 +15,8 @@ public func parseXml(xml: String): XmlDocument {
 // 带选项的顶层解析函数
 public func parseXml(xml: String, options: XmlParseOptions): XmlDocument {
     let doc = XmlDocument()
-    let p = XmlParser(xml, options, doc)
-    p.parseDocument()
+    let parser = XmlParser(xml, options, doc)
+    parser.parseDocument()
     doc
 }
 

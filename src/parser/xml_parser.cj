@@ -67,8 +67,8 @@ class XmlParser {
         if (start >= cur.limit) {
             throw XmlParseException(InvalidText(cur.pos(), "unexpected EOF where name expected"))
         }
-        let b = cur.source[start]
-        if (!isNameStartByte(b)) {
+        let firstByte = cur.source[start]
+        if (!isNameStartByte(firstByte)) {
             throw XmlParseException(InvalidText(cur.pos(), "expected name-start character"))
         }
         cur.skipNameChars()

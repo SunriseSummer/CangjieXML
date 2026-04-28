@@ -293,10 +293,10 @@ public class XmlWriter {
         if (opts.compact || !atLineStart) {
             return
         }
-        var i = 0
-        while (i < depth) {
+        var indentLevel = 0
+        while (indentLevel < depth) {
             emit(opts.indent)
-            i++
+            indentLevel++
         }
         atLineStart = false
     }

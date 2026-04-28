@@ -5,11 +5,11 @@ import fastxml.dom.*
 import fastxml.io.*
 
 /**
- * `sheetN.xml` 的内存模型：二维 grid，按**原表格布局**保留行号 / 列号。
+ * `sheetN.xml` 的内存模型：二维 grid，按**原表格布局**保留行号 / 列号
  *
  * - `rows` 按行号 1 起升序存储；表格中"空行"也会出现为一个空 `Row`
- *   ——这样后续生成 CSV 时就能保持与原表相同的行数。
- * - 每个 `Row` 又按列号 1 起存储；缺失列在 CSV 阶段以空串补齐。
+ *   ——这样后续生成 CSV 时就能保持与原表相同的行数
+ * - 每个 `Row` 又按列号 1 起存储；缺失列在 CSV 阶段以空串补齐
  */
 public class Sheet {
     public let rows: ArrayList<Row>
@@ -44,10 +44,10 @@ public class Cell {
 }
 
 /**
- * 解析一个 sheet 文件。
+ * 解析一个 sheet 文件
  *
  * `sst` 来自 workbook 级 shared strings 表；无 shared strings 时上层可以传
- * 一个空表（`loadSharedStrings` 在文件缺失时本就返回空表）。
+ * 一个空表（`loadSharedStrings` 在文件缺失时本就返回空表）
  *
  * ## OOXML 单元格类型简表
  *
@@ -66,7 +66,7 @@ public class Cell {
  *
  * 本项目不做数字格式化（如 `styles.xml` 里的日期序列号 → "2012/7/2"）——那
  * 是 Excel 渲染层的事，xlsx 原始值本身已经是字符串 / 数字，按源值下发能让
- * CSV 忠实反映 xlsx 数据层。
+ * CSV 忠实反映 xlsx 数据层
  */
 public func loadSheet(path: String, sst: SharedStrings): Sheet {
     let doc = loadXmlFromFile(path)
@@ -76,7 +76,7 @@ public func loadSheet(path: String, sst: SharedStrings): Sheet {
     var maxCol: Int64 = 0
 
     // `<dimension ref="A1:M87"/>`：OOXML 写入端给出的"整表外包盒"。用它做 maxCol
-    // 的下限能把"只有样式、没有值"的尾列也保留到 CSV 里，更忠实还原原表布局。
+    // 的下限能把"只有样式、没有值"的尾列也保留到 CSV 里，更忠实还原原表布局
     match (root.firstChildElement(name: Some("dimension"))) {
         case None => ()
         case Some(dim) =>
@@ -103,14 +103,14 @@ public func loadSheet(path: String, sst: SharedStrings): Sheet {
 }
 
 /**
- * 从 `<dimension ref="...">` 的取值里抽出最大列号。
+ * 从 `<dimension ref="...">` 的取值里抽出最大列号
  *
  * 合法形式：
  *
  * - `A1` （单格）→ 最大列 = 1
  * - `A1:M87` （矩形范围）→ 最大列 = 13
  *
- * 非法 / 空串返回 `None`，上层回退到"按数据单元计算"。
+ * 非法 / 空串返回 `None`，上层回退到"按数据单元计算"
  */
 func maxColFromDimensionRef(ref: String): ?Int64 {
     if (ref.size == 0) { return None }
@@ -138,11 +138,11 @@ func parseRow(rowEl: XmlElement, sst: SharedStrings): Row {
 
 /**
  * 尝试从 `<row r="...">` 里读行号；没有 `r` 属性时退化为**按出现顺序** +1
- * ——OOXML 规范允许省略（被视为"紧跟上一行"），这里不算错误。
+ * ——OOXML 规范允许省略（被视为"紧跟上一行"），这里不算错误
  *
  * 为了简单起见，我们只在有 `r` 时严格解析；没有时回退到 0 并由上层用
  * 出现顺序补齐不在本函数职责内；当前所有 WPS / Excel 主流导出都写 `r`，
- * 遇到省略的样本再加增强。
+ * 遇到省略的样本再加增强
  */
 func parseRowIndex(rowEl: XmlElement): Int64 {
     match (rowEl.attribute("r")) {
@@ -161,18 +161,18 @@ func parseRowIndex(rowEl: XmlElement): Int64 {
 }
 
 /**
- * 解析单个 `<c>` 元素。
+ * 解析单个 `<c>` 元素
  *
  * 空单元格（无 `<v>` 也无 `<is>`）返回 `None`——CSV 阶段会自动按列号用空串
- * 补位，把这些全空单元格留在 grid 里没有额外意义。
+ * 补位，把这些全空单元格留在 grid 里没有额外意义
  */
 func parseCell(cEl: XmlElement, sst: SharedStrings): ?Cell {
     let refAttr = cEl.attribute("r") ?? ""
     let col = match (parseCellRef(refAttr)) {
         case Some((c, _)) => c
         case None =>
-            // 未带 r 属性（极少见，某些轻量导出工具有此行为）。
-            // 本项目不支持该退化路径——告诉上层跳过；交给空列补位。
+            // 未带 r 属性（极少见，某些轻量导出工具有此行为）
+            // 本项目不支持该退化路径——告诉上层跳过；交给空列补位
             return None
     }
 
@@ -188,7 +188,7 @@ func parseCell(cEl: XmlElement, sst: SharedStrings): ?Cell {
 
 /**
  * 读取 `<c>` 的"原始值"——对大多数类型就是 `<v>` 的文本内容；对 `inlineStr`
- * 是 `<is>` 下所有 `<t>` 拼接。找不到任何值时返回 `None`。
+ * 是 `<is>` 下所有 `<t>` 拼接。找不到任何值时返回 `None`
  */
 func readCellRawValue(cEl: XmlElement, ty: String): ?String {
     if (ty == "inlineStr") {
@@ -219,11 +219,11 @@ func decodeCellValue(ty: String, raw: String, sst: SharedStrings): String {
 }
 
 /**
- * 宽松的非负整数解析——用于把 `<v>` 里的共享字符串索引变成 `Int64`。
+ * 宽松的非负整数解析——用于把 `<v>` 里的共享字符串索引变成 `Int64`
  *
  * 故意不抛异常：如果内容不是数字，返回 0 会命中 `sst.get(0)`——要么是合理
  * 的第一条字符串，要么是空串（空表时）。CSV 不会因此爆炸，这正是"尽量多
- * 输出已知数据"的哲学。
+ * 输出已知数据"的哲学
  */
 func parseNonNegativeInt(s: String): Int64 {
     var n: Int64 = 0

@@ -10,7 +10,7 @@ import fastxml.writer.*
 
 /**
  * fastxml 端 perf 探针——与 python_bench / tinyxml2_bench 共用同一份 fixtures
- * + plan.json，输出与之结构一致的 JSON 到 stdout。
+ * + plan.json，输出与之结构一致的 JSON 到 stdout
  *
  * 四个典型场景：
  *   1. parse:      bytes -> XmlDocument                （Parser + IO）
@@ -19,13 +19,13 @@ import fastxml.writer.*
  *   4. traverse:   walk 整棵 DOM，统计元素 + 属性数      （读端典型负载）
  *
  * 设计取舍：
- * - 用 `MonoTime` 做计时：不受系统时钟调整影响，纳秒分辨率。
+ * - 用 `MonoTime` 做计时：不受系统时钟调整影响，纳秒分辨率
  * - serialize / traverse 用一份预解析过的 doc 重复跑——这两个场景应只测自身耗时，
- *   不应把 parse 的成本算进去（与 python / tinyxml2 端做法一致）。
+ *   不应把 parse 的成本算进去（与 python / tinyxml2 端做法一致）
  * - 所有 IO 走 `parseXmlBytes` / `writeXmlToBytes`：避免文件 IO 噪声污染纯 XML
- *   解析与序列化的耗时；与 tinyxml2 端 `Parse(buf, size)` 对齐。
+ *   解析与序列化的耗时；与 tinyxml2 端 `Parse(buf, size)` 对齐
  * - "副作用 sink"用累加 Int64 防止编译器把循环优化为空——Counter.total 与
- *   serialized.size 都被追加到 `sink` 上。
+ *   serialized.size 都被追加到 `sink` 上
  *
  * 用法：cangjie_bench <fixture_dir> <plan.json>
  *   plan.json: [{ "file": "catalog_small.xml", "iterations": 1000 }, ...]
@@ -58,7 +58,7 @@ class PlanEntry {
 
 /**
  * 极简 JSON 解析——只够吃我们自己生成的 plan.json，
- * 与 tinyxml2_bench 端思路对齐（不引第三方依赖）。
+ * 与 tinyxml2_bench 端思路对齐（不引第三方依赖）
  */
 func parsePlan(bytes: Array<Byte>): ArrayList<PlanEntry> {
     let text = String.fromUtf8(bytes)
@@ -194,9 +194,9 @@ func indexOf(s: String, needle: String, start: Int64): Int64 {
 }
 
 // 注意：本工具是 perf bench 的"miniature JSON reader"，仅用于解析本进程
-// 写出的 plan.json（内容是 ASCII，键名 `file` / `iterations`，无 Unicode）。
+// 写出的 plan.json（内容是 ASCII，键名 `file` / `iterations`，无 Unicode）
 // 因此把 ASCII Rune 直接窄化为字节是安全的——超出 ASCII 范围的 Rune 会
-// 被截断，但本场景下根本不会传入。命名上加 Ascii 后缀以提醒边界。
+// 被截断，但本场景下根本不会传入。命名上加 Ascii 后缀以提醒边界
 func indexOfAsciiChar(s: String, c: Rune, start: Int64): Int64 {
     let b = UInt8(UInt32(c))
     var i = start
@@ -208,7 +208,7 @@ func indexOfAsciiChar(s: String, c: Rune, start: Int64): Int64 {
 }
 
 // JSON 值结束符（ASCII）的字节常量——预先求值，避免在热路径里
-// 重复做 Rune→UInt32→UInt8 转换。
+// 重复做 Rune→UInt32→UInt8 转换
 const DELIM_COMMA: Byte = 0x2Cu8 // ','
 const DELIM_RBRACE: Byte = 0x7Du8 // '}'
 const DELIM_LF: Byte = 0x0Au8 // '\n'

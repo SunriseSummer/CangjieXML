@@ -7,16 +7,16 @@ import std.io.*
 import stdx.compress.zlib.*
 
 /**
- * 把 `.xlsx` 解压到指定目录。
+ * 把 `.xlsx` 解压到指定目录
  *
  * `.xlsx` 本质上是一个 ZIP 容器，内部条目要么以 **Stored**（method=0，原样
  * 写入）存储，要么以 **Deflate**（method=8）压缩。本模块自行解析 ZIP 外壳
  * （EOCD / Central Directory / Local File Header），对 Deflate 数据交由
  * `stdx.compress.zlib.DecompressInputStream` 处理，因此**无需调用宿主系统的
- * `unzip`**，Linux / Windows 上都可以直接运行。
+ * `unzip`**，Linux / Windows 上都可以直接运行
  *
  * 不在这一层做"目录清理"——由上层（`main`）决定生命周期，必要时复用
- * 同一解压目录做多次实验。
+ * 同一解压目录做多次实验
  */
 public func unzipXlsx(xlsxPath: String, destDir: String): Unit {
     let destPath = Path(destDir)
@@ -31,15 +31,15 @@ public func unzipXlsx(xlsxPath: String, destDir: String): Unit {
 }
 
 /**
- * 跨平台创建一个独立临时目录，返回绝对路径字符串。
+ * 跨平台创建一个独立临时目录，返回绝对路径字符串
  *
  * 过去这里调用宿主的 `mktemp -d`，只在类 Unix 系统上可用。现在完全走仓颉
  * 标准库：`env.getTempDirectory()` 负责在 Linux / macOS / Windows 上拿到系统
  * 临时根（`$TMPDIR` / `%TEMP%` 等），再由 `Directory.createTemp` 生成唯一子
- * 目录，保证并发安全。
+ * 目录，保证并发安全
  *
  * `prefix` 只用作**可读性分类目录**名，便于在系统临时目录里一眼认出本工具
- * 留下的解压产物；真正的唯一段由 `createTemp` 负责。
+ * 留下的解压产物；真正的唯一段由 `createTemp` 负责
  */
 public func makeTempDir(prefix: String): String {
     let parent = getTempDirectory().join(prefix)
@@ -51,8 +51,8 @@ public func makeTempDir(prefix: String): String {
 
 // ============================================================
 // 以下为纯仓颉 ZIP 解析实现
-// 参考：APPNOTE.TXT（PKWARE ZIP File Format Specification）4.3/4.4 章节。
-// 只覆盖 xlsx 里会出现的子集：单磁盘、Store / Deflate、无 ZIP64 扩展。
+// 参考：APPNOTE.TXT（PKWARE ZIP File Format Specification）4.3/4.4 章节
+// 只覆盖 xlsx 里会出现的子集：单磁盘、Store / Deflate、无 ZIP64 扩展
 // ============================================================
 
 struct ZipEntry {
@@ -78,7 +78,7 @@ const METHOD_DEFLATE: UInt16 = 8u16
 /**
  * 在文件末尾向前扫描 **End of Central Directory Record**，返回其在文件里的
  * 起始偏移。EOCD 至少 22 字节，尾部 comment 最长 65535 字节，所以最多往回
- * 找 65557 字节。
+ * 找 65557 字节
  */
 func findEocd(bytes: Array<Byte>): Int64 {
     let n = bytes.size
@@ -131,7 +131,7 @@ func parseCentralDirectory(bytes: Array<Byte>): ArrayList<ZipEntry> {
 
 /** 提取单个条目到磁盘。目录条目按名创建目录；其余写文件。 */
 func extractEntry(bytes: Array<Byte>, entry: ZipEntry, destDir: String): Unit {
-    // 防 zip-slip：拒绝绝对路径与 `..` 跳出。
+    // 防 zip-slip：拒绝绝对路径与 `..` 跳出
     if (!isSafeEntryName(entry.name)) {
         throw Exception("zip entry has unsafe path: ${entry.name}")
     }
@@ -193,7 +193,7 @@ func inflate(compData: Array<Byte>): Array<Byte> {
 }
 
 /**
- * 判断 zip 条目名是否安全——拒绝绝对路径与任何 `..` 分段，避免 zip-slip。
+ * 判断 zip 条目名是否安全——拒绝绝对路径与任何 `..` 分段，避免 zip-slip
  */
 func isSafeEntryName(name: String): Bool {
     if (name.size == 0) { return false }

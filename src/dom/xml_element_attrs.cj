@@ -59,15 +59,15 @@ extend XmlElement {
      * - 属性不存在返回 `false`
      */
     public func removeAttribute(name: String): Bool {
-        let n = attrOrder.size
-        var i = 0
-        while (i < n) {
-            if (attrOrder[i].name == name) {
-                attrOrder.remove(at: i)
+        let count = attrOrder.size
+        var index = 0
+        while (index < count) {
+            if (attrOrder[index].name == name) {
+                attrOrder.remove(at: index)
                 dropFromAttrIndex(name)
                 return true
             }
-            i++
+            index++
         }
         false
     }

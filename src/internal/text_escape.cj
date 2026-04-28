@@ -147,15 +147,15 @@ public func escapeAttribute(s: String): String {
  * 该函数返回包含 `<![CDATA[` 与 `]]>` 分隔符的完整段，调用方直接把结果写入即可
  */
 public func escapeCdata(s: String): String {
-    let sb = StringBuilder()
-    sb.append(CDATA_OPEN)
+    let buffer = StringBuilder()
+    buffer.append(CDATA_OPEN)
     if (s.contains(CDATA_TERMINATOR)) {
-        appendWithCdataSplit(sb, s)
+        appendWithCdataSplit(buffer, s)
     } else {
-        sb.append(s)
+        buffer.append(s)
     }
-    sb.append(CDATA_CLOSE)
-    sb.toString()
+    buffer.append(CDATA_CLOSE)
+    buffer.toString()
 }
 
 /**

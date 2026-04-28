@@ -6,7 +6,7 @@ import fastxml.io.*
 
 /**
  * 从 workbook 里读取 sheet 列表（名称 + 实际路径），顺序严格按 `<sheets>` 子
- * 元素在 `xl/workbook.xml` 中出现的先后。
+ * 元素在 `xl/workbook.xml` 中出现的先后
  *
  * 形状：
  *
@@ -16,7 +16,7 @@ import fastxml.io.*
  * ```
  *
  * 再结合 `xl/_rels/workbook.xml.rels` 里 `Id -> Target` 的映射，就能把 sheet
- * 名对应到 `xl/worksheets/sheetN.xml`。
+ * 名对应到 `xl/worksheets/sheetN.xml`
  */
 public struct SheetEntry {
     public let name: String
@@ -29,10 +29,10 @@ public struct SheetEntry {
 }
 
 /**
- * 读取 workbook 下所有 sheet（按 `<sheets>` 出现顺序）。
+ * 读取 workbook 下所有 sheet（按 `<sheets>` 出现顺序）
  *
  * `unzipRoot` 是解压 xlsx 的根目录，函数内部负责拼 `xl/workbook.xml` 与
- * `xl/_rels/workbook.xml.rels` 两个路径。
+ * `xl/_rels/workbook.xml.rels` 两个路径
  */
 public func loadSheetList(unzipRoot: String): ArrayList<SheetEntry> {
     let workbookXml = "${unzipRoot}/xl/workbook.xml"
@@ -64,7 +64,7 @@ public func loadSheetList(unzipRoot: String): ArrayList<SheetEntry> {
 }
 
 /**
- * 读取 `xl/_rels/workbook.xml.rels` 并构造 `Id -> Target` 映射。
+ * 读取 `xl/_rels/workbook.xml.rels` 并构造 `Id -> Target` 映射
  *
  * relationships 文件的形状：
  *
@@ -91,20 +91,20 @@ func loadRelationshipMap(path: String): HashMap<String, String> {
 
 /**
  * 把 rels 里 `Target` 字段（相对 `xl/` 根的路径）归一成"相对 xlsx 顶层根"的
- * 路径——我们在 `unzipRoot` 下按"顶层根"寻址。
+ * 路径——我们在 `unzipRoot` 下按"顶层根"寻址
  *
  * 规则：
  *
  * - 以 `/` 开头 → 已是绝对内部路径，去掉前导 `/`；
- * - 否则视为相对 `xl/`（workbook.xml 所在目录），补上前缀。
+ * - 否则视为相对 `xl/`（workbook.xml 所在目录），补上前缀
  *
- * 不再做 `..` 展开——OOXML 文档里不会出现跨目录回退，简单判定足矣。
+ * 不再做 `..` 展开——OOXML 文档里不会出现跨目录回退，简单判定足矣
  */
 func normalizeRelTarget(target: String): String {
     if (target.startsWith("/")) {
         // `split("/", removeEmpty: false)` 会把前导 `/` 产出一个空段，丢掉它
         // 再用 `/` 重新拼回；String 没有稳定的 `[start..]` 字节切片，这是最干
-        // 净的便携写法。
+        // 净的便携写法
         let parts = target.split("/", removeEmpty: false)
         let sb = StringBuilder()
         var first = true

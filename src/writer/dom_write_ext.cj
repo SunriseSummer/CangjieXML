@@ -33,8 +33,8 @@ extend XmlDocument <: XmlWritable {
 
     public func writeToString(options: XmlWriteOptions): String {
         let sink = StringXmlSink()
-        let w = XmlWriter(sink, options: options)
-        w.writeDocument(this)
+        let writer = XmlWriter(sink, options: options)
+        writer.writeDocument(this)
         sink.toString()
     }
 }
@@ -46,8 +46,8 @@ extend XmlElement <: XmlWritable {
 
     public func writeToString(options: XmlWriteOptions): String {
         let sink = StringXmlSink()
-        let w = XmlWriter(sink, options: options)
-        w.writeElement(this)
+        let writer = XmlWriter(sink, options: options)
+        writer.writeElement(this)
         sink.toString()
     }
 }

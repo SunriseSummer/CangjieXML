@@ -51,12 +51,12 @@ public func parseXmlBytes(bytes: Array<Byte>, options: XmlParseOptions): XmlDocu
 // ======================================================================
 
 func readAllBytes(path: String): Array<Byte> {
-    let p = Path(path)
-    if (!exists(p)) {
+    let filePath = Path(path)
+    if (!exists(filePath)) {
         throw XmlIoException(FileNotFound(path))
     }
     try {
-        File.readFrom(p)
+        File.readFrom(filePath)
     } catch (e: FSException) {
         throw XmlIoException(FileReadFailed(path, e.message))
     }
