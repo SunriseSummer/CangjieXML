@@ -114,9 +114,11 @@ func isDeclarationPayload(trimmed: String): Bool {
     if (payloadLength < 3) {
         return false
     }
-    if (trimmed[0] != DECLARATION_PREFIX_X
-        || trimmed[1] != DECLARATION_PREFIX_M
-        || trimmed[2] != DECLARATION_PREFIX_L) {
+    let startsWithX = trimmed[0] == DECLARATION_PREFIX_X
+    let followedByM = trimmed[1] == DECLARATION_PREFIX_M
+    let followedByL = trimmed[2] == DECLARATION_PREFIX_L
+    let hasXmlPrefix = startsWithX && followedByM && followedByL
+    if (!hasXmlPrefix) {
         return false
     }
     payloadLength == 3 || isWsByte(trimmed[3])

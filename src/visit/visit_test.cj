@@ -150,14 +150,14 @@ class CountingVisitor <: XmlVisitor {
     public var decls: Int64 = 0
     public var unknowns: Int64 = 0
 
-    public func visitEnter(document: XmlDocument): Bool { enteredDocs++; true }
-    public func visitExit(document: XmlDocument): Bool  { exitedDocs++; true }
-    public func visitEnter(element: XmlElement): Bool   { enteredEls++; true }
-    public func visitExit(element: XmlElement): Bool    { exitedEls++; true }
-    public func visit(text: XmlText): Bool              { texts++; true }
-    public func visit(comment: XmlComment): Bool        { comments++; true }
-    public func visit(declaration: XmlDeclaration): Bool { decls++; true }
-    public func visit(unknown: XmlUnknown): Bool         { unknowns++; true }
+    public func visitEnter(_: XmlDocument): Bool { enteredDocs++; true }
+    public func visitExit(_: XmlDocument): Bool  { exitedDocs++; true }
+    public func visitEnter(_: XmlElement): Bool  { enteredEls++; true }
+    public func visitExit(_: XmlElement): Bool   { exitedEls++; true }
+    public func visit(_: XmlText): Bool          { texts++; true }
+    public func visit(_: XmlComment): Bool       { comments++; true }
+    public func visit(_: XmlDeclaration): Bool   { decls++; true }
+    public func visit(_: XmlUnknown): Bool       { unknowns++; true }
 }
 
 @Test
@@ -185,11 +185,11 @@ class PruneBookVisitor <: XmlVisitor {
         // 剪枝：不进入 <book> 子树
         return element.name != "book"
     }
-    public func visitExit(element: XmlElement): Bool {
+    public func visitExit(_: XmlElement): Bool {
         exitedEls++
         true
     }
-    public func visit(text: XmlText): Bool {
+    public func visit(_: XmlText): Bool {
         texts++
         true
     }
@@ -212,13 +212,13 @@ class StopOnTextVisitor <: XmlVisitor {
     public var texts: Int64 = 0
     public var elementExits: Int64 = 0
 
-    public func visit(text: XmlText): Bool {
+    public func visit(_: XmlText): Bool {
         texts++
         // 看到第一段文本就停止
         false
     }
 
-    public func visitExit(element: XmlElement): Bool {
+    public func visitExit(_: XmlElement): Bool {
         elementExits++
         true
     }
@@ -304,7 +304,7 @@ func testDefaultVisitorImplementationAcceptsEverything(): Unit {
 
 class UnknownCountingVisitor <: XmlVisitor {
     public var unknowns: Int64 = 0
-    public func visit(unknown: XmlUnknown): Bool {
+    public func visit(_: XmlUnknown): Bool {
         unknowns++
         true
     }
@@ -324,11 +324,11 @@ func testAcceptDispatchesUnknownLeaf(): Unit {
 class DocSkipVisitor <: XmlVisitor {
     public var enteredDoc: Int64 = 0
     public var enteredEls: Int64 = 0
-    public func visitEnter(document: XmlDocument): Bool {
+    public func visitEnter(_: XmlDocument): Bool {
         enteredDoc++
         false  // 剪枝整棵树
     }
-    public func visitEnter(element: XmlElement): Bool {
+    public func visitEnter(_: XmlElement): Bool {
         enteredEls++
         true
     }
@@ -346,7 +346,7 @@ func testAcceptSkipsWholeSubtreeWhenDocumentEnterFalse(): Unit {
 
 class UnknownStopVisitor <: XmlVisitor {
     public var seenUnknown: Int64 = 0
-    public func visit(unknown: XmlUnknown): Bool {
+    public func visit(_: XmlUnknown): Bool {
         seenUnknown++
         false  // 中止遍历
     }

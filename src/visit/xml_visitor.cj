@@ -24,35 +24,35 @@ import fastxml.dom.*
  */
 public interface XmlVisitor {
 
-    func visitEnter(document: XmlDocument): Bool {
+    func visitEnter(_: XmlDocument): Bool {
         true
     }
 
-    func visitExit(document: XmlDocument): Bool {
+    func visitExit(_: XmlDocument): Bool {
         true
     }
 
-    func visitEnter(element: XmlElement): Bool {
+    func visitEnter(_: XmlElement): Bool {
         true
     }
 
-    func visitExit(element: XmlElement): Bool {
+    func visitExit(_: XmlElement): Bool {
         true
     }
 
-    func visit(text: XmlText): Bool {
+    func visit(_: XmlText): Bool {
         true
     }
 
-    func visit(comment: XmlComment): Bool {
+    func visit(_: XmlComment): Bool {
         true
     }
 
-    func visit(declaration: XmlDeclaration): Bool {
+    func visit(_: XmlDeclaration): Bool {
         true
     }
 
-    func visit(unknown: XmlUnknown): Bool {
+    func visit(_: XmlUnknown): Bool {
         true
     }
 }

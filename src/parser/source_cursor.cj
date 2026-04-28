@@ -157,8 +157,13 @@ class SourceCursor {
         let inputSize = input.size
         var bomSeen = false
         var startByte = 0
-        if (inputSize >= BOM_BYTE_COUNT
-            && input[0] == BOM_BYTE_0 && input[1] == BOM_BYTE_1 && input[2] == BOM_BYTE_2) {
+        let hasEnoughBytesForBom = inputSize >= BOM_BYTE_COUNT
+        let matchesBomByte0 = hasEnoughBytesForBom && input[0] == BOM_BYTE_0
+        let matchesBomByte1 = hasEnoughBytesForBom && input[1] == BOM_BYTE_1
+        let matchesBomByte2 = hasEnoughBytesForBom && input[2] == BOM_BYTE_2
+        let matchesBomPrefix = matchesBomByte0 && matchesBomByte1 && matchesBomByte2
+        let hasUtf8BomPrefix = matchesBomPrefix
+        if (hasUtf8BomPrefix) {
             if (!acceptBom) {
                 throw XmlParseException(InvalidEncoding(SourcePos(0, 1, 1), "unexpected UTF-8 BOM (acceptBom = false)"))
             }
@@ -303,11 +308,7 @@ class SourceCursor {
     func skipNameChars(): Unit {
         while (idx < limit) {
             let currentByte = source[idx]
-            if ((currentByte >= BY_A_LOWER && currentByte <= BY_Z_LOWER)
-                || (currentByte >= BY_A_UPPER && currentByte <= BY_Z_UPPER)
-                || (currentByte >= BY_0 && currentByte <= BY_9)
-                || currentByte == BY_UNDERSCORE || currentByte == BY_COLON
-                || currentByte == BY_HYPHEN || currentByte == BY_DOT) {
+            if (isNameCharByte(currentByte)) {
                 idx++
                 column++
             } else {
@@ -423,8 +424,9 @@ class SourceCursor {
         if ((b0 & UTF8_LEAD2_MASK) == UTF8_LEAD2_PREFIX && byteIndex + 1 < limit) {
             let b1 = source[byteIndex + 1]
             if ((b1 & UTF8_CONT_MASK) == UTF8_CONT_PREFIX) {
-                let cp = (UInt32(b0 & UTF8_LEAD2_PAYLOAD_MASK) << UTF8_CONT_BITS)
-                    | UInt32(b1 & UTF8_CONT_PAYLOAD_MASK)
+                let leadPayload = UInt32(b0 & UTF8_LEAD2_PAYLOAD_MASK) << UTF8_CONT_BITS
+                let continuationPayload = UInt32(b1 & UTF8_CONT_PAYLOAD_MASK)
+                let cp = leadPayload | continuationPayload
                 return Utf8Decoded(Rune(cp), UTF8_LEN_2)
             }
         }
@@ -432,11 +434,13 @@ class SourceCursor {
         if ((b0 & UTF8_LEAD3_MASK) == UTF8_LEAD3_PREFIX && byteIndex + 2 < limit) {
             let b1 = source[byteIndex + 1]
             let b2 = source[byteIndex + 2]
-            if ((b1 & UTF8_CONT_MASK) == UTF8_CONT_PREFIX
-                && (b2 & UTF8_CONT_MASK) == UTF8_CONT_PREFIX) {
-                let cp = (UInt32(b0 & UTF8_LEAD3_PAYLOAD_MASK) << (UTF8_CONT_BITS * 2))
-                    | (UInt32(b1 & UTF8_CONT_PAYLOAD_MASK) << UTF8_CONT_BITS)
-                    | UInt32(b2 & UTF8_CONT_PAYLOAD_MASK)
+            let hasValidContinuationBytes = (b1 & UTF8_CONT_MASK) == UTF8_CONT_PREFIX && (b2 & UTF8_CONT_MASK) ==
+                UTF8_CONT_PREFIX
+            if (hasValidContinuationBytes) {
+                let leadPayload = UInt32(b0 & UTF8_LEAD3_PAYLOAD_MASK) << (UTF8_CONT_BITS * 2)
+                let midPayload = UInt32(b1 & UTF8_CONT_PAYLOAD_MASK) << UTF8_CONT_BITS
+                let tailPayload = UInt32(b2 & UTF8_CONT_PAYLOAD_MASK)
+                let cp = leadPayload | midPayload | tailPayload
                 return Utf8Decoded(Rune(cp), UTF8_LEN_3)
             }
         }
@@ -445,13 +449,16 @@ class SourceCursor {
             let b1 = source[byteIndex + 1]
             let b2 = source[byteIndex + 2]
             let b3 = source[byteIndex + 3]
-            if ((b1 & UTF8_CONT_MASK) == UTF8_CONT_PREFIX
-                && (b2 & UTF8_CONT_MASK) == UTF8_CONT_PREFIX
-                && (b3 & UTF8_CONT_MASK) == UTF8_CONT_PREFIX) {
-                let cp = (UInt32(b0 & UTF8_LEAD4_PAYLOAD_MASK) << (UTF8_CONT_BITS * 3))
-                    | (UInt32(b1 & UTF8_CONT_PAYLOAD_MASK) << (UTF8_CONT_BITS * 2))
-                    | (UInt32(b2 & UTF8_CONT_PAYLOAD_MASK) << UTF8_CONT_BITS)
-                    | UInt32(b3 & UTF8_CONT_PAYLOAD_MASK)
+            let isB1Continuation = (b1 & UTF8_CONT_MASK) == UTF8_CONT_PREFIX
+            let isB2Continuation = (b2 & UTF8_CONT_MASK) == UTF8_CONT_PREFIX
+            let isB3Continuation = (b3 & UTF8_CONT_MASK) == UTF8_CONT_PREFIX
+            let hasValidContinuationBytes = isB1Continuation && isB2Continuation && isB3Continuation
+            if (hasValidContinuationBytes) {
+                let leadPayload = UInt32(b0 & UTF8_LEAD4_PAYLOAD_MASK) << (UTF8_CONT_BITS * 3)
+                let upperMidPayload = UInt32(b1 & UTF8_CONT_PAYLOAD_MASK) << (UTF8_CONT_BITS * 2)
+                let lowerMidPayload = UInt32(b2 & UTF8_CONT_PAYLOAD_MASK) << UTF8_CONT_BITS
+                let tailPayload = UInt32(b3 & UTF8_CONT_PAYLOAD_MASK)
+                let cp = leadPayload | upperMidPayload | lowerMidPayload | tailPayload
                 return Utf8Decoded(Rune(cp), UTF8_LEN_4)
             }
         }
@@ -495,7 +502,15 @@ func isAsciiDigit(r: Rune): Bool {
 
 /** 字节版本：仅 ASCII 名称起始字符。 */
 func isNameStartByte(b: Byte): Bool {
-    (b >= BY_A_LOWER && b <= BY_Z_LOWER)
-        || (b >= BY_A_UPPER && b <= BY_Z_UPPER)
-        || b == BY_UNDERSCORE || b == BY_COLON
+    let isLowercaseAscii = b >= BY_A_LOWER && b <= BY_Z_LOWER
+    let isUppercaseAscii = b >= BY_A_UPPER && b <= BY_Z_UPPER
+    isLowercaseAscii || isUppercaseAscii || b == BY_UNDERSCORE || b == BY_COLON
+}
+
+func isNameCharByte(b: Byte): Bool {
+    isNameStartByte(b) || isAsciiDigitByte(b) || b == BY_HYPHEN || b == BY_DOT
+}
+
+func isAsciiDigitByte(b: Byte): Bool {
+    b >= BY_0 && b <= BY_9
 }

@@ -16,7 +16,7 @@
 - 两种遍历范式：函数式 `walk` 与经典 `XmlVisitor`。
 - 确定性序列化：相同 DOM + 相同 `XmlWriteOptions` 产出逐字节一致的输出，天然适配
   diff / 缓存 / 签名场景。
-- 单元测试 260 通过、E2E 10 例与 Python `xml.etree` 指纹一致。
+- 单元测试 260 通过、E2E 15 例与 Python `xml.etree` 指纹一致。
 
 ## 当前状态
 
@@ -30,7 +30,7 @@
 | M5 | Visit | 已完成 |
 | M6 | IO + Error + Options 收口 | 已完成 |
 | M7 | Batch / Concurrency | 跳过（与 DOM 单线程契约冲突，留待后续大版本） |
-| M8 | 回归 / E2E / 发布 | 已完成（10/10 fixture 与 Python `xml.etree` 指纹一致） |
+| M8 | 回归 / E2E / 发布 | 已完成（15/15 fixture 与 Python `xml.etree` 指纹一致） |
 
 ## 环境要求
 

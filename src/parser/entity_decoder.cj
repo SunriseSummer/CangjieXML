@@ -216,10 +216,18 @@ private func hexDigitValueByte(bv: Byte): Int64 {
 
 private func isValidXmlCodepoint(cp: Int64): Bool {
     // XML 1.0 §2.2 Char：0x9 | 0xA | 0xD | [0x20-0xD7FF] | [0xE000-0xFFFD] | [0x10000-0x10FFFF]
-    cp == XML_CHAR_TAB || cp == XML_CHAR_LF || cp == XML_CHAR_CR
-        || (cp >= XML_CHAR_VISIBLE_MIN && cp < XML_CHAR_SURROGATE_RANGE_START)
-        || (cp > XML_CHAR_SURROGATE_RANGE_END && cp <= XML_CHAR_BMP_MAX)
-        || (cp >= XML_CHAR_SUPPLEMENTARY_MIN && cp <= XML_CHAR_MAX)
+    if (cp == XML_CHAR_TAB || cp == XML_CHAR_LF || cp == XML_CHAR_CR) {
+        return true
+    }
+    let isVisibleBmpChar = cp >= XML_CHAR_VISIBLE_MIN && cp < XML_CHAR_SURROGATE_RANGE_START
+    if (isVisibleBmpChar) {
+        return true
+    }
+    let isNonSurrogateBmpChar = cp > XML_CHAR_SURROGATE_RANGE_END && cp <= XML_CHAR_BMP_MAX
+    if (isNonSurrogateBmpChar) {
+        return true
+    }
+    cp >= XML_CHAR_SUPPLEMENTARY_MIN && cp <= XML_CHAR_MAX
 }
 
 private func min(a: Int64, b: Int64): Int64 {

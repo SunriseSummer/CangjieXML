@@ -186,10 +186,12 @@ func appendWithCdataSplit(buffer: StringBuilder, s: String): Unit {
 
 /** 判断 `s[i..i+3]` 是否为 ASCII 字节 `]]>`。 */
 func isCdataTerminatorAt(s: String, candidateIndex: Int64, inputLength: Int64): Bool {
-    return candidateIndex + CDATA_TERMINATOR_LEN <= inputLength
-        && s[candidateIndex] == CDATA_RBRACKET_BYTE
-        && s[candidateIndex + 1] == CDATA_RBRACKET_BYTE
-        && s[candidateIndex + 2] == CDATA_GT_BYTE
+    if (candidateIndex + CDATA_TERMINATOR_LEN > inputLength) {
+        return false
+    }
+    let hasLeadingBrackets = s[candidateIndex] == CDATA_RBRACKET_BYTE && s[candidateIndex + 1] == CDATA_RBRACKET_BYTE
+    let hasTrailingGt = s[candidateIndex + 2] == CDATA_GT_BYTE
+    hasLeadingBrackets && hasTrailingGt
 }
 
 /** UTF-8 BOM 字节序列：EF BB BF。 */
@@ -209,7 +211,7 @@ func needsTextEscape(s: String): Bool {
     var byteIndex = 0
     while (byteIndex < inputLength) {
         let currentByte = s[byteIndex]
-        if (currentByte == ESCAPE_AMP || currentByte == ESCAPE_LT || currentByte == ESCAPE_GT) {
+        if (isTextEscapeByte(currentByte)) {
             return true
         }
         byteIndex++
@@ -222,11 +224,18 @@ func needsAttrEscape(s: String): Bool {
     var byteIndex = 0
     while (byteIndex < inputLength) {
         let currentByte = s[byteIndex]
-        if (currentByte == ESCAPE_AMP || currentByte == ESCAPE_LT
-            || currentByte == ESCAPE_GT || currentByte == ESCAPE_QUOT) {
+        if (isAttrEscapeByte(currentByte)) {
             return true
         }
         byteIndex++
     }
     false
+}
+
+func isTextEscapeByte(currentByte: Byte): Bool {
+    currentByte == ESCAPE_AMP || currentByte == ESCAPE_LT || currentByte == ESCAPE_GT
+}
+
+func isAttrEscapeByte(currentByte: Byte): Bool {
+    isTextEscapeByte(currentByte) || currentByte == ESCAPE_QUOT
 }
