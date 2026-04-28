@@ -227,7 +227,7 @@ func testMixedContentInline(): Unit {
 
 @Test
 func testDeterminism(): Unit {
-    // 相同 DOM + 相同 options 应产生逐字节相同的输出。
+    // 相同 DOM + 相同 options 应产生逐字节相同的输出
     let doc = mkDoc()
     doc.appendChild(doc.createDeclaration())
     let root = doc.createElement("r")
@@ -260,7 +260,7 @@ func testEscapeTextFastPath(): Unit {
 
 // ---------- 辅助扩展 ----------
 //
-// 为测试方便而加的 option 变换器。放在 test 文件里以免污染生产 API。
+// 为测试方便而加的 option 变换器。放在 test 文件里以免污染生产 API
 
 extend XmlWriteOptions {
     func withDeclarationOff(): XmlWriteOptions {
@@ -279,12 +279,12 @@ extend XmlWriteOptions {
 // ======================================================================
 // 以下为原 `writer_extra_test.cj`（已合并）—— "容易被改坏又难以肉眼发现" 的
 // 边界：CDATA 拆分 / compact 预设 / 元素 writeToString 不带声明 / BOM 传递 /
-// 自闭合 / 属性值转义 / XmlWritable 公共接口可见性。
+// 自闭合 / 属性值转义 / XmlWritable 公共接口可见性
 // ======================================================================
 
 @Test
 func testWriteCdataTerminatorIsSplit(): Unit {
-    // CDATA 内容含 `]]>` 必须被拆成两段，否则写出的 XML 非法。
+    // CDATA 内容含 `]]>` 必须被拆成两段，否则写出的 XML 非法
     let doc = XmlDocument()
     let root = doc.createElement("r")
     doc.appendChild(root)
@@ -297,7 +297,7 @@ func testWriteCdataTerminatorIsSplit(): Unit {
 
 @Test
 func testWriteCompactPresetNoIndentFromHand(): Unit {
-    // 不走 parser：完全用 DOM API 手动构造。
+    // 不走 parser：完全用 DOM API 手动构造
     let doc = XmlDocument()
     let a = doc.createElement("a")
     doc.appendChild(a)
@@ -323,7 +323,7 @@ func testWriteElementOnlyOmitsDeclaration(): Unit {
 
 @Test
 func testWriteBomPropagatedFromDocument(): Unit {
-    // doc.writeBom = true 且 options.writeBom = false → 仍应写 BOM。
+    // doc.writeBom = true 且 options.writeBom = false → 仍应写 BOM
     let doc = XmlDocument()
     doc.appendChild(doc.createElement("r"))
     doc.writeBom = true
@@ -356,7 +356,7 @@ func testWriteAttributeValueEscapesQuote(): Unit {
 @Test
 func testXmlWritableIsAPublicInterface(): Unit {
     // 回归测试：`writeToString` 必须经由 `XmlWritable` 接口声明，才能在
-    // `import fastxml.writer.*` 后被跨包调用方看到。
+    // `import fastxml.writer.*` 后被跨包调用方看到
     let doc = XmlDocument()
     let el = doc.createElement("r")
     doc.appendChild(el)
@@ -364,7 +364,7 @@ func testXmlWritableIsAPublicInterface(): Unit {
     let dw: XmlWritable = doc
     let ew: XmlWritable = el
     let docStr = dw.writeToString(XmlWriteOptions(writeDeclaration: false, compact: true))
-    let elStr  = ew.writeToString(XmlWriteOptions.compactPreset())
+    let elStr = ew.writeToString(XmlWriteOptions.compactPreset())
     @Expect(docStr, "<r/>")
     @Expect(elStr, "<r/>")
 }
@@ -375,7 +375,7 @@ func testXmlWritableIsAPublicInterface(): Unit {
 
 @Test
 func testStringXmlSinkInitialCapacityConstructor(): Unit {
-    // 仅为构造兼容——内部不存储 capacity，但入参必须被接受。
+    // 仅为构造兼容——内部不存储 capacity，但入参必须被接受
     let sink = StringXmlSink(1024)
     sink.write("hello")
     sink.write(" world")
@@ -400,8 +400,7 @@ func testWriterWriteNodeOnElement(): Unit {
     let el = doc.createElement("x")
     doc.appendChild(el)
     let sink = StringXmlSink()
-    XmlWriter(sink, options: XmlWriteOptions(writeDeclaration: false, compact: true))
-        .writeNode(el)
+    XmlWriter(sink, options: XmlWriteOptions(writeDeclaration: false, compact: true)).writeNode(el)
     @Expect(sink.toString(), "<x/>")
 }
 
@@ -410,8 +409,7 @@ func testWriterWriteNodeOnText(): Unit {
     let doc = XmlDocument()
     let t = doc.createText("hi&there")
     let sink = StringXmlSink()
-    XmlWriter(sink, options: XmlWriteOptions(writeDeclaration: false, compact: true))
-        .writeNode(t)
+    XmlWriter(sink, options: XmlWriteOptions(writeDeclaration: false, compact: true)).writeNode(t)
     @Expect(sink.toString(), "hi&amp;there")
 }
 
@@ -420,8 +418,7 @@ func testWriterWriteNodeOnComment(): Unit {
     let doc = XmlDocument()
     let c = doc.createComment(" lone ")
     let sink = StringXmlSink()
-    XmlWriter(sink, options: XmlWriteOptions(writeDeclaration: false, compact: true))
-        .writeNode(c)
+    XmlWriter(sink, options: XmlWriteOptions(writeDeclaration: false, compact: true)).writeNode(c)
     @Expect(sink.toString(), "<!-- lone -->")
 }
 
@@ -430,8 +427,7 @@ func testWriterWriteNodeOnUnknown(): Unit {
     let doc = XmlDocument()
     let u = doc.createUnknown("DOCTYPE html")
     let sink = StringXmlSink()
-    XmlWriter(sink, options: XmlWriteOptions(writeDeclaration: false, compact: true))
-        .writeNode(u)
+    XmlWriter(sink, options: XmlWriteOptions(writeDeclaration: false, compact: true)).writeNode(u)
     @Expect(sink.toString(), "<!DOCTYPE html>")
 }
 
@@ -440,15 +436,14 @@ func testWriterWriteNodeOnDeclaration(): Unit {
     let doc = XmlDocument()
     let d = doc.createDeclaration(value: Some("xml version=\"1.1\""))
     let sink = StringXmlSink()
-    XmlWriter(sink, options: XmlWriteOptions(writeDeclaration: false, compact: true))
-        .writeNode(d)
+    XmlWriter(sink, options: XmlWriteOptions(writeDeclaration: false, compact: true)).writeNode(d)
     @Expect(sink.toString(), "<?xml version=\"1.1\"?>")
 }
 
 @Test
 func testWriterInlineRendersAllChildKinds(): Unit {
     // 覆盖 writeNodeInline 的 Comment / Declaration / Unknown 三支——
-    // 当外层元素被判为 Inline（含 Text 子节点）时，这些兄弟节点走 inline 分支。
+    // 当外层元素被判为 Inline（含 Text 子节点）时，这些兄弟节点走 inline 分支
     let doc = XmlDocument()
     let r = doc.createElement("r")
     doc.appendChild(r)

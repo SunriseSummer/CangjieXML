@@ -31,17 +31,15 @@ class TempFile {
 }
 
 func makeSampleDoc(): XmlDocument {
-    XmlDocumentBuilder()
-        .declaration()
-        .root("catalog") { r =>
-            r.element("book") { b =>
-                b.attribute("id", "1").text("SICP")
+    XmlDocumentBuilder().declaration().root("catalog") {
+        r =>
+            r.element("book") {
+                b => b.attribute("id", "1").text("SICP")
             }
-            r.element("book") { b =>
-                b.attribute("id", "2").text("TAOCP")
+            r.element("book") {
+                b => b.attribute("id", "2").text("TAOCP")
             }
-        }
-        .build()
+    }.build()
 }
 
 // ======================================================================
@@ -120,11 +118,9 @@ func testWriteAndParseBytes(): Unit {
 func testUnicodeContentRoundTrip(): Unit {
     let tmp = TempFile("unicode.xml")
     try {
-        let doc = XmlDocumentBuilder()
-            .root("doc") { r =>
-                r.element("book") { b => b.attribute("lang", "zh").text("排序与查找 🔍 — Gödel") }
-            }
-            .build()
+        let doc = XmlDocumentBuilder().root("doc") {
+            r => r.element("book") {b => b.attribute("lang", "zh").text("排序与查找 🔍 — Gödel")}
+        }.build()
         saveXmlToFile(doc, tmp.path)
         let loaded = loadXmlFromFile(tmp.path)
         let root = loaded.rootElement.getOrThrow()
@@ -223,7 +219,7 @@ func testFileXmlSinkWriteAfterCloseThrows(): Unit {
             sink.write("late")
             @Fail("expected XmlIoException on write after close")
         } catch (_: XmlIoException) {
-            ()  // 预期
+            () // 预期
         }
     } finally {
         tmp.cleanup()
@@ -251,14 +247,11 @@ func testFileXmlSinkOnUnwritablePathThrows(): Unit {
 func testEndToEndBuildSaveLoadQuery(): Unit {
     let tmp = TempFile("e2e.xml")
     try {
-        let doc = XmlDocumentBuilder()
-            .declaration()
-            .root("library") { r =>
-                r.element("book") { b =>
-                    b.attribute("id", "42").attribute("avail", "true").text("Gödel, Escher, Bach")
-                }
+        let doc = XmlDocumentBuilder().declaration().root("library") {
+            r => r.element("book") {
+                b => b.attribute("id", "42").attribute("avail", "true").text("Gödel, Escher, Bach")
             }
-            .build()
+        }.build()
         saveXmlToFile(doc, tmp.path)
 
         let back = loadXmlFromFile(tmp.path)
@@ -272,7 +265,7 @@ func testEndToEndBuildSaveLoadQuery(): Unit {
 }
 
 // ======================================================================
-// close 幂等 / 空字节解析 / saveXmlToFile 失败不留半写入文件。
+// close 幂等 / 空字节解析 / saveXmlToFile 失败不留半写入文件
 // ======================================================================
 
 @Test
@@ -283,10 +276,10 @@ func testFileXmlSinkCloseIsIdempotent(): Unit {
         sink.write("<r/>")
         sink.close()
         @Expect(sink.isClosed(), true)
-        // 第二次 close 不应抛，也不应复活句柄。
+        // 第二次 close 不应抛，也不应复活句柄
         sink.close()
         @Expect(sink.isClosed(), true)
-        // 文件内容仍然只有一次写入的结果。
+        // 文件内容仍然只有一次写入的结果
         let content = String.fromUtf8(File.readFrom(Path(tmp.path)))
         @Expect(content, "<r/>")
     } finally {
@@ -298,7 +291,7 @@ func testFileXmlSinkCloseIsIdempotent(): Unit {
 func testParseEmptyBytesThrowsParseException(): Unit {
     // 走 io 层解码 + parser 层"空输入"一条链。空 UTF-8 字节不是 IO 错误，
     // 因此我们期望抛出 `XmlParseException`（由 parser 判定），而不是
-    // `XmlIoException`。
+    // `XmlIoException`
     var threw = false
     try {
         parseXmlBytes([])
@@ -312,7 +305,7 @@ func testParseEmptyBytesThrowsParseException(): Unit {
 func testSaveXmlToFileAtomicOnSerializationFailureAvoidsPartialFile(): Unit {
     // `saveXmlToFile` 通过"先序列化到内存字节，再一次性写盘"的设计天然
     // 规避了"部分写入"。此测试钉死这条设计：对一份合法 doc，若目标路径
-    // 所在目录不存在，我们应当抛 `XmlIoException`，并且不会创建任何副作用。
+    // 所在目录不存在，我们应当抛 `XmlIoException`，并且不会创建任何副作用
     let bogusDir = "/nonexistent_fastxml_dir_e7a3c/out.xml"
     let doc = XmlDocument()
     doc.appendChild(doc.createElement("r"))
@@ -349,13 +342,13 @@ func testXmlIoExceptionWrapsErrorField(): Unit {
 
 @Test
 func testFileXmlSinkFlushAfterCloseIsNoOp(): Unit {
-    // close 之后再 flush 应为 no-op——不抛、不改状态。
+    // close 之后再 flush 应为 no-op——不抛、不改状态
     let tmp = TempFile("flush_after_close.xml")
     try {
         let sink = FileXmlSink(tmp.path)
         sink.write("<x/>")
         sink.close()
-        sink.flush()  // 不应抛
+        sink.flush() // 不应抛
         @Expect(sink.isClosed(), true)
     } finally {
         tmp.cleanup()
@@ -364,7 +357,7 @@ func testFileXmlSinkFlushAfterCloseIsNoOp(): Unit {
 
 @Test
 func testFileXmlSinkExplicitFlushBeforeClose(): Unit {
-    // 覆盖 flush() 的"未关闭"分支——主动调用时内容应进磁盘。
+    // 覆盖 flush() 的"未关闭"分支——主动调用时内容应进磁盘
     let tmp = TempFile("flush_before_close.xml")
     try {
         let sink = FileXmlSink(tmp.path)
@@ -379,7 +372,7 @@ func testFileXmlSinkExplicitFlushBeforeClose(): Unit {
 
 @Test
 func testFileXmlSinkWriteAfterCloseRejected(): Unit {
-    // 覆盖 write() 的 `closed` 分支：关闭后再写必须抛 XmlIoException。
+    // 覆盖 write() 的 `closed` 分支：关闭后再写必须抛 XmlIoException
     let tmp = TempFile("write_after_close.xml")
     try {
         let sink = FileXmlSink(tmp.path)
@@ -389,7 +382,9 @@ func testFileXmlSinkWriteAfterCloseRejected(): Unit {
         try {
             sink.write("<after/>")
         } catch (e: XmlIoException) {
-            if (let FileWriteFailed(_, _) <- e.error) { threw = true }
+            if (let FileWriteFailed(_, _) <- e.error) {
+                threw = true
+            }
         }
         @Expect(threw, true)
     } finally {
@@ -404,14 +399,16 @@ func testFileXmlSinkConstructorFailureOnBadPath(): Unit {
     try {
         FileXmlSink("/nonexistent_fastxml_dir_9beef/out.xml")
     } catch (e: XmlIoException) {
-        if (let FileWriteFailed(_, _) <- e.error) { threw = true }
+        if (let FileWriteFailed(_, _) <- e.error) {
+            threw = true
+        }
     }
     @Expect(threw, true)
 }
 
 @Test
 func testFileXmlSinkStreamsLargeDocument(): Unit {
-    // 覆盖 flush() 的正常路径与 BufferedOutputStream 的真实写入分支。
+    // 覆盖 flush() 的正常路径与 BufferedOutputStream 的真实写入分支
     let tmp = TempFile("large.xml")
     try {
         try (sink = FileXmlSink(tmp.path)) {
@@ -438,7 +435,7 @@ func testFileXmlSinkStreamsLargeDocument(): Unit {
 
 @Test
 func testParseXmlBytesInvalidUtf8(): Unit {
-    // 覆盖 decodeUtf8 的异常分支：0xFF 单字节不是合法 UTF-8 起始序列。
+    // 覆盖 decodeUtf8 的异常分支：0xFF 单字节不是合法 UTF-8 起始序列
     let bogus: Array<Byte> = [0xFFu8, 0xFEu8, 0x00u8]
     var threw = false
     try {
@@ -464,7 +461,9 @@ func testLoadXmlFromFileInvalidUtf8(): Unit {
         try {
             loadXmlFromFile(tmp.path)
         } catch (e: XmlIoException) {
-            if (let FileReadFailed(_, _) <- e.error) { threw = true }
+            if (let FileReadFailed(_, _) <- e.error) {
+                threw = true
+            }
         }
         @Expect(threw, true)
     } finally {

@@ -4,10 +4,10 @@ import fastxml.dom.*
 import fastxml.internal.*
 
 /**
- * XML 写出器：把 DOM 子树序列化为 XML 文本并写入指定 `XmlSink`。
+ * XML 写出器：把 DOM 子树序列化为 XML 文本并写入指定 `XmlSink`
  *
  * 所有行为由 `XmlWriteOptions` 控制，不存在全局静态开关——相同 DOM + 相同
- * options 必然产生相同输出（确定性契约）。
+ * options 必然产生相同输出（确定性契约）
  *
  * ## 排版决策
  *
@@ -27,7 +27,7 @@ public class XmlWriter {
      * Fast path: 当 sink 是 `StringXmlSink` 时，直接拿到其 `StringBuilder`，
      * 绕过 `XmlSink.write` 的接口分派。CangjiePerf 显示 `string_concat`
      * (StringBuilder) 不是仓颉强项；减少接口分派可在热路径上显著降低
-     * 单次 append 的固定开销。
+     * 单次 append 的固定开销
      */
     private let directBuf: ?StringBuilder
 
@@ -40,7 +40,7 @@ public class XmlWriter {
         }
     }
 
-    /** 唯一的字节出口；fast-path 直写 builder，否则走 sink 接口。 */
+    // 唯一的字节出口；fast-path 直写 builder，否则走 sink 接口
     private func emit(text: String): Unit {
         match (directBuf) {
             case Some(b) => b.append(text)
@@ -130,7 +130,7 @@ public class XmlWriter {
     }
 
     private func writeTextNode(t: XmlText): Unit {
-        // 文本节点的缩进策略由上层元素决定；此处只负责内容本身。
+        // 文本节点的缩进策略由上层元素决定；此处只负责内容本身
         if (t.isCdata) {
             emit(escapeCdata(t.value))
         } else {
@@ -144,7 +144,7 @@ public class XmlWriter {
         maybeNewline()
     }
 
-    /** 块级模式写出元素；排版决策由 `chooseLayout` 给出，主流程分三态处理。 */
+    // 块级模式写出元素；排版决策由 `chooseLayout` 给出，主流程分三态处理
     private func writeElementBlock(el: XmlElement): Unit {
         indentIfNeeded()
         writeOpenTagWithAttrs(el)
@@ -163,7 +163,7 @@ public class XmlWriter {
 
     private func finishAsInline(el: XmlElement): Unit {
         emit(TAG_CLOSE)
-        // 直接走链表，避免每次都构造迭代器对象。
+        // 直接走链表，避免每次都构造迭代器对象
         var cur = el.firstChild
         while (let Some(child) <- cur) {
             writeNodeInline(child)
@@ -191,7 +191,7 @@ public class XmlWriter {
     private func writeOpenTagWithAttrs(el: XmlElement): Unit {
         emit(TAG_OPEN)
         emit(el.name)
-        // 索引迭代避免为每个属性构造一个 `ArrayList.Iterator` 对象。
+        // 索引迭代避免为每个属性构造一个 `ArrayList.Iterator` 对象
         let attributeCount = el.attributeCount()
         var attributeIndex = 0
         while (attributeIndex < attributeCount) {
@@ -252,7 +252,7 @@ public class XmlWriter {
     }
 
     private func writeUnknownRaw(value: String): Unit {
-        // PI 形态（`?...?`）原样输出，bang markup 包 `<!...>`。
+        // PI 形态（`?...?`）原样输出，bang markup 包 `<!...>`
         if (value.startsWith("?")) {
             emit(TAG_OPEN);
             emit(value);
@@ -269,7 +269,7 @@ public class XmlWriter {
             case None => SelfClosing
             case Some(_) =>
                 // 紧凑模式无缩进 / 换行语义，非空元素一律按 inline 写出，
-                // 避免为每个元素再扫描子链表判断是否含文本节点。
+                // 避免为每个元素再扫描子链表判断是否含文本节点
                 if (opts.compact || hasTextChild(el)) {
                     Inline
                 } else {

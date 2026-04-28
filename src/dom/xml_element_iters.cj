@@ -1,10 +1,10 @@
 package fastxml.dom
 
 /**
- * `XmlElement` 子节点迭代器：服务于 `childNodes()` / `childElements()`。
+ * `XmlElement` 子节点迭代器：服务于 `childNodes()` / `childElements()`
  */
 
-/** 遍历任意类型的直接子节点。 */
+// 遍历任意类型的直接子节点
 class XmlChildIter <: Iterable<XmlNode> {
     private var first: ?XmlNode
 
@@ -34,7 +34,7 @@ class XmlChildIterator <: Iterator<XmlNode> {
     }
 }
 
-/** 仅遍历元素类型的直接子节点；若 `name` 非空，则按名过滤。 */
+// 仅遍历元素类型的直接子节点；若 `name` 非空，则按名过滤
 class XmlChildElementIter <: Iterable<XmlElement> {
     private var first: ?XmlNode
     private var name: ?String

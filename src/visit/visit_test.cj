@@ -11,7 +11,7 @@ import fastxml.build.*
 // ======================================================================
 
 /*
- * 构造一棵典型的 XML 树，用于多数 walk/accept 测试。
+ * 构造一棵典型的 XML 树，用于多数 walk/accept 测试
  *
  * <?xml ... ?>
  * <!-- top comment -->
@@ -22,19 +22,16 @@ import fastxml.build.*
  * </catalog>
  */
 func makeTree(): XmlDocument {
-    XmlDocumentBuilder()
-        .declaration()
-        .comment("top comment")
-        .root("catalog") { r =>
-            r.element("book") { b =>
-                b.attribute("id", "1").text("SICP")
+    XmlDocumentBuilder().declaration().comment("top comment").root("catalog") {
+        r =>
+            r.element("book") {
+                b => b.attribute("id", "1").text("SICP")
             }
-            r.element("book") { b =>
-                b.attribute("id", "2").comment("note").text("TAOCP")
+            r.element("book") {
+                b => b.attribute("id", "2").comment("note").text("TAOCP")
             }
-            r.element("meta") { m => m.text("42") }
-        }
-        .build()
+            r.element("meta") {m => m.text("42")}
+    }.build()
 }
 
 // ======================================================================
@@ -43,14 +40,20 @@ func makeTree(): XmlDocument {
 
 class Counter {
     public var n: Int64 = 0
-    public func inc(): Unit { n++ }
+    public func inc(): Unit {
+        n++
+    }
 }
 
 @Test
 func testWalkVisitsEveryNode(): Unit {
     let doc = makeTree()
     let c = Counter()
-    walk(doc) { _ => c.inc(); Continue }
+    walk(doc) {
+        _ =>
+        c.inc();
+        Continue
+    }
     // Document + Declaration + top-Comment + catalog + book1 + text "SICP"
     //  + book2 + inner-Comment + text "TAOCP" + meta + text "42" = 11
     @Expect(c.n, 11)
@@ -60,16 +63,17 @@ func testWalkVisitsEveryNode(): Unit {
 func testWalkPreOrder(): Unit {
     let doc = makeTree()
     let order = ArrayList<String>()
-    walk(doc) { kind =>
-        match (kind) {
-            case Document(_)    => order.add("doc")
-            case Element(e)     => order.add("el:${e.name}")
-            case Text(t)        => order.add("txt:${t.value}")
-            case Comment(c)     => order.add("cmt:${c.value}")
-            case Declaration(_) => order.add("decl")
-            case Unknown(_)     => order.add("unk")
-        }
-        Continue
+    walk(doc) {
+        kind =>
+            match (kind) {
+                case Document(_) => order.add("doc")
+                case Element(e) => order.add("el:${e.name}")
+                case Text(t) => order.add("txt:${t.value}")
+                case Comment(c) => order.add("cmt:${c.value}")
+                case Declaration(_) => order.add("decl")
+                case Unknown(_) => order.add("unk")
+            }
+            Continue
     }
     @Expect(order[0], "doc")
     @Expect(order[1], "decl")
@@ -84,12 +88,13 @@ func testWalkSkipChildren(): Unit {
     let doc = makeTree()
     let c = Counter()
     // 跳过 catalog 的子树
-    walk(doc) { kind =>
-        c.inc()
-        match (kind) {
-            case Element(e) where e.name == "catalog" => SkipChildren
-            case _ => Continue
-        }
+    walk(doc) {
+        kind =>
+            c.inc()
+            match (kind) {
+                case Element(e) where e.name == "catalog" => SkipChildren
+                case _ => Continue
+            }
     }
     // 跳过 catalog 的所有后代，仍然应看到：doc + decl + top-comment + catalog 本身 = 4
     @Expect(c.n, 4)
@@ -99,8 +104,8 @@ func testWalkSkipChildren(): Unit {
 func testWalkStopAbortsImmediately(): Unit {
     let doc = makeTree()
     let seen = ArrayList<String>()
-    walk(doc) { kind =>
-        match (kind) {
+    walk(doc) {
+        kind => match (kind) {
             case Element(e) =>
                 seen.add(e.name)
                 if (e.name == "book") {
@@ -118,9 +123,13 @@ func testWalkStopAbortsImmediately(): Unit {
 
 @Test
 func testWalkOnLeafSkipChildrenEqualsContinue(): Unit {
-    let doc = XmlDocumentBuilder().root("r") { r => r.text("hi") }.build()
+    let doc = XmlDocumentBuilder().root("r") {r => r.text("hi")}.build()
     let c = Counter()
-    walk(doc) { _ => c.inc(); SkipChildren }
+    walk(doc) {
+        _ =>
+        c.inc();
+        SkipChildren
+    }
     // SkipChildren 在 Document 根上 → 不进入；仅 Document 自身被访问
     @Expect(c.n, 1)
 }
@@ -131,7 +140,11 @@ func testWalkOnElementSubtree(): Unit {
     let doc = makeTree()
     let root = doc.rootElement.getOrThrow()
     let c = Counter()
-    walk(root) { _ => c.inc(); Continue }
+    walk(root) {
+        _ =>
+        c.inc();
+        Continue
+    }
     // catalog + 2*book + 2*text + 1 inner-comment + meta + 1 text = 8
     @Expect(c.n, 8)
 }
@@ -150,14 +163,38 @@ class CountingVisitor <: XmlVisitor {
     public var decls: Int64 = 0
     public var unknowns: Int64 = 0
 
-    public func visitEnter(_: XmlDocument): Bool { enteredDocs++; true }
-    public func visitExit(_: XmlDocument): Bool  { exitedDocs++; true }
-    public func visitEnter(_: XmlElement): Bool  { enteredEls++; true }
-    public func visitExit(_: XmlElement): Bool   { exitedEls++; true }
-    public func visit(_: XmlText): Bool          { texts++; true }
-    public func visit(_: XmlComment): Bool       { comments++; true }
-    public func visit(_: XmlDeclaration): Bool   { decls++; true }
-    public func visit(_: XmlUnknown): Bool       { unknowns++; true }
+    public func visitEnter(_: XmlDocument): Bool {
+        enteredDocs++;
+        true
+    }
+    public func visitExit(_: XmlDocument): Bool {
+        exitedDocs++;
+        true
+    }
+    public func visitEnter(_: XmlElement): Bool {
+        enteredEls++;
+        true
+    }
+    public func visitExit(_: XmlElement): Bool {
+        exitedEls++;
+        true
+    }
+    public func visit(_: XmlText): Bool {
+        texts++;
+        true
+    }
+    public func visit(_: XmlComment): Bool {
+        comments++;
+        true
+    }
+    public func visit(_: XmlDeclaration): Bool {
+        decls++;
+        true
+    }
+    public func visit(_: XmlUnknown): Bool {
+        unknowns++;
+        true
+    }
 }
 
 @Test
@@ -167,10 +204,10 @@ func testAcceptFullDispatch(): Unit {
     @Expect(accept(doc, v), true)
     @Expect(v.enteredDocs, 1)
     @Expect(v.exitedDocs, 1)
-    @Expect(v.enteredEls, 4)  // catalog + book + book + meta
+    @Expect(v.enteredEls, 4) // catalog + book + book + meta
     @Expect(v.exitedEls, 4)
-    @Expect(v.texts, 3)       // SICP, TAOCP, 42
-    @Expect(v.comments, 2)    // top + inner
+    @Expect(v.texts, 3) // SICP, TAOCP, 42
+    @Expect(v.comments, 2) // top + inner
     @Expect(v.decls, 1)
     @Expect(v.unknowns, 0)
 }
@@ -253,7 +290,11 @@ func testXmlVisitableAcceptMethod(): Unit {
 func testXmlVisitableWalkMethod(): Unit {
     let doc = makeTree()
     let c = Counter()
-    doc.walk { _ => c.inc(); Continue }
+    doc.walk {
+        _ =>
+        c.inc();
+        Continue
+    }
     @Expect(c.n, 11)
 }
 
@@ -265,11 +306,11 @@ func testXmlVisitableWalkMethod(): Unit {
 func testCollectElementsByNameViaWalk(): Unit {
     let doc = makeTree()
     let books = ArrayList<XmlElement>()
-    walk(doc) { kind =>
-        match (kind) {
+    walk(doc) {
+        kind => match (kind) {
             case Element(e) where e.name == "book" =>
                 books.add(e)
-                SkipChildren  // 不再进入 book 的子树
+                SkipChildren // 不再进入 book 的子树
             case _ => Continue
         }
     }
@@ -282,7 +323,11 @@ func testCollectElementsByNameViaWalk(): Unit {
 func testEmptyElementHasNoChildrenWalked(): Unit {
     let doc = XmlDocumentBuilder().root("empty").build()
     let c = Counter()
-    walk(doc) { _ => c.inc(); Continue }
+    walk(doc) {
+        _ =>
+        c.inc();
+        Continue
+    }
     // Document + empty root = 2
     @Expect(c.n, 2)
 }
@@ -296,7 +341,7 @@ class DefaultVisitor <: XmlVisitor {}
 @Test
 func testDefaultVisitorImplementationAcceptsEverything(): Unit {
     // 默认实现对所有节点返回 true → 整次 accept 必然成功；
-    // 同时命中 interface 默认函数体以提升覆盖率。
+    // 同时命中 interface 默认函数体以提升覆盖率
     let doc = makeTree()
     let v = DefaultVisitor()
     @Expect(accept(doc, v), true)
@@ -326,7 +371,7 @@ class DocSkipVisitor <: XmlVisitor {
     public var enteredEls: Int64 = 0
     public func visitEnter(_: XmlDocument): Bool {
         enteredDoc++
-        false  // 剪枝整棵树
+        false // 剪枝整棵树
     }
     public func visitEnter(_: XmlElement): Bool {
         enteredEls++
@@ -348,7 +393,7 @@ class UnknownStopVisitor <: XmlVisitor {
     public var seenUnknown: Int64 = 0
     public func visit(_: XmlUnknown): Bool {
         seenUnknown++
-        false  // 中止遍历
+        false // 中止遍历
     }
 }
 

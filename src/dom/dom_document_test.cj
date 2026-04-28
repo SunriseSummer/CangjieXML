@@ -5,7 +5,7 @@ import std.unittest.testmacro.*
 import fastxml.error.*
 
 // ====================================================================
-// XmlDocument 行为测试：顶层节点约束、工厂、clear。
+// XmlDocument 行为测试：顶层节点约束、工厂、clear
 // ====================================================================
 
 @Test
@@ -135,12 +135,12 @@ func testKindExhaustivePatternMatch(): Unit {
 
     func label(n: XmlNode): String {
         match (n.kind()) {
-            case Document(_)    => "doc"
-            case Element(_)     => "el"
-            case Text(_)        => "t"
-            case Comment(_)     => "c"
+            case Document(_) => "doc"
+            case Element(_) => "el"
+            case Text(_) => "t"
+            case Comment(_) => "c"
             case Declaration(_) => "d"
-            case Unknown(_)     => "u"
+            case Unknown(_) => "u"
         }
     }
 
@@ -154,7 +154,7 @@ func testKindExhaustivePatternMatch(): Unit {
 
 @Test
 func testVersionConstant(): Unit {
-    // 验证 DOM 模块自身的基本稳定性（版本常量测试放在根包自身的测试文件里）。
+    // 验证 DOM 模块自身的基本稳定性（版本常量测试放在根包自身的测试文件里）
     let doc = XmlDocument()
     @Assert(refEq(doc.document, doc))
 }

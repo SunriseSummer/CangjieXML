@@ -4,10 +4,10 @@ import std.convert.*
 import std.collection.*
 
 /**
- * 内置 `XmlValueCodec` 实现——覆盖 XML 文档中最常见的几个标量类型。
+ * 内置 `XmlValueCodec` 实现——覆盖 XML 文档中最常见的几个标量类型
  *
  * 每个 codec 都是"行为无状态"的单例，通过 public 字段暴露，避免用户每次
- * 调用都构造新对象。
+ * 调用都构造新对象
  *
  * ## 约定
  *
@@ -15,14 +15,16 @@ import std.collection.*
  * - `format` 对所有输入都是全值域定义（永不抛异常）；
  * - `BoolCodec` 接受 `"true"` / `"false"` / `"1"` / `"0"`（忽略大小写），
  *   与 tinyxml2 行为对齐；`format` 只输出 `"true"` / `"false"`；
- * - 数值 codec 对含前后空白的输入会先 `trim` 再解析——XML 文本常带空白。
+ * - 数值 codec 对含前后空白的输入会先 `trim` 再解析——XML 文本常带空白
  */
 
-/** `Int64` 编解码。失败返回 `None`（包括溢出）。 */
+// `Int64` 编解码。失败返回 `None`（包括溢出）
 public class Int64Codec <: XmlValueCodec<Int64> {
     public func tryParse(text: String): ?Int64 {
         let trimmed = trimAscii(text)
-        if (trimmed.isEmpty()) { return None }
+        if (trimmed.isEmpty()) {
+            return None
+        }
         try {
             Some(Int64.parse(trimmed))
         } catch (_: Exception) {
@@ -35,11 +37,13 @@ public class Int64Codec <: XmlValueCodec<Int64> {
     }
 }
 
-/** `Int32` 编解码。 */
+// `Int32` 编解码
 public class Int32Codec <: XmlValueCodec<Int32> {
     public func tryParse(text: String): ?Int32 {
         let trimmed = trimAscii(text)
-        if (trimmed.isEmpty()) { return None }
+        if (trimmed.isEmpty()) {
+            return None
+        }
         try {
             Some(Int32.parse(trimmed))
         } catch (_: Exception) {
@@ -52,11 +56,13 @@ public class Int32Codec <: XmlValueCodec<Int32> {
     }
 }
 
-/** `Float64` 编解码。 */
+// `Float64` 编解码
 public class Float64Codec <: XmlValueCodec<Float64> {
     public func tryParse(text: String): ?Float64 {
         let trimmed = trimAscii(text)
-        if (trimmed.isEmpty()) { return None }
+        if (trimmed.isEmpty()) {
+            return None
+        }
         try {
             Some(Float64.parse(trimmed))
         } catch (_: Exception) {
@@ -69,25 +75,29 @@ public class Float64Codec <: XmlValueCodec<Float64> {
     }
 }
 
-/** `Bool` 编解码。接受 `"true"/"false"/"1"/"0"`（忽略大小写）。 */
+// `Bool` 编解码。接受 `"true"/"false"/"1"/"0"`（忽略大小写）
 public class BoolCodec <: XmlValueCodec<Bool> {
     public func tryParse(text: String): ?Bool {
         let t = lowerAscii(trimAscii(text))
         match (t) {
-            case "true"  => Some(true)
-            case "1"     => Some(true)
+            case "true" => Some(true)
+            case "1" => Some(true)
             case "false" => Some(false)
-            case "0"     => Some(false)
-            case _       => None
+            case "0" => Some(false)
+            case _ => None
         }
     }
 
     public func format(value: Bool): String {
-        if (value) { "true" } else { "false" }
+        if (value) {
+            "true"
+        } else {
+            "false"
+        }
     }
 }
 
-/** `String` 透传 codec——便于统一 Builder / Query 的泛型签名。 */
+// `String` 透传 codec——便于统一 Builder / Query 的泛型签名
 public class StringCodec <: XmlValueCodec<String> {
     public func tryParse(text: String): ?String {
         Some(text)
@@ -116,9 +126,15 @@ func trimAscii(s: String): String {
     let rr = toRuneList(s)
     var start = 0
     var end = rr.size
-    while (start < end && isAsciiWhitespace(rr[start])) { start++ }
-    while (end > start && isAsciiWhitespace(rr[end - 1])) { end-- }
-    if (start == 0 && end == rr.size) { return s }
+    while (start < end && isAsciiWhitespace(rr[start])) {
+        start++
+    }
+    while (end > start && isAsciiWhitespace(rr[end - 1])) {
+        end--
+    }
+    if (start == 0 && end == rr.size) {
+        return s
+    }
     let sb = StringBuilder()
     var i = start
     while (i < end) {
@@ -146,6 +162,8 @@ func isAsciiWhitespace(r: Rune): Bool {
 
 func toRuneList(s: String): Array<Rune> {
     let list = ArrayList<Rune>()
-    for (r in s.runes()) { list.add(r) }
+    for (r in s.runes()) {
+        list.add(r)
+    }
     list.toArray()
 }

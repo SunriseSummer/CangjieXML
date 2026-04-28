@@ -7,10 +7,10 @@ import fastxml.error.*
 import fastxml.writer.*
 
 // ====================================================================
-// Parser：顺路径行为测试。
+// Parser：顺路径行为测试
 //
 // 组织方式：核心输入用例覆盖主要语法分支，round-trip 测试验证
-// "parse → write → 再 parse → 语义一致"。
+// "parse → write → 再 parse → 语义一致"
 // ====================================================================
 
 @Test
@@ -46,7 +46,9 @@ func testParseCommentsAtTop(): Unit {
     // 顶层节点应当包含两个 Comment + 一个 Element
     var commentCount = 0
     for (n in doc.childNodes()) {
-        if (let Comment(_) <- n.kind()) { commentCount++ }
+        if (let Comment(_) <- n.kind()) {
+            commentCount++
+        }
     }
     @Expect(commentCount, 2)
 }
@@ -68,8 +70,7 @@ func testParseNestedElementsAndText(): Unit {
 
 @Test
 func testParseEntityReferences(): Unit {
-    let doc = XmlDocument.parseString(
-        "<r t=\"a&amp;b&lt;c&gt;d&quot;e&apos;f\">1&amp;2&#65;&#x42;</r>")
+    let doc = XmlDocument.parseString("<r t=\"a&amp;b&lt;c&gt;d&quot;e&apos;f\">1&amp;2&#65;&#x42;</r>")
     let r = doc.rootElement.getOrThrow()
     @Expect(r.attribute("t").getOrThrow(), "a&b<c>d\"e'f")
     @Expect(r.textContent(), "1&2AB")
@@ -83,13 +84,12 @@ func testParseCdata(): Unit {
     @Expect(r.textContent(), "raw & <stuff>")
     // 且应该是一个 CDATA 标记的 XmlText
     match (r.firstChild) {
-        case Some(n) =>
-            match (n.kind()) {
-                case Text(t) =>
-                    @Expect(t.isCdata, true)
-                    @Expect(t.value, "raw & <stuff>")
-                case _ => @Assert(false)
-            }
+        case Some(n) => match (n.kind()) {
+            case Text(t) =>
+                @Expect(t.isCdata, true)
+                @Expect(t.value, "raw & <stuff>")
+            case _ => @Assert(false)
+        }
         case None => @Assert(false)
     }
 }
@@ -154,7 +154,9 @@ func testErrorEmptyDocument(): Unit {
     try {
         XmlDocument.parseString("   ")
     } catch (e: XmlParseException) {
-        if (let EmptyDocument <- e.error) { caught = true }
+        if (let EmptyDocument <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
@@ -165,7 +167,9 @@ func testErrorMismatchedEndTag(): Unit {
     try {
         XmlDocument.parseString("<a></b>")
     } catch (e: XmlParseException) {
-        if (let MismatchedElement(_, _, _) <- e.error) { caught = true }
+        if (let MismatchedElement(_, _, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
@@ -187,7 +191,9 @@ func testErrorUnknownEntity(): Unit {
     try {
         XmlDocument.parseString("<r>&unknown;</r>")
     } catch (e: XmlParseException) {
-        if (let InvalidText(_, _) <- e.error) { caught = true }
+        if (let InvalidText(_, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
@@ -198,7 +204,9 @@ func testErrorUnterminatedAttribute(): Unit {
     try {
         XmlDocument.parseString("<r a=\"oops/>")
     } catch (e: XmlParseException) {
-        if (let InvalidAttribute(_, _, _) <- e.error) { caught = true }
+        if (let InvalidAttribute(_, _, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
@@ -209,7 +217,9 @@ func testErrorLessThanInAttribute(): Unit {
     try {
         XmlDocument.parseString("<r a=\"<\"/>")
     } catch (e: XmlParseException) {
-        if (let InvalidAttribute(_, _, _) <- e.error) { caught = true }
+        if (let InvalidAttribute(_, _, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
@@ -221,7 +231,9 @@ func testErrorDepthExceeded(): Unit {
     try {
         XmlDocument.parseString("<a><b><c><d/></c></b></a>", opts)
     } catch (e: XmlParseException) {
-        if (let ElementDepthExceeded(_, _) <- e.error) { caught = true }
+        if (let ElementDepthExceeded(_, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
@@ -274,10 +286,10 @@ func testBomAccepted(): Unit {
 
 @Test
 func testBomPropagatesToDocument(): Unit {
-    // 回归：parser 剥离 BOM 时必须把 doc.hasBom=true；否则 parse→write 丢 BOM。
+    // 回归：parser 剥离 BOM 时必须把 doc.hasBom=true；否则 parse→write 丢 BOM
     let doc = XmlDocument.parseString("\u{FEFF}<r/>")
     @Expect(doc.hasBom, true)
-    @Expect(doc.writeBom, false)  // writeBom 不应被连带打开
+    @Expect(doc.writeBom, false) // writeBom 不应被连带打开
     @Expect(XmlDocument.parseString("<r/>").hasBom, false)
 }
 
@@ -289,18 +301,20 @@ func testBomRejectedWhenDisabled(): Unit {
     try {
         XmlDocument.parseString(withBom, opts)
     } catch (e: XmlParseException) {
-        if (let InvalidEncoding(_, _) <- e.error) { caught = true }
+        if (let InvalidEncoding(_, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
 
 // ====================================================================
-// 数值实体 / 空输入 / 深度超限 / 重复属性 / round-trip 等边界用例。
+// 数值实体 / 空输入 / 深度超限 / 重复属性 / round-trip 等边界用例
 // ====================================================================
 
 @Test
 func testParseEmojiNumericEntity(): Unit {
-    // U+1F600 GRINNING FACE 是 4 字节 UTF-8；单独覆盖以防 Rune 构造路径回退。
+    // U+1F600 GRINNING FACE 是 4 字节 UTF-8；单独覆盖以防 Rune 构造路径回退
     let doc = XmlDocument.parseString("<r>&#x1F600;</r>")
     @Expect(doc.rootElement.getOrThrow().textContent(), "\u{1F600}")
 }
@@ -317,7 +331,9 @@ func testParseEmptyInputRejected(): Unit {
     try {
         XmlDocument.parseString("")
     } catch (e: XmlParseException) {
-        if (let EmptyDocument <- e.error) { caught = true }
+        if (let EmptyDocument <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
@@ -328,20 +344,24 @@ func testParseOnlyWhitespaceRejected(): Unit {
     try {
         XmlDocument.parseString("   \n\t  ")
     } catch (e: XmlParseException) {
-        if (let EmptyDocument <- e.error) { caught = true }
+        if (let EmptyDocument <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
 
 @Test
 func testParseDepthLimitHit(): Unit {
-    // 构造深度 5 的嵌套；限制设为 3 必挂。
+    // 构造深度 5 的嵌套；限制设为 3 必挂
     let opts = XmlParseOptions(maxElementDepth: 3)
     var caught = false
     try {
         XmlDocument.parseString("<a><b><c><d><e/></d></c></b></a>", opts)
     } catch (e: XmlParseException) {
-        if (let ElementDepthExceeded(_, _) <- e.error) { caught = true }
+        if (let ElementDepthExceeded(_, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
@@ -380,8 +400,8 @@ func testParseWhitespaceCollapseMode(): Unit {
 
 @Test
 func testParseWhitespaceCollapseDropsEmptyTextNodes(): Unit {
-    // Collapse 模式下，"仅空白"的文本节点会被丢弃——这是 tinyxml2 语义。
-    // 结果：<r> 之下只有 <a/>，无 Text 子节点。
+    // Collapse 模式下，"仅空白"的文本节点会被丢弃——这是 tinyxml2 语义
+    // 结果：<r> 之下只有 <a/>，无 Text 子节点
     let opts = XmlParseOptions(whitespace: Collapse)
     let doc = XmlDocument.parseString("<r>  \n  <a/>  \n  </r>", opts)
     var textCount = 0
@@ -408,10 +428,9 @@ func testCdataTerminatorRoundTripsThroughWriter(): Unit {
     doc.appendChild(r)
     r.appendChild(doc.createText("foo]]>bar", cdata: true))
     let sink = StringXmlSink()
-    XmlWriter(sink, options: XmlWriteOptions(writeDeclaration: false, compact: true))
-        .writeDocument(doc)
+    XmlWriter(sink, options: XmlWriteOptions(writeDeclaration: false, compact: true)).writeDocument(doc)
     let out = sink.toString()
-    // 再解析：textContent 仍应等于原始串。
+    // 再解析：textContent 仍应等于原始串
     let doc2 = XmlDocument.parseString(out)
     @Expect(doc2.rootElement.getOrThrow().textContent(), "foo]]>bar")
 }
@@ -421,29 +440,29 @@ func testDoctypeUnknownRoundTrip(): Unit {
     let xml = "<!DOCTYPE note SYSTEM \"note.dtd\"><r/>"
     let doc = XmlDocument.parseString(xml)
     let sink = StringXmlSink()
-    XmlWriter(sink, options: XmlWriteOptions(writeDeclaration: false, compact: true))
-        .writeDocument(doc)
+    XmlWriter(sink, options: XmlWriteOptions(writeDeclaration: false, compact: true)).writeDocument(doc)
     let out = sink.toString()
-    // 回归："<!" / "!"" 双重包装曾把 <!DOCTYPE ...> 写成 <!!DOCTYPE ...>。
-    // 正确：输出必须与输入一字不差。
+    // 回归："<!" / "!"" 双重包装曾把 <!DOCTYPE ...> 写成 <!!DOCTYPE ...>
+    // 正确：输出必须与输入一字不差
     @Expect(out, xml)
     let doc2 = XmlDocument.parseString(out)
     var unknownCount = 0
     for (n in doc2.childNodes()) {
-        if (let Unknown(_) <- n.kind()) { unknownCount++ }
+        if (let Unknown(_) <- n.kind()) {
+            unknownCount++
+        }
     }
     @Expect(unknownCount, 1)
 }
 
 @Test
 func testProcessingInstructionInsideElementRoundTrip(): Unit {
-    // 元素内的 <?target data?> 存为 XmlUnknown("?target data?")。
-    // 写回时必须仍是 <?target data?>，不能变成 <!?target data?>。
+    // 元素内的 <?target data?> 存为 XmlUnknown("?target data?")
+    // 写回时必须仍是 <?target data?>，不能变成 <!?target data?>
     let xml = "<r><?xml-stylesheet href=\"a.xsl\"?><a/></r>"
     let doc = XmlDocument.parseString(xml)
     let sink = StringXmlSink()
-    XmlWriter(sink, options: XmlWriteOptions(writeDeclaration: false, compact: true))
-        .writeDocument(doc)
+    XmlWriter(sink, options: XmlWriteOptions(writeDeclaration: false, compact: true)).writeDocument(doc)
     let out = sink.toString()
     @Expect(out, xml)
 }
@@ -471,7 +490,9 @@ func testParseStrayEndTagAtTopLevel(): Unit {
     try {
         XmlDocument.parseString("</oops>")
     } catch (e: XmlParseException) {
-        if (let MismatchedElement(_, _, _) <- e.error) { caught = true }
+        if (let MismatchedElement(_, _, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
@@ -482,7 +503,9 @@ func testParseUnexpectedTextAtTopLevel(): Unit {
     try {
         XmlDocument.parseString("bare text<r/>")
     } catch (e: XmlParseException) {
-        if (let InvalidText(_, _) <- e.error) { caught = true }
+        if (let InvalidText(_, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
@@ -493,7 +516,9 @@ func testParseEofAfterLtAtTopLevel(): Unit {
     try {
         XmlDocument.parseString("<")
     } catch (e: XmlParseException) {
-        if (let InvalidText(_, _) <- e.error) { caught = true }
+        if (let InvalidText(_, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
@@ -504,7 +529,9 @@ func testParseUnterminatedProcessingInstructionAtTopLevel(): Unit {
     try {
         XmlDocument.parseString("<?xml version=\"1.0\"")
     } catch (e: XmlParseException) {
-        if (let InvalidDeclaration(_, _) <- e.error) { caught = true }
+        if (let InvalidDeclaration(_, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
@@ -515,7 +542,9 @@ func testParseCdataAtTopLevelRejected(): Unit {
     try {
         XmlDocument.parseString("<![CDATA[x]]><r/>")
     } catch (e: XmlParseException) {
-        if (let InvalidText(_, _) <- e.error) { caught = true }
+        if (let InvalidText(_, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
@@ -526,7 +555,9 @@ func testParseUnterminatedComment(): Unit {
     try {
         XmlDocument.parseString("<!-- oops")
     } catch (e: XmlParseException) {
-        if (let InvalidComment(_, _) <- e.error) { caught = true }
+        if (let InvalidComment(_, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
@@ -537,7 +568,9 @@ func testParseUnterminatedCdataInsideElement(): Unit {
     try {
         XmlDocument.parseString("<r><![CDATA[oops</r>")
     } catch (e: XmlParseException) {
-        if (let InvalidText(_, _) <- e.error) { caught = true }
+        if (let InvalidText(_, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
@@ -545,13 +578,15 @@ func testParseUnterminatedCdataInsideElement(): Unit {
 @Test
 func testParseDoctypeWithInternalSubsetBrackets(): Unit {
     // 覆盖 `<!` markup 的 `[`/`]` 括号深度处理——DOCTYPE 内含 `[...]`
-    // 的子集声明时，`>` 应仅在方括号配平后才终止节点。
+    // 的子集声明时，`>` 应仅在方括号配平后才终止节点
     let xml = "<!DOCTYPE r [<!ELEMENT r (#PCDATA)>]><r/>"
     let doc = XmlDocument.parseString(xml)
     var foundUnknown = false
     for (n in doc.childNodes()) {
         if (let Unknown(u) <- n.kind()) {
-            if (u.value.contains("[")) { foundUnknown = true }
+            if (u.value.contains("[")) {
+                foundUnknown = true
+            }
         }
     }
     @Expect(foundUnknown, true)
@@ -564,7 +599,9 @@ func testParseUnterminatedBangMarkup(): Unit {
     try {
         XmlDocument.parseString("<!DOCTYPE x")
     } catch (e: XmlParseException) {
-        if (let InvalidUnknownNode(_, _) <- e.error) { caught = true }
+        if (let InvalidUnknownNode(_, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
@@ -577,7 +614,9 @@ func testParseEofInsideStartTag(): Unit {
     try {
         XmlDocument.parseString("<r ")
     } catch (e: XmlParseException) {
-        if (let InvalidAttribute(_, _, _) <- e.error) { caught = true }
+        if (let InvalidAttribute(_, _, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
@@ -588,7 +627,9 @@ func testParseAttributeMissingEquals(): Unit {
     try {
         XmlDocument.parseString("<r a 'v'/>")
     } catch (e: XmlParseException) {
-        if (let InvalidAttribute(name, _, _) <- e.error) { caught = (name == "a") }
+        if (let InvalidAttribute(name, _, _) <- e.error) {
+            caught = (name == "a")
+        }
     }
     @Expect(caught, true)
 }
@@ -599,7 +640,9 @@ func testParseUnquotedAttributeValue(): Unit {
     try {
         XmlDocument.parseString("<r a=v/>")
     } catch (e: XmlParseException) {
-        if (let InvalidAttribute(_, _, _) <- e.error) { caught = true }
+        if (let InvalidAttribute(_, _, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
@@ -610,7 +653,9 @@ func testParseEofInsideAttributeValue(): Unit {
     try {
         XmlDocument.parseString("<r a=")
     } catch (e: XmlParseException) {
-        if (let InvalidAttribute(_, _, _) <- e.error) { caught = true }
+        if (let InvalidAttribute(_, _, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
@@ -621,20 +666,26 @@ func testParseUnterminatedAttributeValue(): Unit {
     try {
         XmlDocument.parseString("<r a=\"oops")
     } catch (e: XmlParseException) {
-        if (let InvalidAttribute(_, _, _) <- e.error) { caught = true }
+        if (let InvalidAttribute(_, _, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
 
 @Test
 func testParseEofAfterLtInsideElement(): Unit {
-    // 元素内遇到 `<` 之后 EOF——触发 xml_parser_element.cj 的相应分支。
+    // 元素内遇到 `<` 之后 EOF——触发 xml_parser_element.cj 的相应分支
     var caught = false
     try {
         XmlDocument.parseString("<r><")
     } catch (e: XmlParseException) {
-        if (let InvalidText(_, _) <- e.error) { caught = true }
-        if (let MismatchedElement(_, _, _) <- e.error) { caught = true }
+        if (let InvalidText(_, _) <- e.error) {
+            caught = true
+        }
+        if (let MismatchedElement(_, _, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
@@ -645,7 +696,9 @@ func testParseElementEofBeforeEndTag(): Unit {
     try {
         XmlDocument.parseString("<r>hello")
     } catch (e: XmlParseException) {
-        if (let MismatchedElement(_, close, _) <- e.error) { caught = (close == "(EOF)") }
+        if (let MismatchedElement(_, close, _) <- e.error) {
+            caught = (close == "(EOF)")
+        }
     }
     @Expect(caught, true)
 }
@@ -656,7 +709,9 @@ func testParseUnterminatedPiInsideElement(): Unit {
     try {
         XmlDocument.parseString("<r><?target data")
     } catch (e: XmlParseException) {
-        if (let InvalidUnknownNode(_, _) <- e.error) { caught = true }
+        if (let InvalidUnknownNode(_, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
@@ -668,7 +723,9 @@ func testParseAttributeNameStartsWithDigitRejected(): Unit {
     try {
         XmlDocument.parseString("<1bad/>")
     } catch (e: XmlParseException) {
-        if (let InvalidText(_, _) <- e.error) { caught = true }
+        if (let InvalidText(_, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
@@ -686,7 +743,9 @@ func testParseInvalidHexEntityNonHexChar(): Unit {
     try {
         XmlDocument.parseString("<r>&#xZZ;</r>")
     } catch (e: XmlParseException) {
-        if (let InvalidText(_, _) <- e.error) { caught = true }
+        if (let InvalidText(_, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
@@ -697,7 +756,9 @@ func testParseInvalidDecimalEntityNonDigit(): Unit {
     try {
         XmlDocument.parseString("<r>&#1a2;</r>")
     } catch (e: XmlParseException) {
-        if (let InvalidText(_, _) <- e.error) { caught = true }
+        if (let InvalidText(_, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
@@ -708,7 +769,9 @@ func testParseEmptyNumericEntity(): Unit {
     try {
         XmlDocument.parseString("<r>&#;</r>")
     } catch (e: XmlParseException) {
-        if (let InvalidText(_, _) <- e.error) { caught = true }
+        if (let InvalidText(_, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
@@ -719,7 +782,9 @@ func testParseHexEntityMissingDigits(): Unit {
     try {
         XmlDocument.parseString("<r>&#x;</r>")
     } catch (e: XmlParseException) {
-        if (let InvalidText(_, _) <- e.error) { caught = true }
+        if (let InvalidText(_, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
@@ -730,7 +795,9 @@ func testParseEmptyEntityReferenceBody(): Unit {
     try {
         XmlDocument.parseString("<r>&;</r>")
     } catch (e: XmlParseException) {
-        if (let InvalidText(_, _) <- e.error) { caught = true }
+        if (let InvalidText(_, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
@@ -742,19 +809,23 @@ func testParseInvalidCodepointEntity(): Unit {
     try {
         XmlDocument.parseString("<r>&#0;</r>")
     } catch (e: XmlParseException) {
-        if (let InvalidText(_, _) <- e.error) { caught = true }
+        if (let InvalidText(_, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }
 
 @Test
 func testParseSelfClosingMissingGtTriggersConsumeExpected(): Unit {
-    // `<r/` 后应是 `>`，此处给了 `x`——触发 `consumeExpected(CH_GT)` 抛错。
+    // `<r/` 后应是 `>`，此处给了 `x`——触发 `consumeExpected(CH_GT)` 抛错
     var caught = false
     try {
         XmlDocument.parseString("<r/x>")
     } catch (e: XmlParseException) {
-        if (let InvalidText(_, _) <- e.error) { caught = true }
+        if (let InvalidText(_, _) <- e.error) {
+            caught = true
+        }
     }
     @Expect(caught, true)
 }

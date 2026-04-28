@@ -5,7 +5,7 @@ import std.unittest.testmacro.*
 import fastxml.error.*
 
 // ====================================================================
-// XmlElement 行为测试：子节点 / 属性 / 文本内容 / 遍历。
+// XmlElement 行为测试：子节点 / 属性 / 文本内容 / 遍历
 // ====================================================================
 
 @Test
@@ -30,19 +30,17 @@ func testChildInsertionAndSiblingLinks(): Unit {
 
     // 兄弟导航
     match (a.nextSibling) {
-        case Some(n) =>
-            match (n.kind()) {
-                case Element(e) => @Expect(e.name, "b")
-                case _ => @Assert(false)
-            }
+        case Some(n) => match (n.kind()) {
+            case Element(e) => @Expect(e.name, "b")
+            case _ => @Assert(false)
+        }
         case None => @Assert(false)
     }
     match (c.previousSibling) {
-        case Some(p) =>
-            match (p.kind()) {
-                case Element(e) => @Expect(e.name, "b")
-                case _ => @Assert(false)
-            }
+        case Some(p) => match (p.kind()) {
+            case Element(e) => @Expect(e.name, "b")
+            case _ => @Assert(false)
+        }
         case None => @Assert(false)
     }
 
@@ -273,7 +271,7 @@ func testChildElementsFilterByName(): Unit {
 
 // ====================================================================
 // 覆盖率补充：XmlNode equals/notEquals、element children 边界、
-// element firstChild/lastChild、isEmpty、跨文档、类型约束。
+// element firstChild/lastChild、isEmpty、跨文档、类型约束
 // ====================================================================
 
 @Test
@@ -313,7 +311,7 @@ func testXmlElementFirstLastChildAndIsEmpty(): Unit {
 
 @Test
 func testPrependChildOnEmptyElementEquivalentToAppend(): Unit {
-    // 覆盖 prependChild 的 `headChild == None` 分支。
+    // 覆盖 prependChild 的 `headChild == None` 分支
     let doc = XmlDocument()
     let r = doc.createElement("r")
     doc.appendChild(r)
@@ -335,7 +333,9 @@ func testInsertChildBeforeReferenceMustBeOwned(): Unit {
     var threw = false
     try {
         r.insertChildBefore(alien, newChild)
-    } catch (_: XmlException) { threw = true }
+    } catch (_: XmlException) {
+        threw = true
+    }
     @Expect(threw, true)
 }
 
@@ -356,7 +356,9 @@ func testSelfInsertionRejected(): Unit {
     var threw = false
     try {
         r.appendChild(r)
-    } catch (_: XmlException) { threw = true }
+    } catch (_: XmlException) {
+        threw = true
+    }
     @Expect(threw, true)
 }
 
@@ -368,7 +370,9 @@ func testInsertingDocumentAsChildRejected(): Unit {
     var threw = false
     try {
         r.appendChild(doc)
-    } catch (_: XmlException) { threw = true }
+    } catch (_: XmlException) {
+        threw = true
+    }
     @Expect(threw, true)
 }
 
@@ -381,7 +385,9 @@ func testCrossDocumentAppendAtDocumentLevelRejected(): Unit {
     var threw = false
     try {
         d1.appendChild(alien)
-    } catch (_: XmlException) { threw = true }
+    } catch (_: XmlException) {
+        threw = true
+    }
     @Expect(threw, true)
 }
 
@@ -426,7 +432,7 @@ func testDocumentRemoveChildRejectsCrossDocumentNode(): Unit {
 @Test
 func testTextContentSkipsCommentAndDeclaration(): Unit {
     // 覆盖 collectTextContent 的 `case _ => ()` 分支：非 Text / 非 Element
-    // 子节点（comment / declaration / unknown）不应计入 textContent。
+    // 子节点（comment / declaration / unknown）不应计入 textContent
     let doc = XmlDocument()
     let r = doc.createElement("r")
     doc.appendChild(r)

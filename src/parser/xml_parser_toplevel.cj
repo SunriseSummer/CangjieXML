@@ -4,18 +4,18 @@ import fastxml.dom.*
 import fastxml.error.*
 
 /**
- * `XmlParser` 的文档级与非元素节点解析逻辑。
+ * `XmlParser` 的文档级与非元素节点解析逻辑
  *
- * 与 `xml_parser_element.cj` 对应，二者均以 `extend XmlParser` 挂回同一类。
+ * 与 `xml_parser_element.cj` 对应，二者均以 `extend XmlParser` 挂回同一类
  */
 extend XmlParser {
 
     /**
-     * 公共入口：解析整个文档到 `doc`。
+     * 公共入口：解析整个文档到 `doc`
      *
      * 副作用：如果输入以 UTF-8 BOM 起首（且 `acceptBom` 为真），
-     * 会把 `doc.hasBom` 置为 `true`，保证 parse→write 的往返可保留 BOM。
-     * `writeBom`（写出时是否发 BOM）保持不变——调用方按需显式开启。
+     * 会把 `doc.hasBom` 置为 `true`，保证 parse→write 的往返可保留 BOM
+     * `writeBom`（写出时是否发 BOM）保持不变——调用方按需显式开启
      */
     public func parseDocument(): Unit {
         if (cur.sawBom) {
@@ -140,7 +140,7 @@ extend XmlParser {
                 let body = cur.sliceString(start, cur.idx)
                 cur.advance()
                 // 与 tinyxml2 `XMLUnknown::_value` 对齐：仅承载 `<!` 与 `>` 之间
-                // 的正文，不带头部 `!`，writer 会按需为 bang markup 补 `<!...>`。
+                // 的正文，不带头部 `!`，writer 会按需为 bang markup 补 `<!...>`
                 return doc.createUnknown(body)
             }
             cur.advance()
@@ -148,7 +148,7 @@ extend XmlParser {
         throw XmlParseException(InvalidUnknownNode(startPos, "unterminated '<!' markup"))
     }
 
-    /** 只用于错误消息：读取 `</name>` 里 `/` 后的名字片段。 */
+    // 只用于错误消息：读取 `</name>` 里 `/` 后的名字片段
     public func peekSkippedName(): String {
         let sb = StringBuilder()
         cur.advance() // skip '/'

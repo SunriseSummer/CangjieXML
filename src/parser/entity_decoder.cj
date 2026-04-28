@@ -3,7 +3,7 @@ package fastxml.parser
 import fastxml.error.*
 
 /**
- * XML 实体解码器。
+ * XML 实体解码器
  *
  * 支持的实体——与 XML 1.0 预定义实体 + 数值字符引用一致：
  *
@@ -15,10 +15,10 @@ import fastxml.error.*
  * - `&#N;`  → 码点 N（十进制）
  * - `&#xH;` → 码点 H（十六进制）
  *
- * 不支持 DTD 自定义实体（与 tinyxml2 对齐）。
+ * 不支持 DTD 自定义实体（与 tinyxml2 对齐）
  *
  * 解码失败统一抛 `XmlParseException(InvalidText(...))`，由上层捕获后按上下文
- * 合成 `InvalidAttribute` 等更细的错误枚举再重新抛出。
+ * 合成 `InvalidAttribute` 等更细的错误枚举再重新抛出
  */
 const MAX_ENTITY_NAME_LEN: Int64 = 8 // "&quot;" 是最长的命名实体
 const MAX_NUMERIC_ENTITY_DIGITS: Int64 = 8 // U+10FFFF 用 6 位十六进制足矣，8 为安全上限
@@ -47,11 +47,11 @@ private const XML_CHAR_SUPPLEMENTARY_MIN: Int64 = 0x10000
 private const XML_CHAR_MAX: Int64 = 0x10FFFF
 
 /**
- * 解码含实体的字符串；若无 `&` 则走快路径直接返回原串。
+ * 解码含实体的字符串；若无 `&` 则走快路径直接返回原串
  *
  * 慢路径以字节扫描定位 `&`：XML 实体引用首字符 `&` 与终止符 `;` 都是 ASCII，
  * UTF-8 多字节序列的所有续字节均 ≥ 0x80，按字节扫描结果与按 Rune 扫描完全
- * 一致；以此跳过对整段输入做 Rune 物化。
+ * 一致；以此跳过对整段输入做 Rune 物化
  */
 func decodeEntities(s: String, pos: SourcePos): String {
     let inputLength = s.size
@@ -76,7 +76,7 @@ func decodeEntities(s: String, pos: SourcePos): String {
         if (s[cursor] == ENTITY_AMP) {
             cursor = decodeOneEntity(s, cursor, output, pos)
         } else {
-            // 把直到下一个 `&` 之间的字节段一次性 append。
+            // 把直到下一个 `&` 之间的字节段一次性 append
             var nextAmpIndex = cursor + 1
             while (nextAmpIndex < inputLength && s[nextAmpIndex] != ENTITY_AMP) {
                 nextAmpIndex++
@@ -89,9 +89,9 @@ func decodeEntities(s: String, pos: SourcePos): String {
 }
 
 /**
- * 解析一个以 `&` 开头的实体，返回跨过 `;` 后的新索引。失败抛异常。
+ * 解析一个以 `&` 开头的实体，返回跨过 `;` 后的新索引。失败抛异常
  *
- * 实体体（命名实体名 / 数值字符引用）必须全部为 ASCII，可直接按字节比较。
+ * 实体体（命名实体名 / 数值字符引用）必须全部为 ASCII，可直接按字节比较
  */
 func decodeOneEntity(s: String, start: Int64, out: StringBuilder, pos: SourcePos): Int64 {
     let inputLength = s.size

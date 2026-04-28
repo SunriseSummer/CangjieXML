@@ -4,7 +4,6 @@ import std.collection.*
 import std.unittest.*
 import std.unittest.testmacro.*
 import std.fs.*
-
 import fastxml.*
 import fastxml.dom.*
 import fastxml.parser.*
@@ -18,13 +17,13 @@ import fastxml.error.*
 // ======================================================================
 // 文档示例验证套件
 //
-// 本文件里的每一个 @Test 都精确对应 `doc/*.md` 中的一段仓颉代码示例。
+// 本文件里的每一个 @Test 都精确对应 `doc/*.md` 中的一段仓颉代码示例
 // 目的是：一旦公共 API 发生不兼容的变动，`cjpm test` 会立即报错，从而把
-// "文档与代码漂移"问题挡在合入之前。
+// "文档与代码漂移"问题挡在合入之前
 //
 // 与其他 _test.cj 的分工：
 //   - `src/dom/*_test.cj`、`src/writer/*_test.cj` 等覆盖细粒度行为边界；
-//   - 本文件则专注于"文档示例的外观契约"（输出串、典型返回值等）。
+//   - 本文件则专注于"文档示例的外观契约"（输出串、典型返回值等）
 // ======================================================================
 
 // ----------------------------------------------------------------------
@@ -73,8 +72,7 @@ func docGettingStartedCompactPrint(): Unit {
 // ----------------------------------------------------------------------
 @Test
 func docGettingStartedParseString(): Unit {
-    let doc = parseXml(
-        "<catalog><book id=\"1\">SICP</book></catalog>")
+    let doc = parseXml("<catalog><book id=\"1\">SICP</book></catalog>")
     let root = doc.rootElement.getOrThrow()
     let book = root.firstChildElement(name: Some("book")).getOrThrow()
     @Expect(book.textContent(), "SICP")
@@ -118,9 +116,9 @@ func docDomTopLevelKindsIterate(): Unit {
     for (n in doc.childNodes()) {
         match (n.kind()) {
             case Declaration(_) => kinds += "D"
-            case Element(_)     => kinds += "E"
-            case Comment(_)     => kinds += "C"
-            case _              => kinds += "?"
+            case Element(_) => kinds += "E"
+            case Comment(_) => kinds += "C"
+            case _ => kinds += "?"
         }
     }
     @Expect(kinds, "DEC")
@@ -142,7 +140,10 @@ func docDomAttributesOrderAndHas(): Unit {
 
     // 顺序保留
     var names = ""
-    for (a in e.attributes()) { names += a.name; names += "," }
+    for (a in e.attributes()) {
+        names += a.name
+        names += ","
+    }
     @Expect(names, "id,lang,")
 }
 
@@ -275,13 +276,11 @@ func docQueryRequiredAttributeThrowsOnMissing(): Unit {
 
 @Test
 func docQueryChildElementText(): Unit {
-    let doc = parseXml(
-        "<store><name>SICP</name><price>42.5</price></store>")
+    let doc = parseXml("<store><name>SICP</name><price>42.5</price></store>")
     let root = doc.rootElement.getOrThrow()
 
     @Expect(root.childElementText("name").getOrThrow(), "SICP")
-    let price = root.childElementTextAs<Float64>("price", FLOAT64_CODEC)
-        .getOrThrow()
+    let price = root.childElementTextAs<Float64>("price", FLOAT64_CODEC).getOrThrow()
     @Expect(price > 42.4 && price < 42.6, true)
     @Expect(root.requiredChildElement("name").textContent(), "SICP")
 }
@@ -291,17 +290,15 @@ func docQueryChildElementText(): Unit {
 // ----------------------------------------------------------------------
 @Test
 func docBuilderBasicDSL(): Unit {
-    let doc = XmlDocumentBuilder()
-        .declaration()
-        .root("catalog") { r =>
-            r.element("book") { b =>
-                b.attribute("id", "1").text("SICP")
+    let doc = XmlDocumentBuilder().declaration().root("catalog") {
+        r =>
+            r.element("book") {
+                b => b.attribute("id", "1").text("SICP")
             }
-            r.element("book") { b =>
-                b.attribute("id", "2").text("TAOCP")
+            r.element("book") {
+                b => b.attribute("id", "2").text("TAOCP")
             }
-        }
-        .build()
+    }.build()
 
     let root = doc.rootElement.getOrThrow()
     @Expect(root.name, "catalog")
@@ -317,23 +314,20 @@ func docBuilderDeclarationIdempotent(): Unit {
     let doc = XmlDocumentBuilder().declaration().declaration().root("r").build()
     var count = 0
     for (n in doc.childNodes()) {
-        if (let Declaration(_) <- n.kind()) { count++ }
+        if (let Declaration(_) <- n.kind()) {
+            count++
+        }
     }
     @Expect(count, 1)
 }
 
 @Test
 func docBuilderTypedAttribute(): Unit {
-    let doc = XmlDocumentBuilder()
-        .declaration()
-        .root("catalog") { r =>
-            r.element("book") { b =>
-                b.attributeAs<Int64>("id", 1, INT64_CODEC)
-                 .attributeAs<Bool>("avail", true, BOOL_CODEC)
-                 .text("SICP")
-            }
+    let doc = XmlDocumentBuilder().declaration().root("catalog") {
+        r => r.element("book") {
+            b => b.attributeAs<Int64>("id", 1, INT64_CODEC).attributeAs<Bool>("avail", true, BOOL_CODEC).text("SICP")
         }
-        .build()
+    }.build()
 
     let book = doc.rootElement.getOrThrow().requiredChildElement("book")
     @Expect(book.intAttribute("id").getOrThrow(), 1)
@@ -343,24 +337,18 @@ func docBuilderTypedAttribute(): Unit {
 
 @Test
 func docBuilderMixedTextAndChild(): Unit {
-    let doc = XmlDocumentBuilder()
-        .root("p") { p =>
-            p.text("Hello ")
-             .element("b") { b => b.text("world") }
-             .text("!")
-        }
-        .build()
+    let doc = XmlDocumentBuilder().root("p") {
+        p => p.text("Hello ").element("b") {b => b.text("world")}.text("!")
+    }.build()
     let s = doc.writeToString(XmlWriteOptions(writeDeclaration: false))
     @Expect(s, "<p>Hello <b>world</b>!</p>\n")
 }
 
 @Test
 func docBuilderCdata(): Unit {
-    let doc = XmlDocumentBuilder()
-        .root("code") { c =>
-            c.text("x = 1; y = 2;", cdata: true)
-        }
-        .build()
+    let doc = XmlDocumentBuilder().root("code") {
+        c => c.text("x = 1; y = 2;", cdata: true)
+    }.build()
     let s = doc.writeToString(XmlWriteOptions(writeDeclaration: false))
     @Expect(s, "<code><![CDATA[x = 1; y = 2;]]></code>\n")
 }
@@ -368,21 +356,25 @@ func docBuilderCdata(): Unit {
 // ----------------------------------------------------------------------
 // 08 Visit：walk + XmlVisitor
 // ----------------------------------------------------------------------
-class BookCounter { public var n: Int64 = 0 }
+class BookCounter {
+    public var n: Int64 = 0
+}
 
-class TitleCollector { public let titles: ArrayList<String> = ArrayList<String>() }
+class TitleCollector {
+    public let titles: ArrayList<String> = ArrayList<String>()
+}
 
 @Test
 func docVisitWalkCountsBooks(): Unit {
-    let doc = XmlDocumentBuilder()
-        .root("catalog") { r =>
-            r.element("book") { b => b.attribute("id", "1").text("SICP") }
-            r.element("book") { b => b.attribute("id", "2").text("TAOCP") }
-        }.build()
+    let doc = XmlDocumentBuilder().root("catalog") {
+        r =>
+            r.element("book") {b => b.attribute("id", "1").text("SICP")}
+            r.element("book") {b => b.attribute("id", "2").text("TAOCP")}
+    }.build()
 
     let count = BookCounter()
-    walk(doc) { kind =>
-        match (kind) {
+    walk(doc) {
+        kind => match (kind) {
             case Element(e) where e.name == "book" =>
                 count.n++
                 SkipChildren
@@ -394,15 +386,15 @@ func docVisitWalkCountsBooks(): Unit {
 
 @Test
 func docVisitWalkCollectsTitles(): Unit {
-    let doc = XmlDocumentBuilder()
-        .root("catalog") { r =>
-            r.element("book") { b => b.text("SICP") }
-            r.element("book") { b => b.text("TAOCP") }
-        }.build()
+    let doc = XmlDocumentBuilder().root("catalog") {
+        r =>
+            r.element("book") {b => b.text("SICP")}
+            r.element("book") {b => b.text("TAOCP")}
+    }.build()
 
     let bag = TitleCollector()
-    walk(doc) { kind =>
-        match (kind) {
+    walk(doc) {
+        kind => match (kind) {
             case Element(e) where e.name == "book" =>
                 bag.titles.add(e.textContent())
                 SkipChildren
@@ -419,7 +411,7 @@ class DocBookCollector <: XmlVisitor {
     public func visitEnter(element: XmlElement): Bool {
         if (element.name == "book") {
             titles.add(element.textContent())
-            return false     // 不下钻
+            return false // 不下钻
         }
         true
     }
@@ -427,11 +419,11 @@ class DocBookCollector <: XmlVisitor {
 
 @Test
 func docVisitXmlVisitorCollectsTitles(): Unit {
-    let doc = XmlDocumentBuilder()
-        .root("catalog") { r =>
-            r.element("book") { b => b.text("SICP") }
-            r.element("book") { b => b.text("TAOCP") }
-        }.build()
+    let doc = XmlDocumentBuilder().root("catalog") {
+        r =>
+            r.element("book") {b => b.text("SICP")}
+            r.element("book") {b => b.text("TAOCP")}
+    }.build()
 
     let c = DocBookCollector()
     doc.accept(c)
@@ -460,14 +452,11 @@ class DocTempFile {
 }
 
 func docMakeSampleDoc(): XmlDocument {
-    XmlDocumentBuilder()
-        .declaration()
-        .root("catalog") { r =>
-            r.element("book") { b =>
-                b.attribute("id", "1").text("SICP")
-            }
+    XmlDocumentBuilder().declaration().root("catalog") {
+        r => r.element("book") {
+            b => b.attribute("id", "1").text("SICP")
         }
-        .build()
+    }.build()
 }
 
 @Test
@@ -542,8 +531,7 @@ func docErrorsParseExceptionCarriesXmlError(): Unit {
 // ----------------------------------------------------------------------
 @Test
 func docExampleRoundTripDeterminism(): Unit {
-    let src = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" +
-              "<catalog><book id=\"1\">SICP</book></catalog>"
+    let src = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>" + "<catalog><book id=\"1\">SICP</book></catalog>"
     let d1 = parseXml(src)
     let xml = d1.writeToString(XmlWriteOptions.compactPreset())
     let d2 = parseXml(xml)
