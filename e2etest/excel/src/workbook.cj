@@ -106,17 +106,17 @@ func normalizeRelTarget(target: String): String {
         // 再用 `/` 重新拼回；String 没有稳定的 `[start..]` 字节切片，这是最干
         // 净的便携写法
         let parts = target.split("/", removeEmpty: false)
-        let sb = StringBuilder()
+        let buffer = StringBuilder()
         var first = true
-        var idx = 0
-        for (p in parts) {
-            if (idx == 0) { idx++; continue }         // 跳过前导 `/` 产生的空段
-            if (!first) { sb.append("/") }
+        var partIndex = 0
+        for (part in parts) {
+            if (partIndex == 0) { partIndex++; continue }         // 跳过前导 `/` 产生的空段
+            if (!first) { buffer.append("/") }
             first = false
-            sb.append(p)
-            idx++
+            buffer.append(part)
+            partIndex++
         }
-        return sb.toString()
+        return buffer.toString()
     }
     "xl/${target}"
 }

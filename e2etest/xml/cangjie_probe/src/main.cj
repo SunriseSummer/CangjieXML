@@ -52,7 +52,7 @@ main(args: Array<String>): Int64 {
     0
 }
 
-/** 按文件名字典序列出 fixtures 目录里的所有 `.xml`。 */
+/** 按文件名字典序列出 fixtures 目录里的所有 `.xml` */
 func listXmlFiles(dir: String): ArrayList<String> {
     let infos = Directory.readFrom(Path(dir))
     let names = ArrayList<String>()
@@ -66,7 +66,7 @@ func listXmlFiles(dir: String): ArrayList<String> {
     names
 }
 
-/** 遍历所有 fixture，按指定模式生成合并 JSON 对象。 */
+/** 遍历所有 fixture，按指定模式生成合并 JSON 对象 */
 func renderAllFixtures(dir: String, mode: ProbeMode): String {
     let files = listXmlFiles(dir)
     let json = StringBuilder()

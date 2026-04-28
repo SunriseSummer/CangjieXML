@@ -81,39 +81,39 @@ func convert(xlsxPath: String, outDir: String): Unit {
     println("[xlsx_to_csv] sharedStrings: ${sst.count} item(s)")
 
     let indexWidth = digitCount(sheets.size)
-    var i: Int64 = 1
+    var sheetIndex: Int64 = 1
     for (entry in sheets) {
         let sheetXml = "${extractDir}/${entry.sheetPath}"
         if (!exists(Path(sheetXml))) {
             eprintln("warning: sheet '${entry.name}' missing underlying file: ${sheetXml}")
-            i++
+            sheetIndex++
             continue
         }
         let sheet = loadSheet(sheetXml, sst)
-        let filename = "${padIndex(i, indexWidth)}_${sanitizeFileName(entry.name)}.csv"
+        let filename = "${padIndex(sheetIndex, indexWidth)}_${sanitizeFileName(entry.name)}.csv"
         let csvPath = "${outDir}/${filename}"
         writeSheetToCsv(sheet, csvPath, CsvWriteOptions.default_())
         println(
             "[xlsx_to_csv] wrote ${csvPath} (rows=${sheet.rows.size}, maxCol=${sheet.maxColumn})")
-        i++
+        sheetIndex++
     }
 }
 
-/** 把整数补零到宽度 `width`；`index=3, width=2` → `"03"`。 */
+/** 把整数补零到宽度 `width`；`index=3, width=2` → `"03"` */
 func padIndex(index: Int64, width: Int64): String {
     "${index}".padStart(width, padding: "0")
 }
 
-/** 十进制位数——只用来算序号宽度，0 和负数按 1 位处理（实际不会命中）。 */
+/** 十进制位数——只用来算序号宽度，0 和负数按 1 位处理（实际不会命中） */
 func digitCount(n: Int64): Int64 {
     if (n <= 0) { return 1 }
-    var x = n
-    var d: Int64 = 0
-    while (x > 0) {
-        x /= 10
-        d++
+    var remaining = n
+    var digits: Int64 = 0
+    while (remaining > 0) {
+        remaining /= 10
+        digits++
     }
-    d
+    digits
 }
 
 /**
@@ -128,15 +128,15 @@ func digitCount(n: Int64): Int64 {
  * 额外把两端的空格 / 点去掉——Windows 不允许文件名以空格 / 点结尾
  */
 func sanitizeFileName(name: String): String {
-    let sb = StringBuilder()
+    let buffer = StringBuilder()
     for (r in name.runes()) {
         if (isIllegalFileNameRune(r)) {
-            sb.append(r'_')
+            buffer.append(r'_')
         } else {
-            sb.append(r)
+            buffer.append(r)
         }
     }
-    let trimmed = sb.toString().trimAscii()
+    let trimmed = buffer.toString().trimAscii()
     if (trimmed.size == 0) { return "sheet" }
     trimmed
 }

@@ -21,7 +21,7 @@ public class Sheet {
     }
 }
 
-/** 单个 `<row>` 的内存表示。 */
+/** 单个 `<row>` 的内存表示 */
 public class Row {
     public let index: Int64                          // 1 起的行号
     public let cells: ArrayList<Cell>                // 按列号升序
@@ -32,7 +32,7 @@ public class Row {
     }
 }
 
-/** 单元格的最终**展示值**——已经过共享字符串 / 内联字符串的解析，可直接下发 CSV。 */
+/** 单元格的最终**展示值**——已经过共享字符串 / 内联字符串的解析，可直接下发 CSV */
 public class Cell {
     public let column: Int64
     public let value: String
@@ -91,12 +91,12 @@ public func loadSheet(path: String, sst: SharedStrings): Sheet {
         case None => ()                              // 空 sheet
         case Some(sheetData) =>
             for (rowEl in sheetData.childElements(name: Some("row"))) {
-                let r = parseRow(rowEl, sst)
-                if (r.cells.size > 0) {
-                    let last = r.cells[r.cells.size - 1].column
+                let row = parseRow(rowEl, sst)
+                if (row.cells.size > 0) {
+                    let last = row.cells[row.cells.size - 1].column
                     if (last > maxCol) { maxCol = last }
                 }
-                rows.add(r)
+                rows.add(row)
             }
     }
     Sheet(rows, maxCol)
@@ -123,7 +123,7 @@ func maxColFromDimensionRef(ref: String): ?Int64 {
     }
 }
 
-/** 解析单个 `<row>` 元素。 */
+/** 解析单个 `<row>` 元素 */
 func parseRow(rowEl: XmlElement, sst: SharedStrings): Row {
     let idx = parseRowIndex(rowEl)
     let cells = ArrayList<Cell>()
@@ -148,15 +148,15 @@ func parseRowIndex(rowEl: XmlElement): Int64 {
     match (rowEl.attribute("r")) {
         case None => 0
         case Some(s) =>
-            var n: Int64 = 0
-            for (b in s.toArray()) {
-                if (b >= b'0' && b <= b'9') {
-                    n = n * 10 + Int64(b - b'0')
+            var rowNumber: Int64 = 0
+            for (byte in s.toArray()) {
+                if (byte >= b'0' && byte <= b'9') {
+                    rowNumber = rowNumber * 10 + Int64(byte - b'0')
                 } else {
                     return 0
                 }
             }
-            n
+            rowNumber
     }
 }
 
@@ -195,9 +195,9 @@ func readCellRawValue(cEl: XmlElement, ty: String): ?String {
         match (cEl.firstChildElement(name: Some("is"))) {
             case None => return None
             case Some(isEl) =>
-                let sb = StringBuilder()
-                collectTextNodes(isEl, sb)
-                return Some(sb.toString())
+                let buffer = StringBuilder()
+                collectTextNodes(isEl, buffer)
+                return Some(buffer.toString())
         }
     }
     match (cEl.firstChildElement(name: Some("v"))) {
@@ -206,7 +206,7 @@ func readCellRawValue(cEl: XmlElement, ty: String): ?String {
     }
 }
 
-/** 按单元格类型把 `<v>` 原值翻译成可写入 CSV 的最终字符串。 */
+/** 按单元格类型把 `<v>` 原值翻译成可写入 CSV 的最终字符串 */
 func decodeCellValue(ty: String, raw: String, sst: SharedStrings): String {
     if (ty == "s") {
         return sst.get(parseNonNegativeInt(raw))
@@ -226,13 +226,13 @@ func decodeCellValue(ty: String, raw: String, sst: SharedStrings): String {
  * 输出已知数据"的哲学
  */
 func parseNonNegativeInt(s: String): Int64 {
-    var n: Int64 = 0
-    for (b in s.toArray()) {
-        if (b >= b'0' && b <= b'9') {
-            n = n * 10 + Int64(b - b'0')
+    var value: Int64 = 0
+    for (byte in s.toArray()) {
+        if (byte >= b'0' && byte <= b'9') {
+            value = value * 10 + Int64(byte - b'0')
         } else {
             return 0
         }
     }
-    n
+    value
 }

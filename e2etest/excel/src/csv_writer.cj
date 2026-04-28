@@ -29,12 +29,12 @@ public struct CsvWriteOptions {
     public static func default_(): CsvWriteOptions { CsvWriteOptions() }
 }
 
-/** 把 `Sheet` 序列化为字节串——便于上层选择落盘路径或直接打印。 */
+/** 把 `Sheet` 序列化为字节串——便于上层选择落盘路径或直接打印 */
 public func sheetToCsvBytes(sheet: Sheet, options: CsvWriteOptions): Array<Byte> {
-    let sb = StringBuilder()
+    let buffer = StringBuilder()
     if (options.writeBom) {
         // UTF-8 BOM：先用代码点 U+FEFF 追加进字符串，随后 toUtf8 自动展开为 EF BB BF
-        sb.append("\u{FEFF}")
+        buffer.append("\u{FEFF}")
     }
 
     let maxCol = sheet.maxColumn
@@ -42,47 +42,47 @@ public func sheetToCsvBytes(sheet: Sheet, options: CsvWriteOptions): Array<Byte>
     for (row in sheet.rows) {
         // 保留原表格布局：中间缺失的行号也要占位
         while (expected < row.index) {
-            writeEmptyRow(sb, maxCol, options.delimiter)
+            writeEmptyRow(buffer, maxCol, options.delimiter)
             expected++
         }
-        writeRow(sb, row, maxCol, options.delimiter)
+        writeRow(buffer, row, maxCol, options.delimiter)
         expected++
     }
 
-    sb.toString().toArray()
+    buffer.toString().toArray()
 }
 
-/** 直接落盘；调用方需确保父目录已存在。 */
+/** 直接落盘；调用方需确保父目录已存在 */
 public func writeSheetToCsv(sheet: Sheet, path: String, options: CsvWriteOptions): Unit {
     File.writeTo(Path(path), sheetToCsvBytes(sheet, options))
 }
 
-/** 写一整行。至少输出 `maxCol` 列，缺失列以空串补位。 */
-func writeRow(sb: StringBuilder, row: Row, maxCol: Int64, delim: Rune): Unit {
+/** 写一整行。至少输出 `maxCol` 列，缺失列以空串补位 */
+func writeRow(buffer: StringBuilder, row: Row, maxCol: Int64, delim: Rune): Unit {
     var col: Int64 = 1
-    var i: Int64 = 0
+    var cellIndex: Int64 = 0
     var first = true
     while (col <= maxCol) {
-        if (!first) { sb.append(delim) }
+        if (!first) { buffer.append(delim) }
         first = false
-        if (i < row.cells.size && row.cells[i].column == col) {
-            appendCsvField(sb, row.cells[i].value, delim)
-            i++
+        if (cellIndex < row.cells.size && row.cells[cellIndex].column == col) {
+            appendCsvField(buffer, row.cells[cellIndex].value, delim)
+            cellIndex++
         }
         // 若当前单元格的 column > col，说明这列是空——无需写任何内容
         col++
     }
-    sb.append("\r\n")
+    buffer.append("\r\n")
 }
 
-/** 写一整行空占位行（仅行终止符 + `maxCol - 1` 个分隔符）。 */
-func writeEmptyRow(sb: StringBuilder, maxCol: Int64, delim: Rune): Unit {
+/** 写一整行空占位行（仅行终止符 + `maxCol - 1` 个分隔符） */
+func writeEmptyRow(buffer: StringBuilder, maxCol: Int64, delim: Rune): Unit {
     var col: Int64 = 1
     while (col < maxCol) {
-        sb.append(delim)
+        buffer.append(delim)
         col++
     }
-    sb.append("\r\n")
+    buffer.append("\r\n")
 }
 
 /**
@@ -96,20 +96,20 @@ func writeEmptyRow(sb: StringBuilder, maxCol: Int64, delim: Rune): Unit {
  *
  * 未命中则直接写原值——"快路径"省掉一次新字符串分配
  */
-func appendCsvField(sb: StringBuilder, value: String, delim: Rune): Unit {
+func appendCsvField(buffer: StringBuilder, value: String, delim: Rune): Unit {
     if (!needsQuote(value, delim)) {
-        sb.append(value)
+        buffer.append(value)
         return
     }
-    sb.append(r'"')
+    buffer.append(r'"')
     for (r in value.runes()) {
         if (r == r'"') {
-            sb.append("\"\"")
+            buffer.append("\"\"")
         } else {
-            sb.append(r)
+            buffer.append(r)
         }
     }
-    sb.append(r'"')
+    buffer.append(r'"')
 }
 
 func needsQuote(value: String, delim: Rune): Bool {

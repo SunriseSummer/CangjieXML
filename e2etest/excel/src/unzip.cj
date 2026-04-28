@@ -81,26 +81,26 @@ const METHOD_DEFLATE: UInt16 = 8u16
  * 找 65557 字节
  */
 func findEocd(bytes: Array<Byte>): Int64 {
-    let n = bytes.size
-    if (n < 22) {
-        throw Exception("not a zip archive: too small (${n} bytes)")
+    let length = bytes.size
+    if (length < 22) {
+        throw Exception("not a zip archive: too small (${length} bytes)")
     }
-    var start = n - 65557
+    var start = length - 65557
     if (start < 0) { start = 0 }
-    var i = n - 22
-    while (i >= start) {
-        if (readU32(bytes, i) == EOCD_SIG) {
-            let commentLen = Int64(readU16(bytes, i + 20))
-            if (i + 22 + commentLen == n) {
-                return i
+    var index = length - 22
+    while (index >= start) {
+        if (readU32(bytes, index) == EOCD_SIG) {
+            let commentLen = Int64(readU16(bytes, index + 20))
+            if (index + 22 + commentLen == length) {
+                return index
             }
         }
-        i--
+        index--
     }
     throw Exception("not a zip archive: EOCD signature not found")
 }
 
-/** 解析 Central Directory，返回所有条目（按 CD 中的出现顺序）。 */
+/** 解析 Central Directory，返回所有条目（按 CD 中的出现顺序） */
 func parseCentralDirectory(bytes: Array<Byte>): ArrayList<ZipEntry> {
     let eocdOff = findEocd(bytes)
     let totalEntries = Int64(readU16(bytes, eocdOff + 10))
@@ -108,28 +108,28 @@ func parseCentralDirectory(bytes: Array<Byte>): ArrayList<ZipEntry> {
     let cdOff = Int64(readU32(bytes, eocdOff + 16))
 
     let entries = ArrayList<ZipEntry>()
-    var p = cdOff
+    var pos = cdOff
     let cdEnd = cdOff + cdSize
     var seen: Int64 = 0
-    while (p < cdEnd && seen < totalEntries) {
-        if (readU32(bytes, p) != CD_SIG) {
-            throw Exception("zip central directory corrupted at offset ${p}")
+    while (pos < cdEnd && seen < totalEntries) {
+        if (readU32(bytes, pos) != CD_SIG) {
+            throw Exception("zip central directory corrupted at offset ${pos}")
         }
-        let method = readU16(bytes, p + 10)
-        let compSize = Int64(readU32(bytes, p + 20))
-        let nameLen = Int64(readU16(bytes, p + 28))
-        let extraLen = Int64(readU16(bytes, p + 30))
-        let commentLen = Int64(readU16(bytes, p + 32))
-        let localOff = Int64(readU32(bytes, p + 42))
-        let name = String.fromUtf8(sliceBytes(bytes, p + 46, nameLen))
+        let method = readU16(bytes, pos + 10)
+        let compSize = Int64(readU32(bytes, pos + 20))
+        let nameLen = Int64(readU16(bytes, pos + 28))
+        let extraLen = Int64(readU16(bytes, pos + 30))
+        let commentLen = Int64(readU16(bytes, pos + 32))
+        let localOff = Int64(readU32(bytes, pos + 42))
+        let name = String.fromUtf8(sliceBytes(bytes, pos + 46, nameLen))
         entries.add(ZipEntry(name, method, compSize, localOff))
-        p += 46 + nameLen + extraLen + commentLen
+        pos += 46 + nameLen + extraLen + commentLen
         seen++
     }
     entries
 }
 
-/** 提取单个条目到磁盘。目录条目按名创建目录；其余写文件。 */
+/** 提取单个条目到磁盘。目录条目按名创建目录；其余写文件 */
 func extractEntry(bytes: Array<Byte>, entry: ZipEntry, destDir: String): Unit {
     // 防 zip-slip：拒绝绝对路径与 `..` 跳出
     if (!isSafeEntryName(entry.name)) {
@@ -173,7 +173,7 @@ func extractEntry(bytes: Array<Byte>, entry: ZipEntry, destDir: String): Unit {
         "zip entry '${entry.name}' uses unsupported compression method ${entry.method}")
 }
 
-/** 用 stdx 的 Deflate 解压器把原始 deflate 字节流解压到内存字节。 */
+/** 用 stdx 的 Deflate 解压器把原始 deflate 字节流解压到内存字节 */
 func inflate(compData: Array<Byte>): Array<Byte> {
     let src = ByteBuffer()
     src.write(compData)
@@ -182,9 +182,9 @@ func inflate(compData: Array<Byte>): Array<Byte> {
     let buf = Array<UInt8>(8192, repeat: 0)
     try {
         while (true) {
-            let n = stream.read(buf)
-            if (n <= 0) { break }
-            sink.write(buf[..n])
+            let bytesRead = stream.read(buf)
+            if (bytesRead <= 0) { break }
+            sink.write(buf[..bytesRead])
         }
     } finally {
         stream.close()
@@ -204,7 +204,7 @@ func isSafeEntryName(name: String): Bool {
     true
 }
 
-/** 从大 bytes 中切出 `[off, off+len)` 区间的拷贝，单点做越界检查。 */
+/** 从大 bytes 中切出 `[off, off+len)` 区间的拷贝，单点做越界检查 */
 func sliceBytes(bytes: Array<Byte>, off: Int64, len: Int64): Array<Byte> {
     if (off < 0 || len < 0 || off + len > bytes.size) {
         throw Exception("zip slice out of range: off=${off}, len=${len}, size=${bytes.size}")
@@ -212,7 +212,7 @@ func sliceBytes(bytes: Array<Byte>, off: Int64, len: Int64): Array<Byte> {
     bytes[off..off + len]
 }
 
-/** 小端序读 UInt16。 */
+/** 小端序读 UInt16 */
 func readU16(buf: Array<Byte>, off: Int64): UInt16 {
     if (off < 0 || off + 2 > buf.size) {
         throw Exception("zip readU16 out of range: off=${off}, size=${buf.size}")
@@ -220,7 +220,7 @@ func readU16(buf: Array<Byte>, off: Int64): UInt16 {
     UInt16(buf[off]) | (UInt16(buf[off + 1]) << 8)
 }
 
-/** 小端序读 UInt32。 */
+/** 小端序读 UInt32 */
 func readU32(buf: Array<Byte>, off: Int64): UInt32 {
     if (off < 0 || off + 4 > buf.size) {
         throw Exception("zip readU32 out of range: off=${off}, size=${buf.size}")

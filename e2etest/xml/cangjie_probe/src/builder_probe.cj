@@ -56,9 +56,9 @@ func buildBookstoreEquivalent(): XmlDocument {
     ]
     let builder = XmlDocumentBuilder().declaration()
     builder.root("bookstore") { r =>
-        var i = 1
+        var bookId = 1
         for ((title, author, year, price) in books) {
-            let idStr = "${i}"
+            let idStr = "${bookId}"
             r.element("book") { b =>
                 b.attribute("id", idStr).attribute("category", "cs")
                 b.element("title")  { t => t.text(title).build() }
@@ -68,10 +68,10 @@ func buildBookstoreEquivalent(): XmlDocument {
                     p.attribute("currency", "USD").text(price).build()
                 }
             }
-            i++
+            bookId++
         }
     }
     builder.build()
 }
 
-/** 与主 `emitFingerprint` 冲突的 wrapper 已内联；本文件只保留构造与渲染。 */
+/** 与主 `emitFingerprint` 冲突的 wrapper 已内联；本文件只保留构造与渲染 */

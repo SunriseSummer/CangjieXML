@@ -34,7 +34,7 @@ public class SharedStrings {
         this.items = items
     }
 
-    /** 条目总数——用来在上层校验索引越界时给出清晰的错误信息。 */
+    /** 条目总数——用来在上层校验索引越界时给出清晰的错误信息 */
     public prop count: Int64 {
         get() { items.size }
     }
@@ -79,19 +79,19 @@ public func loadSharedStrings(path: String): SharedStrings {
  * 主文本流里
  */
 func collectTextInSi(si: XmlElement): String {
-    let sb = StringBuilder()
-    collectTextNodes(si, sb)
-    sb.toString()
+    let buffer = StringBuilder()
+    collectTextNodes(si, buffer)
+    buffer.toString()
 }
 
-func collectTextNodes(el: XmlElement, sb: StringBuilder): Unit {
+func collectTextNodes(el: XmlElement, buffer: StringBuilder): Unit {
     for (child in el.childNodes()) {
         match (child.kind()) {
             case Element(e) where e.name == "t" =>
                 // <t> 本身只有文本子节点——用 textContent 拿整段字符即可，免得再递归一层
-                sb.append(e.textContent())
+                buffer.append(e.textContent())
             case Element(e) =>
-                collectTextNodes(e, sb)
+                collectTextNodes(e, buffer)
             case _ => ()
         }
     }
