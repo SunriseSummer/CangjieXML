@@ -46,20 +46,66 @@ const BY_Z_LOWER: Byte = 0x7Au8
 
 const ASCII_LIMIT_BYTE: Byte = 0x80u8
 
-/** UTF-8 BOM 的字节序列。 */
+/** UTF-8 BOM 的字节序列（`EF BB BF`）。 */
 const BOM_BYTE_0: Byte = 0xEFu8
 const BOM_BYTE_1: Byte = 0xBBu8
 const BOM_BYTE_2: Byte = 0xBFu8
 
-/**
- * 注释 / CDATA / DOCTYPE 等结构关键串的预编译字节常量，
- * 供 [SourceCursor.consumeIfMatchBytes] 在热路径上避免重复字符串解码。
- *
- * 这些前缀全部为 ASCII，UTF-8 多字节序列的所有续字节均 ≥ 0x80，
- * 因此按字节比较与按 Rune 比较结果一致，但完全避免码点解码。
- */
+// ---------------------------------------------------------------------------
+// UTF-8 编码识别用位掩码 / 前缀。
+//
+// 命名遵循 RFC 3629 中 leading byte 的形式：`UTF8_LEAD<N>_MASK` 提取序列长度
+// 判定位，`UTF8_LEAD<N>_PREFIX` 是序列首字节"长度位"的标准取值；
+// `UTF8_CONT_MASK` / `UTF8_CONT_PREFIX` 用于识别续字节（`10xxxxxx`）。
+// 三个 `UTF8_PAYLOAD<N>_MASK` 用于从首字节提取该长度对应的有效负载比特。
+// ---------------------------------------------------------------------------
+
+/** 续字节判定：`(b & UTF8_CONT_MASK) == UTF8_CONT_PREFIX` 即 `10xxxxxx`。 */
+const UTF8_CONT_MASK: Byte = 0xC0u8
+const UTF8_CONT_PREFIX: Byte = 0x80u8
+/** 续字节有效负载比特掩码（低 6 位）。 */
+const UTF8_CONT_PAYLOAD_MASK: Byte = 0x3Fu8
+
+/** 2 字节序列首字节判定：`(b & UTF8_LEAD2_MASK) == UTF8_LEAD2_PREFIX`。 */
+const UTF8_LEAD2_MASK: Byte = 0xE0u8
+const UTF8_LEAD2_PREFIX: Byte = 0xC0u8
+/** 2 字节首字节有效负载（低 5 位）。 */
+const UTF8_LEAD2_PAYLOAD_MASK: Byte = 0x1Fu8
+
+/** 3 字节序列首字节判定。 */
+const UTF8_LEAD3_MASK: Byte = 0xF0u8
+const UTF8_LEAD3_PREFIX: Byte = 0xE0u8
+/** 3 字节首字节有效负载（低 4 位）。 */
+const UTF8_LEAD3_PAYLOAD_MASK: Byte = 0x0Fu8
+
+/** 4 字节序列首字节判定。 */
+const UTF8_LEAD4_MASK: Byte = 0xF8u8
+const UTF8_LEAD4_PREFIX: Byte = 0xF0u8
+/** 4 字节首字节有效负载（低 3 位）。 */
+const UTF8_LEAD4_PAYLOAD_MASK: Byte = 0x07u8
+
+/** 续字节贡献的有效比特数（每续字节贡献 6 位）。 */
+const UTF8_CONT_BITS: UInt32 = 6
+
+/** Unicode 替换字符 U+FFFD，用于无法解码的 UTF-8 字节序列回退。 */
+const UTF8_REPLACEMENT_CODEPOINT: UInt32 = 0xFFFDu32
+
+// ---------------------------------------------------------------------------
+// 注释 / CDATA 等结构关键串的预编译字节序列。
+//
+// 这些前缀全部为 ASCII，UTF-8 多字节序列的所有续字节均 ≥ 0x80，
+// 因此按字节比较与按 Rune 比较结果一致，但完全避免码点解码。
+// ---------------------------------------------------------------------------
+
+/** `[CDATA[` 中各 ASCII 字母的字节常量。 */
+const BY_C_UPPER: Byte = 0x43u8
+const BY_D_UPPER: Byte = 0x44u8
+const BY_A_UPPER_LIT: Byte = 0x41u8
+const BY_T_UPPER: Byte = 0x54u8
+
 let BYTES_COMMENT_OPEN_DASHES: Array<Byte> = [BY_HYPHEN, BY_HYPHEN]
-let BYTES_CDATA_PROLOGUE: Array<Byte> = [BY_LBRACK, 0x43u8, 0x44u8, 0x41u8, 0x54u8, 0x41u8, BY_LBRACK] // "[CDATA["
+let BYTES_CDATA_PROLOGUE: Array<Byte> =
+    [BY_LBRACK, BY_C_UPPER, BY_D_UPPER, BY_A_UPPER_LIT, BY_T_UPPER, BY_A_UPPER_LIT, BY_LBRACK] // "[CDATA["
 let BYTES_COMMENT_EPILOGUE: Array<Byte> = [BY_HYPHEN, BY_HYPHEN, BY_GT]
 let BYTES_CDATA_EPILOGUE: Array<Byte> = [BY_RBRACK, BY_RBRACK, BY_GT]
 
@@ -82,8 +128,6 @@ let BYTES_CDATA_EPILOGUE: Array<Byte> = [BY_RBRACK, BY_RBRACK, BY_GT]
  */
 class SourceCursor {
     let source: String
-    /** 输入是否纯 ASCII；用于在跨越非 ASCII 时是否走 UTF-8 解码慢路径。 */
-    let isAsciiOnly: Bool
     /** 当前字节位置；start = BOM 之后。 */
     var idx: Int64 = 0
     var line: Int64 = 1
@@ -115,7 +159,6 @@ class SourceCursor {
             this.source = input[startByte..n]
         }
         this.limit = this.source.size
-        this.isAsciiOnly = isAsciiInputBytes(this.source)
     }
 
     /** 是否已到末尾。 */
@@ -173,7 +216,7 @@ class SourceCursor {
     func matches(ch: Rune): Bool {
         if (eof()) { return false }
         let cp = UInt32(ch)
-        if (cp < 0x80u32) {
+        if (cp < UInt32(ASCII_LIMIT_BYTE)) {
             return source[idx] == UInt8(cp)
         }
         currentRune() == ch
@@ -257,17 +300,7 @@ class SourceCursor {
                 return
             }
             idx++
-            if (b == BY_LF) {
-                line++
-                column = 1
-            } else if (b < ASCII_LIMIT_BYTE) {
-                column++
-            } else {
-                // UTF-8 续字节：仅在序列首字节时计列，即 (b & 0xC0) != 0x80。
-                if ((b & 0xC0u8) != 0x80u8) {
-                    column++
-                }
-            }
+            advanceColumnAfterByte(b)
         }
     }
 
@@ -289,18 +322,29 @@ class SourceCursor {
                 return false
             }
             idx++
-            if (b == BY_LF) {
-                line++
-                column = 1
-            } else if (b < ASCII_LIMIT_BYTE) {
-                column++
-            } else {
-                if ((b & 0xC0u8) != 0x80u8) {
-                    column++
-                }
-            }
+            advanceColumnAfterByte(b)
         }
         false
+    }
+
+    /**
+     * `idx` 已向前推进 1 字节后，按字节 `b` 的角色更新 `line` / `column`：
+     *
+     * - LF：换行，列号重置为 1。
+     * - 其他 ASCII 字节：列号 +1。
+     * - UTF-8 续字节（`10xxxxxx`）：列号不变。
+     * - UTF-8 序列首字节（≥ 0x80 且非续字节）：列号 +1（整个码点算一列）。
+     */
+    private func advanceColumnAfterByte(b: Byte): Unit {
+        if (b == BY_LF) {
+            line++
+            column = 1
+        } else if (b < ASCII_LIMIT_BYTE) {
+            column++
+        } else if ((b & UTF8_CONT_MASK) != UTF8_CONT_PREFIX) {
+            // 多字节序列首字节：整个码点只计一列。
+            column++
+        }
     }
 
     /**
@@ -350,37 +394,44 @@ class SourceCursor {
      */
     func decodeUtf8At(pos: Int64): Utf8Decoded {
         let b0 = source[pos]
-        if ((b0 & 0xE0u8) == 0xC0u8 && pos + 1 < limit) {
+        // 2 字节序列 `110xxxxx 10xxxxxx`
+        if ((b0 & UTF8_LEAD2_MASK) == UTF8_LEAD2_PREFIX && pos + 1 < limit) {
             let b1 = source[pos + 1]
-            if ((b1 & 0xC0u8) == 0x80u8) {
-                let cp = (UInt32(b0 & 0x1Fu8) << 6) | UInt32(b1 & 0x3Fu8)
+            if ((b1 & UTF8_CONT_MASK) == UTF8_CONT_PREFIX) {
+                let cp = (UInt32(b0 & UTF8_LEAD2_PAYLOAD_MASK) << UTF8_CONT_BITS)
+                    | UInt32(b1 & UTF8_CONT_PAYLOAD_MASK)
                 return Utf8Decoded(Rune(cp), 2)
             }
         }
-        if ((b0 & 0xF0u8) == 0xE0u8 && pos + 2 < limit) {
+        // 3 字节序列 `1110xxxx 10xxxxxx 10xxxxxx`
+        if ((b0 & UTF8_LEAD3_MASK) == UTF8_LEAD3_PREFIX && pos + 2 < limit) {
             let b1 = source[pos + 1]
             let b2 = source[pos + 2]
-            if ((b1 & 0xC0u8) == 0x80u8 && (b2 & 0xC0u8) == 0x80u8) {
-                let cp = (UInt32(b0 & 0x0Fu8) << 12)
-                    | (UInt32(b1 & 0x3Fu8) << 6)
-                    | UInt32(b2 & 0x3Fu8)
+            if ((b1 & UTF8_CONT_MASK) == UTF8_CONT_PREFIX
+                && (b2 & UTF8_CONT_MASK) == UTF8_CONT_PREFIX) {
+                let cp = (UInt32(b0 & UTF8_LEAD3_PAYLOAD_MASK) << (UTF8_CONT_BITS * 2))
+                    | (UInt32(b1 & UTF8_CONT_PAYLOAD_MASK) << UTF8_CONT_BITS)
+                    | UInt32(b2 & UTF8_CONT_PAYLOAD_MASK)
                 return Utf8Decoded(Rune(cp), 3)
             }
         }
-        if ((b0 & 0xF8u8) == 0xF0u8 && pos + 3 < limit) {
+        // 4 字节序列 `11110xxx 10xxxxxx 10xxxxxx 10xxxxxx`
+        if ((b0 & UTF8_LEAD4_MASK) == UTF8_LEAD4_PREFIX && pos + 3 < limit) {
             let b1 = source[pos + 1]
             let b2 = source[pos + 2]
             let b3 = source[pos + 3]
-            if ((b1 & 0xC0u8) == 0x80u8 && (b2 & 0xC0u8) == 0x80u8 && (b3 & 0xC0u8) == 0x80u8) {
-                let cp = (UInt32(b0 & 0x07u8) << 18)
-                    | (UInt32(b1 & 0x3Fu8) << 12)
-                    | (UInt32(b2 & 0x3Fu8) << 6)
-                    | UInt32(b3 & 0x3Fu8)
+            if ((b1 & UTF8_CONT_MASK) == UTF8_CONT_PREFIX
+                && (b2 & UTF8_CONT_MASK) == UTF8_CONT_PREFIX
+                && (b3 & UTF8_CONT_MASK) == UTF8_CONT_PREFIX) {
+                let cp = (UInt32(b0 & UTF8_LEAD4_PAYLOAD_MASK) << (UTF8_CONT_BITS * 3))
+                    | (UInt32(b1 & UTF8_CONT_PAYLOAD_MASK) << (UTF8_CONT_BITS * 2))
+                    | (UInt32(b2 & UTF8_CONT_PAYLOAD_MASK) << UTF8_CONT_BITS)
+                    | UInt32(b3 & UTF8_CONT_PAYLOAD_MASK)
                 return Utf8Decoded(Rune(cp), 4)
             }
         }
-        // 非法 UTF-8：返回替换字符并按 1 字节推进。
-        Utf8Decoded(Rune(0xFFFDu32), 1)
+        // 非法 UTF-8：返回 U+FFFD 替换字符并按 1 字节推进。
+        Utf8Decoded(Rune(UTF8_REPLACEMENT_CODEPOINT), 1)
     }
 }
 
@@ -392,18 +443,6 @@ struct Utf8Decoded {
         this.rune = rune
         this.byteLen = byteLen
     }
-}
-
-private func isAsciiInputBytes(input: String): Bool {
-    let n = input.size
-    var i = 0
-    while (i < n) {
-        if (input[i] >= ASCII_LIMIT_BYTE) {
-            return false
-        }
-        i++
-    }
-    true
 }
 
 /** XML 规范 §2.3 定义的空白字符集合。 */
