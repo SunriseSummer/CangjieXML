@@ -26,6 +26,8 @@ const CDATA_TERMINATOR: String = "]]>"
 const CDATA_TERMINATOR_LEN: Int64 = 3
 /** 拆分后在 `]]` 与 `>` 之间插入的分隔段，使两半分别落入相邻 CDATA。 */
 const CDATA_REOPEN_AFTER_BRACKETS: String = "]]><![CDATA["
+private const CDATA_RBRACKET_BYTE: Byte = 0x5Du8 // ']'
+private const CDATA_GT_BYTE: Byte = 0x3Eu8 // '>'
 
 const BOM_BYTE_0: Byte = 0xEFu8
 const BOM_BYTE_1: Byte = 0xBBu8
@@ -33,8 +35,8 @@ const BOM_BYTE_2: Byte = 0xBFu8
 
 // 转义触发字节——以字节常量声明，避免在热路径上每次比较都做 `Rune → UInt8` 转换。
 private const ESCAPE_AMP: Byte = 0x26u8 // '&'
-private const ESCAPE_LT: Byte = 0x3Cu8  // '<'
-private const ESCAPE_GT: Byte = 0x3Eu8  // '>'
+private const ESCAPE_LT: Byte = 0x3Cu8 // '<'
+private const ESCAPE_GT: Byte = 0x3Eu8 // '>'
 private const ESCAPE_QUOT: Byte = 0x22u8 // '"'
 
 /**
@@ -51,29 +53,37 @@ public func escapeText(s: String): String {
     if (!needsTextEscape(s)) {
         return s
     }
-    let n = s.size
-    let sb = StringBuilder()
-    var i = 0
-    var lastEmit = 0
-    while (i < n) {
-        let b = s[i]
-        if (b == ESCAPE_AMP) {
-            if (i > lastEmit) { sb.append(s[lastEmit..i]) }
-            sb.append("&amp;")
-            lastEmit = i + 1
-        } else if (b == ESCAPE_LT) {
-            if (i > lastEmit) { sb.append(s[lastEmit..i]) }
-            sb.append("&lt;")
-            lastEmit = i + 1
-        } else if (b == ESCAPE_GT) {
-            if (i > lastEmit) { sb.append(s[lastEmit..i]) }
-            sb.append("&gt;")
-            lastEmit = i + 1
+    let inputLength = s.size
+    let buffer = StringBuilder()
+    var byteIndex = 0
+    var lastWriteIndex = 0
+    while (byteIndex < inputLength) {
+        let currentByte = s[byteIndex]
+        if (currentByte == ESCAPE_AMP) {
+            if (byteIndex > lastWriteIndex) {
+                buffer.append(s[lastWriteIndex..byteIndex])
+            }
+            buffer.append("&amp;")
+            lastWriteIndex = byteIndex + 1
+        } else if (currentByte == ESCAPE_LT) {
+            if (byteIndex > lastWriteIndex) {
+                buffer.append(s[lastWriteIndex..byteIndex])
+            }
+            buffer.append("&lt;")
+            lastWriteIndex = byteIndex + 1
+        } else if (currentByte == ESCAPE_GT) {
+            if (byteIndex > lastWriteIndex) {
+                buffer.append(s[lastWriteIndex..byteIndex])
+            }
+            buffer.append("&gt;")
+            lastWriteIndex = byteIndex + 1
         }
-        i++
+        byteIndex++
     }
-    if (lastEmit < n) { sb.append(s[lastEmit..n]) }
-    sb.toString()
+    if (lastWriteIndex < inputLength) {
+        buffer.append(s[lastWriteIndex..inputLength])
+    }
+    buffer.toString()
 }
 
 /**
@@ -86,33 +96,43 @@ public func escapeAttribute(s: String): String {
     if (!needsAttrEscape(s)) {
         return s
     }
-    let n = s.size
-    let sb = StringBuilder()
-    var i = 0
-    var lastEmit = 0
-    while (i < n) {
-        let b = s[i]
-        if (b == ESCAPE_AMP) {
-            if (i > lastEmit) { sb.append(s[lastEmit..i]) }
-            sb.append("&amp;")
-            lastEmit = i + 1
-        } else if (b == ESCAPE_LT) {
-            if (i > lastEmit) { sb.append(s[lastEmit..i]) }
-            sb.append("&lt;")
-            lastEmit = i + 1
-        } else if (b == ESCAPE_GT) {
-            if (i > lastEmit) { sb.append(s[lastEmit..i]) }
-            sb.append("&gt;")
-            lastEmit = i + 1
-        } else if (b == ESCAPE_QUOT) {
-            if (i > lastEmit) { sb.append(s[lastEmit..i]) }
-            sb.append("&quot;")
-            lastEmit = i + 1
+    let inputLength = s.size
+    let buffer = StringBuilder()
+    var byteIndex = 0
+    var lastWriteIndex = 0
+    while (byteIndex < inputLength) {
+        let currentByte = s[byteIndex]
+        if (currentByte == ESCAPE_AMP) {
+            if (byteIndex > lastWriteIndex) {
+                buffer.append(s[lastWriteIndex..byteIndex])
+            }
+            buffer.append("&amp;")
+            lastWriteIndex = byteIndex + 1
+        } else if (currentByte == ESCAPE_LT) {
+            if (byteIndex > lastWriteIndex) {
+                buffer.append(s[lastWriteIndex..byteIndex])
+            }
+            buffer.append("&lt;")
+            lastWriteIndex = byteIndex + 1
+        } else if (currentByte == ESCAPE_GT) {
+            if (byteIndex > lastWriteIndex) {
+                buffer.append(s[lastWriteIndex..byteIndex])
+            }
+            buffer.append("&gt;")
+            lastWriteIndex = byteIndex + 1
+        } else if (currentByte == ESCAPE_QUOT) {
+            if (byteIndex > lastWriteIndex) {
+                buffer.append(s[lastWriteIndex..byteIndex])
+            }
+            buffer.append("&quot;")
+            lastWriteIndex = byteIndex + 1
         }
-        i++
+        byteIndex++
     }
-    if (lastEmit < n) { sb.append(s[lastEmit..n]) }
-    sb.toString()
+    if (lastWriteIndex < inputLength) {
+        buffer.append(s[lastWriteIndex..inputLength])
+    }
+    buffer.toString()
 }
 
 /**
@@ -140,36 +160,36 @@ public func escapeCdata(s: String): String {
 
 /** CDATA 内容中遇到 `]]>` 的分段处理：以字节扫描定位 `]]>`（全 ASCII，UTF-8
  *  多字节序列的所有字节均 ≥ 0x80）；命中时把 `]]` 与 `>` 分入相邻 CDATA 段。 */
-func appendWithCdataSplit(sb: StringBuilder, s: String): Unit {
-    let n = s.size
-    var i = 0
-    var lastEmit = 0
-    while (i < n) {
-        if (isCdataTerminatorAt(s, i, n)) {
-            if (i > lastEmit) {
-                sb.append(s[lastEmit..i])
+func appendWithCdataSplit(buffer: StringBuilder, s: String): Unit {
+    let inputLength = s.size
+    var byteIndex = 0
+    var lastWriteIndex = 0
+    while (byteIndex < inputLength) {
+        if (isCdataTerminatorAt(s, byteIndex, inputLength)) {
+            if (byteIndex > lastWriteIndex) {
+                buffer.append(s[lastWriteIndex..byteIndex])
             }
             // 把 `]]>` 拆成 `]]` + reopen + `>`，二者各自归属相邻的 CDATA 段。
-            sb.append(s[i..i + 2])
-            sb.append(CDATA_REOPEN_AFTER_BRACKETS)
-            sb.append(s[i + 2..i + 3])
-            i += CDATA_TERMINATOR_LEN
-            lastEmit = i
+            buffer.append(s[byteIndex..byteIndex + 2])
+            buffer.append(CDATA_REOPEN_AFTER_BRACKETS)
+            buffer.append(s[byteIndex + 2..byteIndex + 3])
+            byteIndex += CDATA_TERMINATOR_LEN
+            lastWriteIndex = byteIndex
         } else {
-            i++
+            byteIndex++
         }
     }
-    if (lastEmit < n) {
-        sb.append(s[lastEmit..n])
+    if (lastWriteIndex < inputLength) {
+        buffer.append(s[lastWriteIndex..inputLength])
     }
 }
 
 /** 判断 `s[i..i+3]` 是否为 ASCII 字节 `]]>`。 */
-func isCdataTerminatorAt(s: String, i: Int64, n: Int64): Bool {
-    i + CDATA_TERMINATOR_LEN <= n
-        && s[i] == 0x5Du8 // ']'
-        && s[i + 1] == 0x5Du8
-        && s[i + 2] == 0x3Eu8 // '>'
+func isCdataTerminatorAt(s: String, candidateIndex: Int64, inputLength: Int64): Bool {
+    return candidateIndex + CDATA_TERMINATOR_LEN <= inputLength
+        && s[candidateIndex] == CDATA_RBRACKET_BYTE
+        && s[candidateIndex + 1] == CDATA_RBRACKET_BYTE
+        && s[candidateIndex + 2] == CDATA_GT_BYTE
 }
 
 /** UTF-8 BOM 字节序列：EF BB BF。 */
@@ -178,33 +198,35 @@ public let UTF8_BOM: Array<Byte> = [BOM_BYTE_0, BOM_BYTE_1, BOM_BYTE_2]
 /** UTF-8 BOM 的字符串表示（单个 U+FEFF 码点）。 */
 public let UTF8_BOM_STRING: String = "\u{FEFF}"
 
-// ----------------------------------------------------------------------
-// 内部快路径：判断是否需要转义。
-//
-// 这两个判定函数对每个文本节点 / 每个属性值都会被调用。`& < > "` 都是 ASCII
-// 单字节，UTF-8 多字节序列的所有字节均 ≥ 0x80，按字节扫描即可一次到位。
-// ----------------------------------------------------------------------
-
+/*
+ * 内部快路径：判断是否需要转义。
+ *
+ * 这两个判定函数对每个文本节点 / 每个属性值都会被调用。`& < > "` 都是 ASCII
+ * 单字节，UTF-8 多字节序列的所有字节均 ≥ 0x80，按字节扫描即可一次到位。
+ */
 func needsTextEscape(s: String): Bool {
-    let n = s.size
-    var i = 0
-    while (i < n) {
-        let b = s[i]
-        if (b == ESCAPE_AMP || b == ESCAPE_LT || b == ESCAPE_GT) { return true }
-        i++
+    let inputLength = s.size
+    var byteIndex = 0
+    while (byteIndex < inputLength) {
+        let currentByte = s[byteIndex]
+        if (currentByte == ESCAPE_AMP || currentByte == ESCAPE_LT || currentByte == ESCAPE_GT) {
+            return true
+        }
+        byteIndex++
     }
     false
 }
 
 func needsAttrEscape(s: String): Bool {
-    let n = s.size
-    var i = 0
-    while (i < n) {
-        let b = s[i]
-        if (b == ESCAPE_AMP || b == ESCAPE_LT || b == ESCAPE_GT || b == ESCAPE_QUOT) {
+    let inputLength = s.size
+    var byteIndex = 0
+    while (byteIndex < inputLength) {
+        let currentByte = s[byteIndex]
+        if (currentByte == ESCAPE_AMP || currentByte == ESCAPE_LT
+            || currentByte == ESCAPE_GT || currentByte == ESCAPE_QUOT) {
             return true
         }
-        i++
+        byteIndex++
     }
     false
 }

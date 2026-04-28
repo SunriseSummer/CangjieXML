@@ -20,34 +20,34 @@ const RUNE_BOM: Rune = '\u{FEFF}'
  * 与 `CH_*: Rune` 对齐的字节常量，热路径上按字节比较即可，
  * 避免 `Rune == Rune` 带来的码点装箱比较。
  */
-const BY_LT: Byte = 0x3Cu8       // '<'
-const BY_GT: Byte = 0x3Eu8       // '>'
-const BY_AMP: Byte = 0x26u8      // '&'
-const BY_QUOT: Byte = 0x22u8     // '"'
-const BY_APOS: Byte = 0x27u8     // '\''
-const BY_SLASH: Byte = 0x2Fu8    // '/'
+const BY_LT: Byte = 0x3Cu8 // '<'
+const BY_GT: Byte = 0x3Eu8 // '>'
+const BY_AMP: Byte = 0x26u8 // '&'
+const BY_QUOT: Byte = 0x22u8 // '"'
+const BY_APOS: Byte = 0x27u8 // '\''
+const BY_SLASH: Byte = 0x2Fu8 // '/'
 const BY_QUESTION: Byte = 0x3Fu8 // '?'
-const BY_BANG: Byte = 0x21u8     // '!'
-const BY_EQUALS: Byte = 0x3Du8   // '='
-const BY_LF: Byte = 0x0Au8       // '\n'
-const BY_CR: Byte = 0x0Du8       // '\r'
-const BY_TAB: Byte = 0x09u8      // '\t'
-const BY_SP: Byte = 0x20u8       // ' '
-const BY_LBRACK: Byte = 0x5Bu8   // '['
-const BY_RBRACK: Byte = 0x5Du8   // ']'
+const BY_BANG: Byte = 0x21u8 // '!'
+const BY_EQUALS: Byte = 0x3Du8 // '='
+const BY_LF: Byte = 0x0Au8 // '\n'
+const BY_CR: Byte = 0x0Du8 // '\r'
+const BY_TAB: Byte = 0x09u8 // '\t'
+const BY_SP: Byte = 0x20u8 // ' '
+const BY_LBRACK: Byte = 0x5Bu8 // '['
+const BY_RBRACK: Byte = 0x5Du8 // ']'
 const BY_UNDERSCORE: Byte = 0x5Fu8 // '_'
-const BY_COLON: Byte = 0x3Au8    // ':'
-const BY_HYPHEN: Byte = 0x2Du8   // '-'
-const BY_DOT: Byte = 0x2Eu8      // '.'
-const BY_0: Byte = 0x30u8        // '0'
-const BY_9: Byte = 0x39u8        // '9'
-const BY_A_UPPER: Byte = 0x41u8  // 'A'
-const BY_Z_UPPER: Byte = 0x5Au8  // 'Z'
-const BY_A_LOWER: Byte = 0x61u8  // 'a'
-const BY_Z_LOWER: Byte = 0x7Au8  // 'z'
-const BY_C_UPPER: Byte = 0x43u8  // 'C'
-const BY_D_UPPER: Byte = 0x44u8  // 'D'
-const BY_T_UPPER: Byte = 0x54u8  // 'T'
+const BY_COLON: Byte = 0x3Au8 // ':'
+const BY_HYPHEN: Byte = 0x2Du8 // '-'
+const BY_DOT: Byte = 0x2Eu8 // '.'
+const BY_0: Byte = 0x30u8 // '0'
+const BY_9: Byte = 0x39u8 // '9'
+const BY_A_UPPER: Byte = 0x41u8 // 'A'
+const BY_Z_UPPER: Byte = 0x5Au8 // 'Z'
+const BY_A_LOWER: Byte = 0x61u8 // 'a'
+const BY_Z_LOWER: Byte = 0x7Au8 // 'z'
+const BY_C_UPPER: Byte = 0x43u8 // 'C'
+const BY_D_UPPER: Byte = 0x44u8 // 'D'
+const BY_T_UPPER: Byte = 0x54u8 // 'T'
 
 /** ASCII 边界：`b < ASCII_LIMIT_BYTE` 即纯 ASCII 字节。 */
 const ASCII_LIMIT_BYTE: Byte = 0x80u8
@@ -115,8 +115,8 @@ const UTF8_REPLACEMENT_CODEPOINT: UInt32 = 0xFFFDu32
  * 因此按字节比较与按 Rune 比较结果一致，但完全避免码点解码。
  */
 let BYTES_COMMENT_OPEN_DASHES: Array<Byte> = [BY_HYPHEN, BY_HYPHEN]
-let BYTES_CDATA_PROLOGUE: Array<Byte> =
-    [BY_LBRACK, BY_C_UPPER, BY_D_UPPER, BY_A_UPPER, BY_T_UPPER, BY_A_UPPER, BY_LBRACK] // "[CDATA["
+let BYTES_CDATA_PROLOGUE: Array<Byte> = [BY_LBRACK, BY_C_UPPER, BY_D_UPPER, BY_A_UPPER, BY_T_UPPER, BY_A_UPPER,
+    BY_LBRACK] // "[CDATA["
 let BYTES_COMMENT_EPILOGUE: Array<Byte> = [BY_HYPHEN, BY_HYPHEN, BY_GT]
 let BYTES_CDATA_EPILOGUE: Array<Byte> = [BY_RBRACK, BY_RBRACK, BY_GT]
 
@@ -193,7 +193,11 @@ class SourceCursor {
      * 是非法字符，可安全用作"无字节"哨兵值；供需要"无 EOF 检查"的等值比较使用。
      */
     func currentByteOr0(): Byte {
-        if (idx < limit) { source[idx] } else { NO_BYTE }
+        if (idx < limit) {
+            source[idx]
+        } else {
+            NO_BYTE
+        }
     }
 
     /**
@@ -201,8 +205,12 @@ class SourceCursor {
      * 一个 ASCII 分隔符（如 `?>`、`</`）。
      */
     func byteAtOffset(k: Int64): Byte {
-        let p = idx + k
-        if (p >= 0 && p < limit) { source[p] } else { NO_BYTE }
+        let targetIndex = idx + k
+        if (targetIndex >= 0 && targetIndex < limit) {
+            source[targetIndex]
+        } else {
+            NO_BYTE
+        }
     }
 
     /**
@@ -210,9 +218,9 @@ class SourceCursor {
      * ASCII 走快路径直接构造；非 ASCII 解码 UTF-8。
      */
     func currentRune(): Rune {
-        let b = source[idx]
-        if (b < ASCII_LIMIT_BYTE) {
-            return Rune(UInt32(b))
+        let currentByte = source[idx]
+        if (currentByte < ASCII_LIMIT_BYTE) {
+            return Rune(UInt32(currentByte))
         }
         decodeUtf8At(idx).rune
     }
@@ -228,7 +236,9 @@ class SourceCursor {
 
     /** 当前字符是否等于 `ch`；EOF 时返回 false。 */
     func matches(ch: Rune): Bool {
-        if (eof()) { return false }
+        if (eof()) {
+            return false
+        }
         let cp = UInt32(ch)
         if (cp < UInt32(ASCII_LIMIT_BYTE)) {
             return source[idx] == UInt8(cp)
@@ -240,8 +250,8 @@ class SourceCursor {
     func matchesAt(k: Int64, ch: Rune): Bool {
         // 全部调用点的 ch 都是 ASCII 分隔符（'/'、'>'）。
         let cp = UInt32(ch)
-        let p = idx + k
-        p >= 0 && p < limit && source[p] == UInt8(cp)
+        let targetIndex = idx + k
+        targetIndex >= 0 && targetIndex < limit && source[targetIndex] == UInt8(cp)
     }
 
     /** 消费一个字符并返回；到达 EOF 返回 None。 */
@@ -249,16 +259,16 @@ class SourceCursor {
         if (eof()) {
             return None
         }
-        let b = source[idx]
-        if (b < ASCII_LIMIT_BYTE) {
+        let currentByte = source[idx]
+        if (currentByte < ASCII_LIMIT_BYTE) {
             idx++
-            if (b == BY_LF) {
+            if (currentByte == BY_LF) {
                 line++
                 column = 1
             } else {
                 column++
             }
-            return Some(Rune(UInt32(b)))
+            return Some(Rune(UInt32(currentByte)))
         }
         // 非 ASCII：解码 UTF-8 序列长度，整段跳过；列号 +1。
         let decoded = decodeUtf8At(idx)
@@ -270,12 +280,12 @@ class SourceCursor {
     /** 跳过所有 XML 空白字符（空格 / 制表 / LF / CR）。 */
     func skipWhitespace(): Unit {
         while (idx < limit) {
-            let b = source[idx]
-            if (b == BY_LF) {
+            let currentByte = source[idx]
+            if (currentByte == BY_LF) {
                 idx++
                 line++
                 column = 1
-            } else if (b == BY_SP || b == BY_TAB || b == BY_CR) {
+            } else if (currentByte == BY_SP || currentByte == BY_TAB || currentByte == BY_CR) {
                 idx++
                 column++
             } else {
@@ -292,12 +302,12 @@ class SourceCursor {
      */
     func skipNameChars(): Unit {
         while (idx < limit) {
-            let b = source[idx]
-            if ((b >= BY_A_LOWER && b <= BY_Z_LOWER)
-                || (b >= BY_A_UPPER && b <= BY_Z_UPPER)
-                || (b >= BY_0 && b <= BY_9)
-                || b == BY_UNDERSCORE || b == BY_COLON
-                || b == BY_HYPHEN || b == BY_DOT) {
+            let currentByte = source[idx]
+            if ((currentByte >= BY_A_LOWER && currentByte <= BY_Z_LOWER)
+                || (currentByte >= BY_A_UPPER && currentByte <= BY_Z_UPPER)
+                || (currentByte >= BY_0 && currentByte <= BY_9)
+                || currentByte == BY_UNDERSCORE || currentByte == BY_COLON
+                || currentByte == BY_HYPHEN || currentByte == BY_DOT) {
                 idx++
                 column++
             } else {
@@ -309,12 +319,12 @@ class SourceCursor {
     /** 扫描到下一个 `<` 或 EOF；供 `parseTextBody` 使用，遇到 LF 时维护行号。 */
     func skipUntilLt(): Unit {
         while (idx < limit) {
-            let b = source[idx]
-            if (b == BY_LT) {
+            let currentByte = source[idx]
+            if (currentByte == BY_LT) {
                 return
             }
             idx++
-            advanceColumnAfterByte(b)
+            advanceColumnAfterByte(currentByte)
         }
     }
 
@@ -328,15 +338,15 @@ class SourceCursor {
         // quoteCh 必为 `"` 或 `'`，都是 ASCII。
         let quoteByte = UInt8(UInt32(quoteCh))
         while (idx < limit) {
-            let b = source[idx]
-            if (b == quoteByte) {
+            let currentByte = source[idx]
+            if (currentByte == quoteByte) {
                 return true
             }
-            if (b == BY_LT) {
+            if (currentByte == BY_LT) {
                 return false
             }
             idx++
-            advanceColumnAfterByte(b)
+            advanceColumnAfterByte(currentByte)
         }
         false
     }

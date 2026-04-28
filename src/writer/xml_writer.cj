@@ -192,16 +192,16 @@ public class XmlWriter {
         emit(TAG_OPEN)
         emit(el.name)
         // 索引迭代避免为每个属性构造一个 `ArrayList.Iterator` 对象。
-        let n = el.attributeCount()
-        var i = 0
-        while (i < n) {
-            let a = el.attributeAt(i)
+        let attributeCount = el.attributeCount()
+        var attributeIndex = 0
+        while (attributeIndex < attributeCount) {
+            let attribute = el.attributeAt(attributeIndex)
             emit(ATTR_SPACE)
-            emit(a.name)
+            emit(attribute.name)
             emit(ATTR_EQUALS_QUOTE)
-            emit(escapeAttribute(a.value))
+            emit(escapeAttribute(attribute.value))
             emit(ATTR_CLOSE_QUOTE)
-            i++
+            attributeIndex++
         }
     }
 
