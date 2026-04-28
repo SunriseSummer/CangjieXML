@@ -39,14 +39,13 @@ func testBuildDeclarationIdempotent(): Unit {
 
 @Test
 func testBuildNestedElements(): Unit {
-    let doc = XmlDocumentBuilder().root("catalog") {
-        r =>
-            r.element("book") {
-                b => b.attribute("id", "1").text("SICP")
-            }
-            r.element("book") {
-                b => b.attribute("id", "2").text("TAOCP")
-            }
+    let doc = XmlDocumentBuilder().root("catalog") { r =>
+        r.element("book") {
+            b => b.attribute("id", "1").text("SICP")
+        }
+        r.element("book") {
+            b => b.attribute("id", "2").text("TAOCP")
+        }
     }.build()
 
     let root = doc.rootElement.getOrThrow()
@@ -122,16 +121,15 @@ func testBuilderReturnsRegularDom(): Unit {
 
 @Test
 func testRoundTripBuildWriteParseQuery(): Unit {
-    let doc1 = XmlDocumentBuilder().declaration().root("catalog") {
-        r =>
-            r.element("book") {
-                b => b.attributeAs<Int64>("id", 1, INT64_CODEC).attributeAs<Bool>("avail", true, BOOL_CODEC).text(
-                    "SICP")
-            }
-            r.element("book") {
-                b => b.attributeAs<Int64>("id", 2, INT64_CODEC).attributeAs<Bool>("avail", false, BOOL_CODEC).text(
-                    "TAOCP")
-            }
+    let doc1 = XmlDocumentBuilder().declaration().root("catalog") { r =>
+        r.element("book") {
+            b => b.attributeAs<Int64>("id", 1, INT64_CODEC).attributeAs<Bool>("avail", true, BOOL_CODEC).text(
+                "SICP")
+        }
+        r.element("book") {
+            b => b.attributeAs<Int64>("id", 2, INT64_CODEC).attributeAs<Bool>("avail", false, BOOL_CODEC).text(
+                "TAOCP")
+        }
     }.build()
 
     // Writer

@@ -22,15 +22,14 @@ import fastxml.build.*
  * </catalog>
  */
 func makeTree(): XmlDocument {
-    XmlDocumentBuilder().declaration().comment("top comment").root("catalog") {
-        r =>
-            r.element("book") {
-                b => b.attribute("id", "1").text("SICP")
-            }
-            r.element("book") {
-                b => b.attribute("id", "2").comment("note").text("TAOCP")
-            }
-            r.element("meta") {m => m.text("42")}
+    XmlDocumentBuilder().declaration().comment("top comment").root("catalog") { r =>
+        r.element("book") {
+            b => b.attribute("id", "1").text("SICP")
+        }
+        r.element("book") {
+            b => b.attribute("id", "2").comment("note").text("TAOCP")
+        }
+        r.element("meta") {m => m.text("42")}
     }.build()
 }
 
@@ -49,8 +48,7 @@ class Counter {
 func testWalkVisitsEveryNode(): Unit {
     let doc = makeTree()
     let c = Counter()
-    walk(doc) {
-        _ =>
+    walk(doc) { _ =>
         c.inc();
         Continue
     }
@@ -63,17 +61,16 @@ func testWalkVisitsEveryNode(): Unit {
 func testWalkPreOrder(): Unit {
     let doc = makeTree()
     let order = ArrayList<String>()
-    walk(doc) {
-        kind =>
-            match (kind) {
-                case Document(_) => order.add("doc")
-                case Element(e) => order.add("el:${e.name}")
-                case Text(t) => order.add("txt:${t.value}")
-                case Comment(c) => order.add("cmt:${c.value}")
-                case Declaration(_) => order.add("decl")
-                case Unknown(_) => order.add("unk")
-            }
-            Continue
+    walk(doc) { kind =>
+        match (kind) {
+            case Document(_) => order.add("doc")
+            case Element(e) => order.add("el:${e.name}")
+            case Text(t) => order.add("txt:${t.value}")
+            case Comment(c) => order.add("cmt:${c.value}")
+            case Declaration(_) => order.add("decl")
+            case Unknown(_) => order.add("unk")
+        }
+        Continue
     }
     @Expect(order[0], "doc")
     @Expect(order[1], "decl")
@@ -88,13 +85,12 @@ func testWalkSkipChildren(): Unit {
     let doc = makeTree()
     let c = Counter()
     // 跳过 catalog 的子树
-    walk(doc) {
-        kind =>
-            c.inc()
-            match (kind) {
-                case Element(e) where e.name == "catalog" => SkipChildren
-                case _ => Continue
-            }
+    walk(doc) { kind =>
+        c.inc()
+        match (kind) {
+            case Element(e) where e.name == "catalog" => SkipChildren
+            case _ => Continue
+        }
     }
     // 跳过 catalog 的所有后代，仍然应看到：doc + decl + top-comment + catalog 本身 = 4
     @Expect(c.n, 4)
@@ -125,8 +121,7 @@ func testWalkStopAbortsImmediately(): Unit {
 func testWalkOnLeafSkipChildrenEqualsContinue(): Unit {
     let doc = XmlDocumentBuilder().root("r") {r => r.text("hi")}.build()
     let c = Counter()
-    walk(doc) {
-        _ =>
+    walk(doc) { _ =>
         c.inc();
         SkipChildren
     }
@@ -140,8 +135,7 @@ func testWalkOnElementSubtree(): Unit {
     let doc = makeTree()
     let root = doc.rootElement.getOrThrow()
     let c = Counter()
-    walk(root) {
-        _ =>
+    walk(root) { _ =>
         c.inc();
         Continue
     }
@@ -290,8 +284,7 @@ func testXmlVisitableAcceptMethod(): Unit {
 func testXmlVisitableWalkMethod(): Unit {
     let doc = makeTree()
     let c = Counter()
-    doc.walk {
-        _ =>
+    doc.walk { _ =>
         c.inc();
         Continue
     }
@@ -323,8 +316,7 @@ func testCollectElementsByNameViaWalk(): Unit {
 func testEmptyElementHasNoChildrenWalked(): Unit {
     let doc = XmlDocumentBuilder().root("empty").build()
     let c = Counter()
-    walk(doc) {
-        _ =>
+    walk(doc) { _ =>
         c.inc();
         Continue
     }

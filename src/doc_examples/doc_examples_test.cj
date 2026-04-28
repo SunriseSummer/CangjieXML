@@ -290,14 +290,13 @@ func docQueryChildElementText(): Unit {
 // ----------------------------------------------------------------------
 @Test
 func docBuilderBasicDSL(): Unit {
-    let doc = XmlDocumentBuilder().declaration().root("catalog") {
-        r =>
-            r.element("book") {
-                b => b.attribute("id", "1").text("SICP")
-            }
-            r.element("book") {
-                b => b.attribute("id", "2").text("TAOCP")
-            }
+    let doc = XmlDocumentBuilder().declaration().root("catalog") { r =>
+        r.element("book") {
+            b => b.attribute("id", "1").text("SICP")
+        }
+        r.element("book") {
+            b => b.attribute("id", "2").text("TAOCP")
+        }
     }.build()
 
     let root = doc.rootElement.getOrThrow()
@@ -366,10 +365,9 @@ class TitleCollector {
 
 @Test
 func docVisitWalkCountsBooks(): Unit {
-    let doc = XmlDocumentBuilder().root("catalog") {
-        r =>
-            r.element("book") {b => b.attribute("id", "1").text("SICP")}
-            r.element("book") {b => b.attribute("id", "2").text("TAOCP")}
+    let doc = XmlDocumentBuilder().root("catalog") { r =>
+        r.element("book") {b => b.attribute("id", "1").text("SICP")}
+        r.element("book") {b => b.attribute("id", "2").text("TAOCP")}
     }.build()
 
     let count = BookCounter()
@@ -386,10 +384,9 @@ func docVisitWalkCountsBooks(): Unit {
 
 @Test
 func docVisitWalkCollectsTitles(): Unit {
-    let doc = XmlDocumentBuilder().root("catalog") {
-        r =>
-            r.element("book") {b => b.text("SICP")}
-            r.element("book") {b => b.text("TAOCP")}
+    let doc = XmlDocumentBuilder().root("catalog") { r =>
+        r.element("book") {b => b.text("SICP")}
+        r.element("book") {b => b.text("TAOCP")}
     }.build()
 
     let bag = TitleCollector()
@@ -419,10 +416,9 @@ class DocBookCollector <: XmlVisitor {
 
 @Test
 func docVisitXmlVisitorCollectsTitles(): Unit {
-    let doc = XmlDocumentBuilder().root("catalog") {
-        r =>
-            r.element("book") {b => b.text("SICP")}
-            r.element("book") {b => b.text("TAOCP")}
+    let doc = XmlDocumentBuilder().root("catalog") { r =>
+        r.element("book") {b => b.text("SICP")}
+        r.element("book") {b => b.text("TAOCP")}
     }.build()
 
     let c = DocBookCollector()

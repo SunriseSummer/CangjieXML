@@ -31,14 +31,13 @@ class TempFile {
 }
 
 func makeSampleDoc(): XmlDocument {
-    XmlDocumentBuilder().declaration().root("catalog") {
-        r =>
-            r.element("book") {
-                b => b.attribute("id", "1").text("SICP")
-            }
-            r.element("book") {
-                b => b.attribute("id", "2").text("TAOCP")
-            }
+    XmlDocumentBuilder().declaration().root("catalog") { r =>
+        r.element("book") {
+            b => b.attribute("id", "1").text("SICP")
+        }
+        r.element("book") {
+            b => b.attribute("id", "2").text("TAOCP")
+        }
     }.build()
 }
 
