@@ -22,7 +22,13 @@ public interface XmlSink {
  * 非线程安全——并发使用需要外部同步。
  */
 public class StringXmlSink <: XmlSink {
-    private let buffer: StringBuilder
+    /*
+     * 包内可见，供 `XmlWriter` 的 fast-path 直接 append 绕过接口分派。
+     * 仓颉字符串 builder 性能特征（CangjiePerf::string_concat）显示
+     * `StringBuilder.append` 单次成本不算低，因此减少接口分派 + 减少 append
+     * 次数对热路径收益显著。
+     */
+    let buffer: StringBuilder
 
     public init() {
         this.buffer = StringBuilder()

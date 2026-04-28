@@ -57,14 +57,14 @@ extend XmlParser {
         if (cur.eof()) {
             throw XmlParseException(InvalidText(startPos, "unexpected EOF after '<'"))
         }
-        let r = cur.runes[cur.idx]
-        if (r == CH_QUESTION) {
+        let b = cur.currentByte()
+        if (b == BY_QUESTION) {
             return parsePiOrDeclarationTop(startPos)
         }
-        if (r == CH_BANG) {
+        if (b == BY_BANG) {
             return parseBangMarkup(startPos, atTop: true)
         }
-        if (r == CH_SLASH) {
+        if (b == BY_SLASH) {
             throw XmlParseException(MismatchedElement("(none)", peekSkippedName(), startPos))
         }
         if (rootSeenAlready) {
@@ -94,10 +94,10 @@ extend XmlParser {
 
     public func parseBangMarkup(startPos: SourcePos, atTop!: Bool): XmlNode {
         consumeExpected(CH_BANG)
-        if (cur.consumeIfMatch(RUNE_COMMENT_OPEN_DASHES)) {
+        if (cur.consumeIfMatchBytes(BYTES_COMMENT_OPEN_DASHES)) {
             return parseCommentBody(startPos)
         }
-        if (cur.consumeIfMatch(RUNE_CDATA_PROLOGUE)) {
+        if (cur.consumeIfMatchBytes(BYTES_CDATA_PROLOGUE)) {
             if (atTop) {
                 throw XmlParseException(InvalidText(startPos, "CDATA is not allowed at document top level"))
             }
@@ -109,7 +109,7 @@ extend XmlParser {
     public func parseCommentBody(startPos: SourcePos): XmlNode {
         let start = cur.idx
         while (!cur.eof()) {
-            if (cur.consumeIfMatch(RUNE_COMMENT_EPILOGUE)) {
+            if (cur.consumeIfMatchBytes(BYTES_COMMENT_EPILOGUE)) {
                 return doc.createComment(cur.sliceString(start, cur.idx - EPILOGUE_LEN))
             }
             cur.advance()
@@ -120,7 +120,7 @@ extend XmlParser {
     public func parseCdataBody(startPos: SourcePos): XmlNode {
         let start = cur.idx
         while (!cur.eof()) {
-            if (cur.consumeIfMatch(RUNE_CDATA_EPILOGUE)) {
+            if (cur.consumeIfMatchBytes(BYTES_CDATA_EPILOGUE)) {
                 return doc.createText(cur.sliceString(start, cur.idx - EPILOGUE_LEN), cdata: true)
             }
             cur.advance()

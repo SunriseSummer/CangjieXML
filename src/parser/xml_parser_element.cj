@@ -33,8 +33,8 @@ extend XmlParser {
             if (cur.eof()) {
                 throw XmlParseException(InvalidAttribute("(?)", cur.pos(), "unexpected EOF inside start tag"))
             }
-            let r = cur.runes[cur.idx]
-            if (r == CH_GT || r == CH_SLASH) {
+            let b = cur.currentByte()
+            if (b == BY_GT || b == BY_SLASH) {
                 return
             }
             parseOneAttribute(el)
@@ -70,8 +70,13 @@ extend XmlParser {
         if (cur.eof()) {
             throw XmlParseException(InvalidAttribute(attrName, attrPos, "unexpected EOF inside attribute value"))
         }
-        let quoteCh = cur.runes[cur.idx]
-        if (quoteCh == CH_QUOT || quoteCh == CH_APOS) {
+        let qb = cur.currentByte()
+        var quoteCh: Rune
+        if (qb == BY_QUOT) {
+            quoteCh = CH_QUOT
+            cur.advance()
+        } else if (qb == BY_APOS) {
+            quoteCh = CH_APOS
             cur.advance()
         } else {
             throw XmlParseException(InvalidAttribute(attrName, attrPos, "attribute value must be quoted"))
@@ -116,12 +121,12 @@ extend XmlParser {
         if (cur.eof()) {
             throw XmlParseException(InvalidText(startPos, "unexpected EOF after '<'"))
         }
-        let r = cur.runes[cur.idx]
-        if (r == CH_QUESTION) {
+        let b = cur.currentByte()
+        if (b == BY_QUESTION) {
             consumeExpected(CH_QUESTION)
             return parsePiInsideElement(startPos)
         }
-        if (r == CH_BANG) {
+        if (b == BY_BANG) {
             return parseBangMarkup(startPos, atTop: false)
         }
         parseElement(startPos, depth + 1)

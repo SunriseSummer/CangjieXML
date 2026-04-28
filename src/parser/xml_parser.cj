@@ -58,11 +58,11 @@ class XmlParser {
      */
     func readName(): String {
         let start = cur.idx
-        if (start >= cur.runes.size) {
+        if (start >= cur.limit) {
             throw XmlParseException(InvalidText(cur.pos(), "unexpected EOF where name expected"))
         }
-        let r = cur.runes[start]
-        if (!isNameStart(r)) {
+        let b = cur.source[start]
+        if (!isNameStartByte(b)) {
             throw XmlParseException(InvalidText(cur.pos(), "expected name-start character"))
         }
         cur.skipNameChars()
