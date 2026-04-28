@@ -3,7 +3,7 @@ package fastxml.visit
 import fastxml.dom.*
 
 /**
- * `accept` / `walk` 作为 `XmlNode` 方法的接口契约。
+ * `accept` / `walk` 作为 `XmlNode` 方法的接口契约
  *
  * `import fastxml.visit.*` 后即可写：
  *
@@ -12,7 +12,7 @@ import fastxml.dom.*
  * doc.walk { k => Continue }
  * ```
  *
- * 顶层函数 `accept(node, visitor)` / `walk(node, fn)` 也保留。
+ * 顶层函数 `accept(node, visitor)` / `walk(node, fn)` 也保留
  */
 public interface XmlVisitable {
     func accept(visitor: XmlVisitor): Bool

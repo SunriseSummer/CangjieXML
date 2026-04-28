@@ -4,7 +4,7 @@
 
 - **仓颉 SDK**：`1.0.5`
 - **仓颉项目管理器**：`cjpm`
-- 可选：用于 E2E 验收的 Python 3（`e2etest/run.py`）
+- 可选：用于 E2E 验收的 Python 3（`e2etest/xml/run.py`）
 
 ---
 

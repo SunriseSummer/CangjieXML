@@ -6,10 +6,10 @@ import fastxml.error.*
 import fastxml.parser.*
 
 /**
- * 从文件加载 XML 文档——对 `parseXml` 的 IO 侧封装。
+ * 从文件加载 XML 文档——对 `parseXml` 的 IO 侧封装
  *
- * 文件一律按 **UTF-8** 解读；XML 声明里的 `encoding="..."` 不参与实际解码。
- * IO 异常被收敛成 `XmlIoException`；语法错误仍以 `XmlParseException` 原样抛出。
+ * 文件一律按 **UTF-8** 解读；XML 声明里的 `encoding="..."` 不参与实际解码
+ * IO 异常被收敛成 `XmlIoException`；语法错误仍以 `XmlParseException` 原样抛出
  *
  * | 触发情形 | 抛出 |
  * |---|---|
@@ -18,7 +18,7 @@ import fastxml.parser.*
  * | 字节不是合法 UTF-8 | `XmlIoException(FileReadFailed(path, "invalid UTF-8"))` |
  * | XML 语法错误 | `XmlParseException(...)`（原样抛出） |
  */
-/** 错误消息里用来标识"无文件路径的字节源"。 */
+// 错误消息里用来标识"无文件路径的字节源"
 const IN_MEMORY_SOURCE_LABEL: String = "<bytes>"
 
 public func loadXmlFromFile(path: String): XmlDocument {
@@ -32,9 +32,9 @@ public func loadXmlFromFile(path: String, options: XmlParseOptions): XmlDocument
 }
 
 /**
- * 从字节数组解析 XML 文档。字节按 UTF-8 解码；非法 UTF-8 抛 `XmlIoException`。
+ * 从字节数组解析 XML 文档。字节按 UTF-8 解码；非法 UTF-8 抛 `XmlIoException`
  *
- * 典型场景：HTTP 响应体、JDBC Blob、嵌入资源等"已经在内存里的字节流"。
+ * 典型场景：HTTP 响应体、JDBC Blob、嵌入资源等"已经在内存里的字节流"
  */
 public func parseXmlBytes(bytes: Array<Byte>): XmlDocument {
     parseXmlBytes(bytes, XmlParseOptions.default_())

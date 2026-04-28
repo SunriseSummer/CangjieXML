@@ -236,7 +236,7 @@ func testInt32AttributeReadsValue(): Unit {
 
 @Test
 func testChildElementTextAsReturnsNoneWhenMissing(): Unit {
-    // 覆盖 childElementTextAs 中 childElementText 返回 None 的分支。
+    // 覆盖 childElementTextAs 中 childElementText 返回 None 的分支
     let root = makeTree()
     @Expect(root.childElementTextAs<Int64>("missing", INT64_CODEC).isNone(), true)
 }

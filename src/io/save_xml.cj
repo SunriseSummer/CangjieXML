@@ -6,11 +6,11 @@ import fastxml.error.*
 import fastxml.writer.*
 
 /**
- * 把 `XmlDocument` 序列化后写入目标文件。
+ * 把 `XmlDocument` 序列化后写入目标文件
  *
  * 实现策略：先在内存把整个文档序列化为字节，再一次性写盘——序列化失败时
  * 不打开文件，自然获得"不破坏原文件"语义。大文档场景的流式替代见同包内
- * `FileXmlSink`。
+ * `FileXmlSink`
  *
  * ## 错误映射
  *
@@ -29,7 +29,7 @@ public func saveXmlToFile(doc: XmlDocument, path: String, options: XmlWriteOptio
 }
 
 /**
- * 序列化 `XmlDocument` 为 UTF-8 字节。适合写入 HTTP 响应、BLOB、内存管道等。
+ * 序列化 `XmlDocument` 为 UTF-8 字节。适合写入 HTTP 响应、BLOB、内存管道等
  */
 public func writeXmlToBytes(doc: XmlDocument): Array<Byte> {
     writeXmlToBytes(doc, XmlWriteOptions.default_())

@@ -1,10 +1,10 @@
 package fastxml.writer
 
 /**
- * XML 写出选项。
+ * XML 写出选项
  *
  * 不可变值类型（`struct` + `let`），一经构造不可修改——保证"相同 DOM +
- * 相同 options → 完全相同输出"的确定性。
+ * 相同 options → 完全相同输出"的确定性
  *
  * | 字段 | 语义 | 默认 |
  * |---|---|---|
@@ -42,12 +42,12 @@ public struct XmlWriteOptions {
         this.boolFalseText = boolFalseText
     }
 
-    /** 默认配置：美化输出，写声明，不写 BOM。 */
+    // 默认配置：美化输出，写声明，不写 BOM
     public static func default_(): XmlWriteOptions {
         XmlWriteOptions()
     }
 
-    /** 紧凑配置：单行无缩进；文档声明仍输出。 */
+    // 紧凑配置：单行无缩进；文档声明仍输出
     public static func compactPreset(): XmlWriteOptions {
         XmlWriteOptions(compact: true, lineEnd: "")
     }

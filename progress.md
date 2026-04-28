@@ -498,12 +498,12 @@ public class FileXmlSink <: XmlSink & Resource {
 
 #### 5.8.1 新增 `e2etest/` 端到端验收
 
-- `e2etest/fixtures/generate.py` —— Python 用 `xml.etree` 生成 10 份典型 XML（目录/配置/深嵌套/Unicode/实体/混合内容/自闭合/RSS/无声明/CDATA）。
-- `e2etest/python_probe/probe.py` —— Python 侧指纹 extractor，`xml.etree` 解析后规约成结构化 JSON。
-- `e2etest/cangjie_probe/` —— 独立 cjpm 项目，通过 `path = "../.."` 引用本库，`loadXmlFromFile` 解析后导出同一份 JSON 形状。
-- `e2etest/diff.py` —— 两侧 JSON 逐字段 diff，任何差异即 fail。
-- `e2etest/run.sh` —— 一键入口：生成 → 构建仓颉 probe → 跑两端 → diff，任意步骤非 0 立即失败。
-- `e2etest/README.md` —— 指纹设计、覆盖的 10 份 fixture、失败排查。
+- `e2etest/xml/fixtures/generate.py` —— Python 用 `xml.etree` 生成 15 份典型 XML（目录/配置/深嵌套/Unicode/实体/混合内容/自闭合/RSS/无声明/CDATA/CDATA 终止符/BOM/DOCTYPE/元素内 PI/实体集合）。
+- `e2etest/xml/python_probe/probe.py` —— Python 侧指纹 extractor，`xml.etree` 解析后规约成结构化 JSON。
+- `e2etest/xml/cangjie_probe/` —— 独立 cjpm 项目，通过 `path = "../../.."` 引用本库，`loadXmlFromFile` 解析后导出同一份 JSON 形状。
+- `e2etest/xml/diff.py` —— 两侧 JSON 逐字段 diff，任何差异即 fail。
+- `python3 e2etest/xml/run.py` —— 一键入口：生成 → 构建仓颉 probe → 跑两端 → diff，任意步骤非 0 立即失败。
+- `e2etest/xml/README.md` —— 指纹设计、覆盖的 15 份 fixture、失败排查。
 
 #### 5.8.2 指纹（fingerprint）
 
@@ -520,7 +520,7 @@ public class FileXmlSink <: XmlSink & Resource {
 
 #### 5.8.3 迭代中真实捕获到的 bug
 
-**Bug**（**e2etest 自身**的 probe 代码，非主库）：`normalizeWhitespace` / `jsonEscape` 最初按字节遍历、把非特殊字节重造成 `Rune(UInt32(b))`，导致每个 UTF-8 续字节被当成独立码点，`算法导论` 被重写成 Latin-1 伪字符。**修复**：非特殊字节直接复制进 `ArrayList<Byte>`，最后 `String.fromUtf8` 一次性重建——通用规则：**按字节扫描的逻辑不应反向构造 `Rune`**。主库自身通过 10/10 指纹一致证明了 UTF-8 往返正确。
+**Bug**（**e2etest 自身**的 probe 代码，非主库）：`normalizeWhitespace` / `jsonEscape` 最初按字节遍历、把非特殊字节重造成 `Rune(UInt32(b))`，导致每个 UTF-8 续字节被当成独立码点，`算法导论` 被重写成 Latin-1 伪字符。**修复**：非特殊字节直接复制进 `ArrayList<Byte>`，最后 `String.fromUtf8` 一次性重建——通用规则：**按字节扫描的逻辑不应反向构造 `Rune`**。主库自身通过 15/15 指纹一致证明了 UTF-8 往返正确。
 
 **顺手修**：`src/io/file_xml_sink.cj` 的 `import fastxml.dom.*` 属实未用，移除。
 
@@ -530,7 +530,7 @@ public class FileXmlSink <: XmlSink & Resource {
 |---|---|
 | `cjpm build` | ✅ |
 | `cjpm test` | ✅ **119/119**（0 FAILED，0 ERROR） |
-| `bash e2etest/run.sh` | ✅ `[PASS] all 10 fixtures produce identical fingerprints` |
+| `python3 e2etest/xml/run.py` | ✅ `[PASS] all 15 fixtures produce identical fingerprints` |
 | 单文件 ≤ 300 行 | ✅（`fingerprint.cj` 196 行为 e2e 最长；主库最长 298） |
 | 无下划线前缀 | ✅ |
 | 常量化 / 无魔鬼数字 | ✅ |

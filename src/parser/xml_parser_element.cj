@@ -4,9 +4,9 @@ import fastxml.dom.*
 import fastxml.error.*
 
 /**
- * `XmlParser` 的元素级解析：元素、属性、子节点扫描、文本、闭合标签。
+ * `XmlParser` 的元素级解析：元素、属性、子节点扫描、文本、闭合标签
  *
- * 与 `xml_parser_toplevel.cj` 同样以 `extend XmlParser` 挂回同一个类。
+ * 与 `xml_parser_toplevel.cj` 同样以 `extend XmlParser` 挂回同一个类
  */
 extend XmlParser {
     public func parseElement(startPos: SourcePos, depth: Int64): XmlElement {
@@ -52,7 +52,7 @@ extend XmlParser {
         cur.skipWhitespace()
         let raw = readQuotedAttrValue(attrName, attrPos)
         let decoded = decodeEntitiesOrRethrowAttr(raw, attrName, attrPos)
-        // 一次查询完成 dup-check + 插入，避免 hasAttribute + setAttribute 的两次 HashMap 查找。
+        // 一次查询完成 dup-check + 插入，避免 hasAttribute + setAttribute 的两次 HashMap 查找
         if (!el.tryAddAttribute(attrName, decoded)) {
             throw XmlParseException(InvalidAttribute(attrName, attrPos, "duplicate attribute"))
         }

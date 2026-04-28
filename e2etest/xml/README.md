@@ -11,7 +11,7 @@ e2e 对照证明"整条链路跟业界共识一致"。
 ```
 e2etest/
 ├── fixtures/
-│   ├── generate.py          # 用 xml.etree 生成 10 份典型 XML
+│   ├── generate.py          # 用 xml.etree 生成 15 份典型 XML
 │   └── *.xml                # 运行 generate.py 后产生
 ├── python_probe/
 │   └── probe.py             # Python 侧指纹 extractor
@@ -33,10 +33,10 @@ python3 e2etest/xml/run.py
 ```
 
 脚本会：
-1. `python3 fixtures/generate.py` — 生成 10 份 `.xml`
+1. `python3 fixtures/generate.py` — 生成 15 份 `.xml`
 2. `cjpm build`（在 `cangjie_probe/` 下）— 构建仓颉 probe，`cjpm.toml` 已显式配置 `-O2`
 3. 分别跑 Python probe 与仓颉 probe → 两份 JSON
-4. `diff.py` 对比 → 全绿则 `[PASS] all 10 fixtures produce identical fingerprints`
+4. `diff.py` 对比 → 全绿则 `[PASS] all 15 fixtures produce identical fingerprints`
 
 无需外部 Python 第三方包；脚本只依赖 `python3` 和 `cjc`（`run.py` 会在 `cjpm`
 不在 PATH 时自动 source `/opt/cangjie/envsetup.sh`）。
@@ -93,6 +93,11 @@ python3 e2etest/xml/run.py
 | 08 | `rss.xml` | RSS 风格多子项 |
 | 09 | `bookstore_no_decl.xml` | 无 XML 声明，仅根元素 |
 | 10 | `cdata.xml` | 真正的 `<![CDATA[...]]>` 区段 |
+| 11 | `cdata_terminator.xml` | CDATA 内部含 `]]>`，覆盖 writer 分段写回 |
+| 12 | `bom.xml` | UTF-8 BOM 起首，覆盖解析 / 写回 BOM 语义 |
+| 13 | `doctype.xml` | `<!DOCTYPE ...>` 走 `XmlUnknown` 路径 |
+| 14 | `pi_in_element.xml` | 元素内处理指令，覆盖 `XmlUnknown("?...?")` |
+| 15 | `entity_refs.xml` | 命名 / 十进制 / 十六进制实体集中回归 |
 
 ## 迭代过程中发现并修复的问题
 
@@ -108,7 +113,7 @@ python3 e2etest/xml/run.py
 
 这个坑发生在 probe 自己，不是 `fastxml` 主库 —— 但它恰好示范了
 "写 Unicode 相关代码时必须区分 byte 与 codepoint"的通用教训。
-主库自身通过 10/10 指纹一致证明了编码正确。
+主库自身通过 15/15 指纹一致证明了编码正确。
 
 ## 失败排查
 

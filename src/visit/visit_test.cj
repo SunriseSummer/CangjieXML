@@ -10,8 +10,8 @@ import fastxml.build.*
 // 共享测试夹具
 // ======================================================================
 
-/*
- * 构造一棵典型的 XML 树，用于多数 walk/accept 测试。
+/**
+ * 构造一棵典型的 XML 树，用于多数 walk/accept 测试
  *
  * <?xml ... ?>
  * <!-- top comment -->
@@ -296,7 +296,7 @@ class DefaultVisitor <: XmlVisitor {}
 @Test
 func testDefaultVisitorImplementationAcceptsEverything(): Unit {
     // 默认实现对所有节点返回 true → 整次 accept 必然成功；
-    // 同时命中 interface 默认函数体以提升覆盖率。
+    // 同时命中 interface 默认函数体以提升覆盖率
     let doc = makeTree()
     let v = DefaultVisitor()
     @Expect(accept(doc, v), true)

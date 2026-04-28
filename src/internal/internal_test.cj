@@ -4,12 +4,11 @@ import std.unittest.*
 import std.unittest.testmacro.*
 
 /**
- * 覆盖 `internal.text_escape` 的写出方向转义工具的单元测试。
+ * 覆盖 `internal.text_escape` 的写出方向转义工具的单元测试
  *
  * 直接对单一函数做边界断言（如 CDATA 中含 `]]>` 的分段），失败时能精确指到
- * "转义规则自身"这一层。
+ * "转义规则自身"这一层
  */
-
 @Test
 func testEscapeTextNoEscapeNeeded(): Unit {
     @Expect(escapeText("hello world"), "hello world")
@@ -43,7 +42,7 @@ func testEscapeCdataSimple(): Unit {
 @Test
 func testEscapeCdataSplitsTerminator(): Unit {
     // 关键不变量：输出串不包含裸的 `]]>`（除去合法的段结尾），
-    // 每一段都以 `<![CDATA[` 开启、`]]>` 关闭。
+    // 每一段都以 `<![CDATA[` 开启、`]]>` 关闭
     let got = escapeCdata("foo]]>bar")
     @Expect(got, "<![CDATA[foo]]]]><![CDATA[>bar]]>")
 }
@@ -56,7 +55,7 @@ func testEscapeCdataMultipleTerminators(): Unit {
 
 @Test
 func testEscapeTextFastPathPreservesIdentity(): Unit {
-    // 快路径：不需要转义时直接 return 原串；行为上表现为值相等。
+    // 快路径：不需要转义时直接 return 原串；行为上表现为值相等
     // （我们无法在用户层观察到"同一引用"，但能观察到等值。）
     let raw = "just text"
     @Expect(escapeText(raw), raw)

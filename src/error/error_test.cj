@@ -4,13 +4,12 @@ import std.unittest.*
 import std.unittest.testmacro.*
 
 /**
- * `XmlError` / `SourcePos` / 异常类型的单元测试。
+ * `XmlError` / `SourcePos` / 异常类型的单元测试
  *
  * 这些类型绝大多数分支之前只被 parser_test 通过"真实解析错误"间接触达，
  * 而 `XmlError.toString` 的每个分支都是面向调用方的诊断面——值得直接钉死，
- * 以免某分支的格式被误改后只能靠集成测试才发现。
+ * 以免某分支的格式被误改后只能靠集成测试才发现
  */
-
 @Test
 func testSourcePosToString(): Unit {
     let p = SourcePos(42, 3, 5)
