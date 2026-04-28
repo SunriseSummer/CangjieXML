@@ -102,9 +102,7 @@ public class XmlDocument <: XmlNode {
         XmlElement(this, name)
     }
 
-    /**
-     * 创建一个归属于本文档的文本节点。`cdata = true` 时该节点视作 CDATA
-     */
+    // 创建一个归属于本文档的文本节点，`cdata = true` 时该节点视作 CDATA
     public func createText(value: String, cdata!: Bool = false): XmlText {
         XmlText(this, value, cdata)
     }
@@ -114,9 +112,7 @@ public class XmlDocument <: XmlNode {
         XmlComment(this, value)
     }
 
-    /**
-     * 创建 XML 声明节点。`value` 省略时使用默认声明：`xml version="1.0" encoding="UTF-8"`
-     */
+    // 创建 XML 声明节点，`value` 省略时使用默认声明：`xml version="1.0" encoding="UTF-8"`
     public func createDeclaration(value!: ?String = None): XmlDeclaration {
         let v = value ?? DEFAULT_DECLARATION_VALUE
         XmlDeclaration(this, v)
@@ -146,9 +142,7 @@ public class XmlDocument <: XmlNode {
         linkAtEnd(node)
     }
 
-    /**
-     * 在顶层开头插入节点。其他约束同 `appendChild`
-     */
+    // 在顶层开头插入节点，其他约束同 `appendChild`
     public func prependChild(node: XmlNode): Unit {
         checkTopLevelInsertable(node, prepending: true)
         node.removeSelf()
@@ -165,9 +159,7 @@ public class XmlDocument <: XmlNode {
         }
     }
 
-    /**
-     * 从文档移除顶层节点。成功返回 `true`；若 `node` 不是本文档的直接顶层节点，返回 `false`
-     */
+    // 从文档移除顶层节点，成功返回 `true`，若 `node` 不是本文档的直接顶层节点，返回 `false`
     public func removeChild(node: XmlNode): Bool {
         if (!node.inDocFlag) {
             return false
@@ -197,9 +189,7 @@ public class XmlDocument <: XmlNode {
         true
     }
 
-    /**
-     * 清空文档所有顶层节点，重置为初始状态。`hasBom` / `writeBom` 不受影响
-     */
+    // 清空文档所有顶层节点，重置为初始状态，`hasBom` / `writeBom` 不受影响
     public func clear(): Unit {
         var cur = headChild
         while (let Some(n) <- cur) {
@@ -261,22 +251,20 @@ public class XmlDocument <: XmlNode {
                 // - `appendChild`：要求文档为空，否则 decl 会落在别的节点之后；
                 // - `prependChild`：允许——新 decl 会成为新 head
                 if (!prepending && headChild.isSome()) {
-                    throwDom(
-                        "XmlDeclaration must be the first top-level node; " +
+                    throwDom("XmlDeclaration must be the first top-level node; " +
                             "use prependChild or insert the declaration before other nodes")
                 }
             case _ =>
                 // 反向约束：若首个顶层节点是 Declaration，其他节点不得 prepend
                 // 到它之前——否则 Declaration 会不再是首节点，与 XML 规范冲突
                 if (prepending && isFirstChildDeclaration()) {
-                    throwDom(
-                        "cannot prepend a node before the XmlDeclaration; " +
+                    throwDom("cannot prepend a node before the XmlDeclaration; " +
                             "declaration must remain the first top-level node")
                 }
         }
     }
 
-    // 是否存在首个顶层节点，且它是 `XmlDeclaration`。供位置约束检查使用
+    // 是否存在首个顶层节点，且它是 `XmlDeclaration`，供位置约束检查使用
     private func isFirstChildDeclaration(): Bool {
         match (headChild) {
             case None => false
