@@ -31,14 +31,17 @@ class TempFile {
 }
 
 func makeSampleDoc(): XmlDocument {
-    XmlDocumentBuilder().declaration().root("catalog") { r =>
-        r.element("book") {
-            b => b.attribute("id", "1").text("SICP")
+    XmlDocumentBuilder()
+        .declaration()
+        .root("catalog") { r =>
+            r.element("book") { b =>
+                b.attribute("id", "1").text("SICP")
+            }
+            r.element("book") { b =>
+                b.attribute("id", "2").text("TAOCP")
+            }
         }
-        r.element("book") {
-            b => b.attribute("id", "2").text("TAOCP")
-        }
-    }.build()
+        .build()
 }
 
 // ======================================================================
@@ -117,9 +120,11 @@ func testWriteAndParseBytes(): Unit {
 func testUnicodeContentRoundTrip(): Unit {
     let tmp = TempFile("unicode.xml")
     try {
-        let doc = XmlDocumentBuilder().root("doc") {
-            r => r.element("book") {b => b.attribute("lang", "zh").text("排序与查找 🔍 — Gödel")}
-        }.build()
+        let doc = XmlDocumentBuilder()
+            .root("doc") { r =>
+                r.element("book") { b => b.attribute("lang", "zh").text("排序与查找 🔍 — Gödel") }
+            }
+            .build()
         saveXmlToFile(doc, tmp.path)
         let loaded = loadXmlFromFile(tmp.path)
         let root = loaded.rootElement.getOrThrow()
@@ -218,7 +223,7 @@ func testFileXmlSinkWriteAfterCloseThrows(): Unit {
             sink.write("late")
             @Fail("expected XmlIoException on write after close")
         } catch (_: XmlIoException) {
-            () // 预期
+            ()  // 预期
         }
     } finally {
         tmp.cleanup()
@@ -246,11 +251,14 @@ func testFileXmlSinkOnUnwritablePathThrows(): Unit {
 func testEndToEndBuildSaveLoadQuery(): Unit {
     let tmp = TempFile("e2e.xml")
     try {
-        let doc = XmlDocumentBuilder().declaration().root("library") {
-            r => r.element("book") {
-                b => b.attribute("id", "42").attribute("avail", "true").text("Gödel, Escher, Bach")
+        let doc = XmlDocumentBuilder()
+            .declaration()
+            .root("library") { r =>
+                r.element("book") { b =>
+                    b.attribute("id", "42").attribute("avail", "true").text("Gödel, Escher, Bach")
+                }
             }
-        }.build()
+            .build()
         saveXmlToFile(doc, tmp.path)
 
         let back = loadXmlFromFile(tmp.path)
@@ -347,7 +355,7 @@ func testFileXmlSinkFlushAfterCloseIsNoOp(): Unit {
         let sink = FileXmlSink(tmp.path)
         sink.write("<x/>")
         sink.close()
-        sink.flush() // 不应抛
+        sink.flush()  // 不应抛
         @Expect(sink.isClosed(), true)
     } finally {
         tmp.cleanup()
@@ -381,9 +389,7 @@ func testFileXmlSinkWriteAfterCloseRejected(): Unit {
         try {
             sink.write("<after/>")
         } catch (e: XmlIoException) {
-            if (let FileWriteFailed(_, _) <- e.error) {
-                threw = true
-            }
+            if (let FileWriteFailed(_, _) <- e.error) { threw = true }
         }
         @Expect(threw, true)
     } finally {
@@ -398,9 +404,7 @@ func testFileXmlSinkConstructorFailureOnBadPath(): Unit {
     try {
         FileXmlSink("/nonexistent_fastxml_dir_9beef/out.xml")
     } catch (e: XmlIoException) {
-        if (let FileWriteFailed(_, _) <- e.error) {
-            threw = true
-        }
+        if (let FileWriteFailed(_, _) <- e.error) { threw = true }
     }
     @Expect(threw, true)
 }
@@ -460,9 +464,7 @@ func testLoadXmlFromFileInvalidUtf8(): Unit {
         try {
             loadXmlFromFile(tmp.path)
         } catch (e: XmlIoException) {
-            if (let FileReadFailed(_, _) <- e.error) {
-                threw = true
-            }
+            if (let FileReadFailed(_, _) <- e.error) { threw = true }
         }
         @Expect(threw, true)
     } finally {
