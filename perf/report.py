@@ -39,9 +39,9 @@ LIB_COLOR = {
     "python_xml.etree": "#D08C3F",   # 橙
 }
 
-FIXTURE_DESC = {
-    "catalog": "目录/条目/属性/文本（最常见的业务文档）",
-    "config":  "属性密集型（典型配置文件，几乎无文本节点）",
+FIXTURE_SHAPE = {
+    "catalog": "目录文档（条目 + 属性 + 文本）",
+    "config":  "配置文件（属性密集，几乎无文本）",
     "deep":    "深嵌套（递归路径、栈深度）",
 }
 
@@ -114,11 +114,9 @@ def build_svg_chart(scenario: str, indexed: dict[str, dict]) -> str:
     group_gap    = 14         # 组之间的间距
     left_pad     = 170        # fixture 名所占左侧宽度
     right_pad    = 70         # 数值标注预留宽度
-    top_pad      = 36
-    bottom_pad   = 30
+    top_pad      = 32
+    bottom_pad   = 16
     plot_w       = 460        # 绘图区横向像素
-    title_h      = 18
-    legend_h     = 18
 
     group_h  = n_lib * bar_h + (n_lib - 1) * bar_gap
     plot_h   = n_fix * group_h + (n_fix - 1) * group_gap
@@ -129,28 +127,27 @@ def build_svg_chart(scenario: str, indexed: dict[str, dict]) -> str:
     parts.append(
         f'<svg xmlns="http://www.w3.org/2000/svg" '
         f'viewBox="0 0 {width} {height}" '
-        f'role="img" aria-label="{scenario} 场景对比直方图" '
+        f'role="img" aria-label="{scenario}" '
         f'font-family="-apple-system,Segoe UI,Helvetica,Arial,sans-serif" '
         f'font-size="11">'
     )
-    # 标题
+    # 标题（仅场景名）
     parts.append(
-        f'<text x="{left_pad}" y="16" font-size="13" font-weight="600">'
-        f'场景：{scenario}（条长按 fixture 内最大值归一，尾部为实际 ms/次）'
-        f'</text>'
+        f'<text x="{left_pad}" y="14" font-size="12" font-weight="600">'
+        f'{scenario}</text>'
     )
-    # 图例
-    legend_y = 30
-    lx = left_pad
+    # 图例（右上）
+    legend_y = 14
+    lx = left_pad + 70
     for lib in LIBS:
         parts.append(
-            f'<rect x="{lx}" y="{legend_y - 9}" width="12" height="10" '
+            f'<rect x="{lx}" y="{legend_y - 9}" width="10" height="10" '
             f'fill="{LIB_COLOR[lib]}"/>'
         )
         parts.append(
-            f'<text x="{lx + 16}" y="{legend_y}">{LIB_LABEL[lib]}</text>'
+            f'<text x="{lx + 14}" y="{legend_y}">{LIB_LABEL[lib]}</text>'
         )
-        lx += 16 + 8 + 8 * len(LIB_LABEL[lib])  # 粗略宽度
+        lx += 14 + 7 * len(LIB_LABEL[lib]) + 12
 
     # 网格底色
     parts.append(
@@ -206,19 +203,15 @@ def render_report(by_lib: dict, iters: dict[str, int]) -> str:
     lines.append("# 性能对比：CangjieXML / tinyxml2 / Python xml.etree")
     lines.append("")
     lines.append("> 由 `perf/report.py` 自动生成，请勿手工修改。")
-    lines.append("> 重新生成：先 `python3 perf/bench.py` 跑基准，再 `python3 perf/report.py` 出报告。")
     lines.append("")
 
     lines.append("## 测试方法")
     lines.append("")
-    lines.append("- 三端共享同一组 fixture（`perf/fixtures/`）：紧凑 UTF-8 XML，"
-                 "覆盖目录型 / 属性密集型 / 深嵌套三种形态，每种 small / medium / large 三档共 9 份。")
-    lines.append("- 四个场景：`parse` 解析为 DOM、`serialize` 序列化为字节、"
-                 "`roundtrip` 解析后立即序列化、`traverse` 深度遍历整棵 DOM。")
-    lines.append("- 计时：单调时钟（C++ `steady_clock` / Python `perf_counter_ns` / 仓颉 `MonoTime`），"
-                 "单位毫秒；每个单元跑 N 次取平均，N 由 fixture 字节量决定，目标单元总耗时落在 0.05 ~ 5s 区间。")
-    lines.append("- 库版本：CangjieXML（本仓库，`-O2`）、tinyxml2 11.0.0（`-O2 -DNDEBUG`）、"
-                 "Python `xml.etree.ElementTree`（系统 Python）。")
+    lines.append("- 形态：目录文档、属性密集型、深嵌套，各 small / medium / large 共 9 份 fixture（`perf/fixtures/`）。")
+    lines.append("- 场景：`parse` 解析、`serialize` 序列化、`roundtrip` 解析+序列化、`traverse` 深度遍历。")
+    lines.append("- 计时：单调时钟，毫秒为单位；每单元跑 N 次取均值，N 由 fixture 字节量自适应至 0.05–5 s。")
+    lines.append("- 库版本：CangjieXML（本仓库，`-O2`）、tinyxml2 11.0.0（`-O2 -DNDEBUG`）、Python `xml.etree.ElementTree`。")
+    lines.append("- 结果表中 “×” 为相对 `tinyxml2` 的耗时倍率，越小越快；图表条长按各 fixture 内最大值归一化，尾部数值为实际 ms。")
     lines.append("")
 
     lines.append("## fixture 概况")
@@ -228,16 +221,19 @@ def render_report(by_lib: dict, iters: dict[str, int]) -> str:
     for f in FIXTURE_ORDER:
         kind = f.split("_", 1)[0]
         size = (FIXTURES_DIR / f).stat().st_size
-        lines.append(f"| `{f}` | {size:,} | {FIXTURE_DESC[kind]} |")
+        lines.append(f"| `{f}` | {size:,} | {FIXTURE_SHAPE[kind]} |")
     lines.append("")
 
     for scenario in SCENARIOS:
         lines.append(f"## 场景：`{scenario}`")
         lines.append("")
-        header_libs = " | ".join(f"{LIB_LABEL[l]} (ms/次)" for l in LIBS)
-        ratio_libs  = " | ".join(f"{LIB_LABEL[l]} 倍率"
-                                 for l in LIBS if l != "tinyxml2-11.0.0")
-        lines.append(f"| fixture | 迭代 | {header_libs} | {ratio_libs} |")
+        # 表头：ms 列用库名，倍率列在库名后加 “×”
+        ms_cols    = " | ".join(f"{LIB_LABEL[l]}" for l in LIBS)
+        ratio_cols = " | ".join(f"{LIB_LABEL[l]} ×"
+                                for l in LIBS if l != "tinyxml2-11.0.0")
+        lines.append(
+            f"| fixture | N | {ms_cols} | {ratio_cols} |"
+        )
         sep = "|---|--:|" + "--:|" * len(LIBS) + "--:|" * (len(LIBS) - 1)
         lines.append(sep)
 
@@ -261,13 +257,10 @@ def render_report(by_lib: dict, iters: dict[str, int]) -> str:
                 + " | " + " | ".join(ratio_cells) + " |"
             )
         lines.append("")
-        lines.append("> 倍率列以 `tinyxml2` 为 1×；数值越小越快。")
-        lines.append("")
         svg_path = CHARTS_DIR / f"{scenario}.svg"
         svg_path.write_text(build_svg_chart(scenario, indexed), encoding="utf-8")
-        # 用相对路径引用，便于 GitHub / 本地预览均能正常渲染。
         rel = svg_path.relative_to(PERF_DIR).as_posix()
-        lines.append(f"![{scenario} 场景对比直方图]({rel})")
+        lines.append(f"![{scenario}]({rel})")
         lines.append("")
 
     lines.append("---")
