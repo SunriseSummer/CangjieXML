@@ -16,7 +16,7 @@ const CH_LF: Rune = r'\n'
 // UTF-8 BOM 的码点形式，对应 `text_escape.cj` 中的字节常量
 const RUNE_BOM: Rune = '\u{FEFF}'
 
-/*
+/**
  * 与 `CH_*: Rune` 对齐的字节常量，热路径上按字节比较即可，
  * 避免 `Rune == Rune` 带来的码点装箱比较
  */
@@ -62,7 +62,7 @@ const BOM_BYTE_2: Byte = 0xBFu8
 // UTF-8 BOM 长度（字节）
 const BOM_BYTE_COUNT: Int64 = 3
 
-/*
+/**
  * UTF-8 编码识别用位掩码 / 前缀
  *
  * 命名遵循 RFC 3629 中 leading byte 的形式：`UTF8_LEAD<N>_MASK` 提取序列长度
@@ -108,7 +108,7 @@ const UTF8_INVALID_ADVANCE: Int64 = 1
 // Unicode 替换字符 U+FFFD，用于无法解码的 UTF-8 字节序列回退
 const UTF8_REPLACEMENT_CODEPOINT: UInt32 = 0xFFFDu32
 
-/*
+/**
  * 注释 / CDATA 等结构关键串的预编译字节序列
  *
  * 这些前缀全部为 ASCII，UTF-8 多字节序列的所有续字节均 ≥ 0x80，
@@ -147,7 +147,7 @@ class SourceCursor {
     // 总长度（字节）
     let limit: Int64
 
-    /*
+    /**
      * 输入是否以 UTF-8 BOM 起首，由 parser 在构造文档后回写到
      * `XmlDocument.hasBom`，使 parse→write 往返保留 BOM 语义
      */

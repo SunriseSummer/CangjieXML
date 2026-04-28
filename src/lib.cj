@@ -1,4 +1,4 @@
-/*
+/**
  * CangjieXML —— 纯仓颉实现的 XML 库
  *
  * 根包 `fastxml` 只做两件事：

@@ -247,10 +247,11 @@ public class XmlDocument <: XmlNode {
         }
         // 根元素与声明的唯一性约束
         match (node.kind()) {
-            case Element(_) => match (rootElement) {
-                case Some(_) => throwDom("XmlDocument already has a root element")
-                case None => ()
-            }
+            case Element(_) =>
+                match (rootElement) {
+                    case Some(_) => throwDom("XmlDocument already has a root element")
+                    case None => ()
+                }
             case Declaration(_) =>
                 match (declaration) {
                     case Some(_) => throwDom("XmlDocument already has an XML declaration")
@@ -279,10 +280,11 @@ public class XmlDocument <: XmlNode {
     private func isFirstChildDeclaration(): Bool {
         match (headChild) {
             case None => false
-            case Some(h) => match (h.kind()) {
-                case Declaration(_) => true
-                case _ => false
-            }
+            case Some(h) =>
+                match (h.kind()) {
+                    case Declaration(_) => true
+                    case _ => false
+                }
         }
     }
 }

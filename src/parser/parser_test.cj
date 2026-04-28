@@ -84,12 +84,13 @@ func testParseCdata(): Unit {
     @Expect(r.textContent(), "raw & <stuff>")
     // 且应该是一个 CDATA 标记的 XmlText
     match (r.firstChild) {
-        case Some(n) => match (n.kind()) {
-            case Text(t) =>
-                @Expect(t.isCdata, true)
-                @Expect(t.value, "raw & <stuff>")
-            case _ => @Assert(false)
-        }
+        case Some(n) =>
+            match (n.kind()) {
+                case Text(t) =>
+                    @Expect(t.isCdata, true)
+                    @Expect(t.value, "raw & <stuff>")
+                case _ => @Assert(false)
+            }
         case None => @Assert(false)
     }
 }

@@ -1,6 +1,6 @@
 package fastxml.writer
 
-/*
+/**
  * Writer 的语法片段常量与排版三态枚举
  *
  * `DEFAULT_XML_DECLARATION_VALUE` 公开导出，供上层在合成默认声明时复用

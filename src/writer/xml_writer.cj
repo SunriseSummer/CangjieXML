@@ -23,7 +23,7 @@ public class XmlWriter {
     var depth: Int64 = 0
     var atLineStart: Bool = true
 
-    /*
+    /**
      * Fast path: 当 sink 是 `StringXmlSink` 时，直接拿到其 `StringBuilder`，
      * 绕过 `XmlSink.write` 的接口分派。CangjiePerf 显示 `string_concat`
      * (StringBuilder) 不是仓颉强项；减少接口分派可在热路径上显著降低

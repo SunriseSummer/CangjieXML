@@ -3,7 +3,7 @@ package fastxml.parser
 import fastxml.dom.*
 import fastxml.error.*
 
-/*
+/**
  * 结构性字面量常量，集中避免散落到多个函数
  *
  * 注意：以下 String 形式仅用于错误消息 / 静态结构；热路径上的前缀匹配使用
@@ -76,7 +76,7 @@ class XmlParser {
     }
 }
 
-/*
+/**
  * 无状态纯函数：文本工具
  *
  * XML 1.0 §2.3 的空白集合（U+0020 / U+0009 / U+000A / U+000D）全是 ASCII

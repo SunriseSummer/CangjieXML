@@ -30,17 +30,19 @@ func testChildInsertionAndSiblingLinks(): Unit {
 
     // 兄弟导航
     match (a.nextSibling) {
-        case Some(n) => match (n.kind()) {
-            case Element(e) => @Expect(e.name, "b")
-            case _ => @Assert(false)
-        }
+        case Some(n) =>
+            match (n.kind()) {
+                case Element(e) => @Expect(e.name, "b")
+                case _ => @Assert(false)
+            }
         case None => @Assert(false)
     }
     match (c.previousSibling) {
-        case Some(p) => match (p.kind()) {
-            case Element(e) => @Expect(e.name, "b")
-            case _ => @Assert(false)
-        }
+        case Some(p) =>
+            match (p.kind()) {
+                case Element(e) => @Expect(e.name, "b")
+                case _ => @Assert(false)
+            }
         case None => @Assert(false)
     }
 

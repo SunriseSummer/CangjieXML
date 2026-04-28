@@ -158,7 +158,7 @@ public func escapeCdata(s: String): String {
     sb.toString()
 }
 
-/*
+/**
  * CDATA 内容中遇到 `]]>` 的分段处理：以字节扫描定位 `]]>`（全 ASCII，UTF-8
  * 多字节序列的所有字节均 ≥ 0x80）；命中时把 `]]` 与 `>` 分入相邻 CDATA 段
  */
@@ -202,7 +202,7 @@ public let UTF8_BOM: Array<Byte> = [BOM_BYTE_0, BOM_BYTE_1, BOM_BYTE_2]
 // UTF-8 BOM 的字符串表示（单个 U+FEFF 码点）
 public let UTF8_BOM_STRING: String = "\u{FEFF}"
 
-/*
+/**
  * 内部快路径：判断是否需要转义
  *
  * 这两个判定函数对每个文本节点 / 每个属性值都会被调用。`& < > "` 都是 ASCII
