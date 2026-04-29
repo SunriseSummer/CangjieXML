@@ -211,7 +211,7 @@ try (sink = FileXmlSink("/tmp/big.xml")) {
 ```cangjie
 import fastxml.writer.*
 
-// 仅用作示范：把 XML 写到一个 StringBuilder，然后计算长度
+// 仅用作示范：把 XML 写到一个计数器 Sink，统计写出长度
 class CountingSink <: XmlSink {
     public var n: Int64 = 0
     public func write(text: String): Unit { n += text.size }
@@ -221,7 +221,8 @@ class CountingSink <: XmlSink {
 let s = CountingSink()
 let w = XmlWriter(s, options: XmlWriteOptions.compactPreset())
 w.writeDocument(doc)
-// s.n 即为 UTF-16 字符数（仓颉 String.size 的含义）
+// 仓颉 String 内部即 UTF-8 字节序列，`String.size` 返回字节数；
+// 因此 s.n 等于序列化结果的 UTF-8 字节长度
 ```
 
 ---
