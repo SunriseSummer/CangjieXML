@@ -1,11 +1,9 @@
-# CangjieXML
+# fastxml：仓颉高性能 xml 库
 
-纯仓颉语言实现的 XML 处理库，以 [tinyxml2](https://github.com/leethomason/tinyxml2)
-为参照重构，零 C/C++ 依赖，与 `cjpm` 工具链无缝集成。
+参考 [tinyxml2](https://github.com/leethomason/tinyxml2)，用仓颉语言实现了一个高性能 xml 库，充分发挥仓颉现代语言特性，更灵活易用。
 
 - 完整 API 文档：[`doc/`](./doc/README.md)
 - 性能数据：[`perf/report.md`](./perf/report.md)
-- 设计文档：[`DESIGN.md`](./DESIGN.md)
 
 ## 特性
 
