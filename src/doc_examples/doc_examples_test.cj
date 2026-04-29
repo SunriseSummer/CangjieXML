@@ -146,6 +146,34 @@ func docDomAttributesOrderAndHas(): Unit {
     @Expect(names, "id,lang,")
 }
 
+// doc/03-dom.md "示例：属性与查询" 中的索引访问 + tryAddAttribute 段落
+@Test
+func docDomAttributeAtAndTryAddAttribute(): Unit {
+    let doc = XmlDocument()
+    let e = doc.createElement("book")
+    e.setAttribute("id", "1")
+    e.setAttribute("lang", "en")
+    doc.appendChild(e)
+
+    // 索引访问（避免迭代器分配的热路径写法）
+    var pairs = ""
+    var i = 0
+    while (i < e.attributeCount()) {
+        let a = e.attributeAt(i)
+        pairs += "${a.name}=${a.value};"
+        i++
+    }
+    @Expect(pairs, "id=1;lang=en;")
+
+    // 不覆盖式新增：新名字成功，重复名字失败
+    @Expect(e.tryAddAttribute("genre", "fiction"), true)
+    @Expect(e.tryAddAttribute("id", "9"), false)
+    // 已存在的属性值未被覆盖
+    @Expect(e.attribute("id").getOrThrow(), "1")
+    @Expect(e.attribute("genre").getOrThrow(), "fiction")
+    @Expect(e.attributeCount(), 3)
+}
+
 // ----------------------------------------------------------------------
 // 04 Parser：空白折叠
 // ----------------------------------------------------------------------
@@ -505,6 +533,60 @@ func docIoFileNotFoundIsXmlIoException(): Unit {
         }
     }
     @Expect(matched, true)
+}
+
+// doc/11-examples.md 示例 7：FileXmlSink 流式写盘
+@Test
+func docIoFileXmlSinkStreaming(): Unit {
+    let tmp = DocTempFile("file_sink_stream.xml")
+    try {
+        let doc = docMakeSampleDoc()
+        try (sink = FileXmlSink(tmp.path)) {
+            let w = XmlWriter(sink)
+            w.writeDocument(doc)
+        }
+        // 落盘后能读回，且与同一选项下的 writeXmlToBytes 等价
+        let loaded = loadXmlFromFile(tmp.path)
+        @Expect(loaded.rootElement.getOrThrow().name, "catalog")
+        @Expect(loaded.rootElement.getOrThrow()
+            .requiredChildElement("book").intAttribute("id").getOrThrow(), 1)
+    } finally {
+        tmp.cleanup()
+    }
+}
+
+// doc/11-examples.md 示例 8：自定义 Sink，统计输出长度（注意 String.size 是字节数）
+class DocCountingSink <: XmlSink {
+    public var n: Int64 = 0
+    public func write(text: String): Unit {
+        n += text.size
+    }
+    public func flush(): Unit {}
+}
+
+@Test
+func docExampleCustomSinkCountsBytes(): Unit {
+    let doc = docMakeSampleDoc()
+    let sink = DocCountingSink()
+    let writer = XmlWriter(sink, options: XmlWriteOptions.compactPreset())
+    writer.writeDocument(doc)
+
+    // 与 writeXmlToBytes(...) 走同一序列化器、同一选项；二者字节数应一致
+    let bytes = writeXmlToBytes(doc, XmlWriteOptions.compactPreset())
+    @Expect(sink.n, bytes.size)
+    @Expect(sink.n > 0, true)
+}
+
+// doc/11-examples.md 示例 9：裸 DOM 直接生成 CDATA（与 Builder 路径互补）
+@Test
+func docExampleCdataViaBareDom(): Unit {
+    let doc = XmlDocument()
+    let r = doc.createElement("code")
+    doc.appendChild(r)
+    r.appendChild(doc.createText("x < 3 && y > 1", cdata: true))
+
+    @Expect(doc.writeToString(XmlWriteOptions(writeDeclaration: false)),
+        "<code><![CDATA[x < 3 && y > 1]]></code>\n")
 }
 
 // ----------------------------------------------------------------------

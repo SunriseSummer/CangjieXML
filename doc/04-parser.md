@@ -134,14 +134,15 @@ try {
 
 ```cangjie
 public struct SourcePos <: ToString {
-    public let offset: Int64   // 从文档起始（忽略 BOM）算起的 Rune 索引
+    public let offset: Int64   // 从文档起始（剥离 BOM 之后）算起的字节偏移
     public let line: Int64     // 1 起
-    public let column: Int64   // 1 起
+    public let column: Int64   // 1 起（按码点计）
 }
 ```
 
-> Parser 产出的 `offset` 以 **Rune（码点）** 为单位，与 `line` / `column` 的计数
-> 保持一致；不是字节偏移。
+> Parser 产出的 `offset` 以 **字节** 为单位（仓颉 `String` 内部即 UTF-8 字节），
+> 纯 ASCII 输入下与"码点偏移"完全一致；含多字节 UTF-8 字符时按字节计。
+> 行列定位仍按 **码点** 计数，对人类阅读最直观；`offset` 主要用于错误信息呈现。
 
 ---
 

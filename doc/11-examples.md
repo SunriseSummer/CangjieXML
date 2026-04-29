@@ -1,8 +1,8 @@
 # 11 — 示例集
 
-本章收录覆盖多包、可直接复制使用的端到端示例。本章的每一段仓颉代码都在
-`src/doc_examples/doc_examples_test.cj` 中作为 `@Test` 被执行——你看到的
-断言就是实际运行时的断言。
+本章收录覆盖多包、可直接复制使用的端到端示例。除非显式标注为"示意草图"，
+本章的代码都已在 `src/doc_examples/doc_examples_test.cj` 中作为 `@Test`
+被执行——你看到的断言就是实际运行时的断言。
 
 ---
 
@@ -164,6 +164,11 @@ doc.accept(c)
 
 ## 6. 文件 IO + 健壮错误处理
 
+> 下方代码是 **错误处理骨架**：使用 `return` 提前退出意味着它需要包在某个
+> 函数体内才能编译。`saveXmlToFile` + `loadXmlFromFile` 的成功路径与
+> `FileNotFound` 分支已分别由 `docIoFileRoundTrip` /
+> `docIoFileNotFoundIsXmlIoException` 自动化覆盖。
+
 ```cangjie
 import fastxml.dom.*
 import fastxml.io.*
@@ -211,7 +216,7 @@ try (sink = FileXmlSink("/tmp/big.xml")) {
 ```cangjie
 import fastxml.writer.*
 
-// 仅用作示范：把 XML 写到一个 StringBuilder，然后计算长度
+// 仅用作示范：把 XML 写到一个计数器 Sink，统计写出长度
 class CountingSink <: XmlSink {
     public var n: Int64 = 0
     public func write(text: String): Unit { n += text.size }
@@ -221,7 +226,8 @@ class CountingSink <: XmlSink {
 let s = CountingSink()
 let w = XmlWriter(s, options: XmlWriteOptions.compactPreset())
 w.writeDocument(doc)
-// s.n 即为 UTF-16 字符数（仓颉 String.size 的含义）
+// 仓颉 String 内部即 UTF-8 字节序列，`String.size` 返回字节数；
+// 因此 s.n 等于序列化结果的 UTF-8 字节长度
 ```
 
 ---

@@ -44,9 +44,9 @@ public enum XmlError <: ToString {
 
 ```cangjie
 public struct SourcePos <: ToString {
-    public let offset: Int64    // Rune 偏移（不含 BOM）
+    public let offset: Int64    // 字节偏移（剥离 BOM 之后；纯 ASCII 与码点偏移等价）
     public let line: Int64      // 1 起
-    public let column: Int64    // 1 起
+    public let column: Int64    // 1 起（按码点计）
 
     public static func zero(): SourcePos    // (0, 1, 1)
 }
