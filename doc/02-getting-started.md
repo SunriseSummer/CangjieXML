@@ -7,21 +7,11 @@
 
 ---
 
-## 在项目中使用 CangjieXML
+## 在项目引入 fastxml
 
-CangjieXML 以标准 `cjpm` 包形式组织。把它作为依赖引入后即可使用所有公共 API。
-
-假设你的项目目录结构为：
-
-```
-my_app/
-├── cjpm.toml
-└── src/
-    └── main.cj
-```
-
-在 `cjpm.toml` 中声明依赖（具体依赖声明语法以 `cjpm` 当前版本为准）后，即可
+在你的仓颉项目配置文件 `cjpm.toml` 中声明 fastxml 依赖，即可
 通过 `import fastxml.*` / `import fastxml.dom.*` 等方式引入。
+可参见端到端测试项目 `e2etest/excel/cjpm.toml` 的配置方法。
 
 ---
 
