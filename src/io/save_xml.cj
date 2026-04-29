@@ -37,8 +37,8 @@ public func writeXmlToBytes(doc: XmlDocument): Array<Byte> {
 
 public func writeXmlToBytes(doc: XmlDocument, options: XmlWriteOptions): Array<Byte> {
     let sink = StringXmlSink()
-    let w = XmlWriter(sink, options: options)
-    w.writeDocument(doc)
+    let writer = XmlWriter(sink, options: options)
+    writer.writeDocument(doc)
     sink.toString().toArray()
 }
 

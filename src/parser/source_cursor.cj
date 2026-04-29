@@ -52,9 +52,6 @@ const BY_T_UPPER: Byte = 0x54u8 // 'T'
 // ASCII 边界：`b < ASCII_LIMIT_BYTE` 即纯 ASCII 字节
 const ASCII_LIMIT_BYTE: Byte = 0x80u8
 
-// "无字节"哨兵——XML 文本中 0x00 本就非法，可安全用作越界返回值
-const NO_BYTE: Byte = 0x00u8
-
 // UTF-8 BOM 字节序列 `EF BB BF`
 const BOM_BYTE_0: Byte = 0xEFu8
 const BOM_BYTE_1: Byte = 0xBBu8
@@ -191,31 +188,6 @@ class SourceCursor {
      */
     func currentByte(): Byte {
         source[idx]
-    }
-
-    /**
-     * 取当前位置的字节，越界时返回 [NO_BYTE]。`NO_BYTE = 0x00` 在 XML 文本中本就
-     * 是非法字符，可安全用作"无字节"哨兵值；供需要"无 EOF 检查"的等值比较使用
-     */
-    func currentByteOr0(): Byte {
-        if (idx < limit) {
-            source[idx]
-        } else {
-            NO_BYTE
-        }
-    }
-
-    /**
-     * 取偏移 `k` 字节处的字节，越界返回 [NO_BYTE]。`k` 一般为 1，用于 lookahead
-     * 一个 ASCII 分隔符（如 `?>`、`</`）
-     */
-    func byteAtOffset(k: Int64): Byte {
-        let targetIndex = idx + k
-        if (targetIndex >= 0 && targetIndex < limit) {
-            source[targetIndex]
-        } else {
-            NO_BYTE
-        }
     }
 
     /**
@@ -382,12 +354,12 @@ class SourceCursor {
         if (idx + prefixLen > limit) {
             return false
         }
-        var i = 0
-        while (i < prefixLen) {
-            if (source[idx + i] != prefix[i]) {
+        var byteIndex = 0
+        while (byteIndex < prefixLen) {
+            if (source[idx + byteIndex] != prefix[byteIndex]) {
                 return false
             }
-            i++
+            byteIndex++
         }
         idx += prefixLen
         column += prefixLen
@@ -475,11 +447,6 @@ struct Utf8Decoded {
         this.rune = rune
         this.byteLen = byteLen
     }
-}
-
-// XML 规范 §2.3 定义的空白字符集合
-func isXmlWhitespace(r: Rune): Bool {
-    r == r' ' || r == r'\t' || r == CH_LF || r == r'\r'
 }
 
 // 名称起始字符（XML 1.0 Name 子集：字母 / `_` / `:`）

@@ -33,8 +33,8 @@ extend XmlParser {
             if (cur.eof()) {
                 throw XmlParseException(InvalidAttribute("(?)", cur.pos(), "unexpected EOF inside start tag"))
             }
-            let b = cur.currentByte()
-            if (b == BY_GT || b == BY_SLASH) {
+            let currentByte = cur.currentByte()
+            if (currentByte == BY_GT || currentByte == BY_SLASH) {
                 return
             }
             parseOneAttribute(el)
@@ -121,12 +121,12 @@ extend XmlParser {
         if (cur.eof()) {
             throw XmlParseException(InvalidText(startPos, "unexpected EOF after '<'"))
         }
-        let b = cur.currentByte()
-        if (b == BY_QUESTION) {
+        let currentByte = cur.currentByte()
+        if (currentByte == BY_QUESTION) {
             consumeExpected(CH_QUESTION)
             return parsePiInsideElement(startPos)
         }
-        if (b == BY_BANG) {
+        if (currentByte == BY_BANG) {
             return parseBangMarkup(startPos, atTop: false)
         }
         parseElement(startPos, depth + 1)

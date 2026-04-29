@@ -53,14 +53,14 @@ public class XmlElement <: XmlNode {
         match (attrIndex) {
             case Some(m) => m.get(name)
             case None =>
-                let n = attrOrder.size
-                var i = 0
-                while (i < n) {
-                    let a = attrOrder[i]
-                    if (a.name == name) {
-                        return Some(a)
+                let count = attrOrder.size
+                var index = 0
+                while (index < count) {
+                    let attr = attrOrder[index]
+                    if (attr.name == name) {
+                        return Some(attr)
                     }
-                    i++
+                    index++
                 }
                 None
         }
@@ -76,15 +76,15 @@ public class XmlElement <: XmlNode {
             case Some(m) => m[attr.name] = attr
             case None =>
                 if (attrOrder.size > ATTR_INDEX_THRESHOLD) {
-                    let m = HashMap<String, XmlAttribute>()
-                    let n = attrOrder.size
-                    var i = 0
-                    while (i < n) {
-                        let a = attrOrder[i]
-                        m[a.name] = a
-                        i++
+                    let map = HashMap<String, XmlAttribute>()
+                    let count = attrOrder.size
+                    var index = 0
+                    while (index < count) {
+                        let existing = attrOrder[index]
+                        map[existing.name] = existing
+                        index++
                     }
-                    attrIndex = Some(m)
+                    attrIndex = Some(map)
                 }
         }
     }
@@ -108,9 +108,9 @@ public class XmlElement <: XmlNode {
      * - CDATA 与普通文本一视同仁，只取其 `value`
      */
     public func textContent(): String {
-        let sb = StringBuilder()
-        collectTextContent(this, sb)
-        sb.toString()
+        let buffer = StringBuilder()
+        collectTextContent(this, buffer)
+        buffer.toString()
     }
 
     /**
@@ -124,8 +124,8 @@ public class XmlElement <: XmlNode {
      */
     public func setTextContent(value: String): Unit {
         clearAllChildren()
-        let t = document.createText(value)
-        linkAtEnd(t)
+        let textNode = document.createText(value)
+        linkAtEnd(textNode)
     }
 
     // ==================================================================
@@ -174,15 +174,15 @@ public class XmlElement <: XmlNode {
         tailChild = None
     }
 
-    private static func collectTextContent(el: XmlElement, sb: StringBuilder): Unit {
-        var cur = el.headChild
-        while (let Some(n) <- cur) {
-            match (n.kind()) {
-                case Text(t) => sb.append(t.value)
-                case Element(child) => collectTextContent(child, sb)
+    private static func collectTextContent(el: XmlElement, buffer: StringBuilder): Unit {
+        var cursor = el.headChild
+        while (let Some(child) <- cursor) {
+            match (child.kind()) {
+                case Text(t) => buffer.append(t.value)
+                case Element(grandchild) => collectTextContent(grandchild, buffer)
                 case _ => ()
             }
-            cur = n.nextRef
+            cursor = child.nextRef
         }
     }
 }

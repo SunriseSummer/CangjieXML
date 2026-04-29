@@ -78,8 +78,8 @@ public class Float64Codec <: XmlValueCodec<Float64> {
 // `Bool` 编解码。接受 `"true"/"false"/"1"/"0"`（忽略大小写）
 public class BoolCodec <: XmlValueCodec<Bool> {
     public func tryParse(text: String): ?Bool {
-        let t = lowerAscii(trimAscii(text))
-        match (t) {
+        let normalized = lowerAscii(trimAscii(text))
+        match (normalized) {
             case "true" => Some(true)
             case "1" => Some(true)
             case "false" => Some(false)
@@ -135,25 +135,25 @@ func trimAscii(s: String): String {
     if (start == 0 && end == rr.size) {
         return s
     }
-    let sb = StringBuilder()
-    var i = start
-    while (i < end) {
-        sb.append(rr[i])
-        i++
+    let buffer = StringBuilder()
+    var index = start
+    while (index < end) {
+        buffer.append(rr[index])
+        index++
     }
-    sb.toString()
+    buffer.toString()
 }
 
 func lowerAscii(s: String): String {
-    let sb = StringBuilder()
+    let buffer = StringBuilder()
     for (r in s.runes()) {
         if (r >= r'A' && r <= r'Z') {
-            sb.append(Rune(UInt32(r) + UInt32(r'a') - UInt32(r'A')))
+            buffer.append(Rune(UInt32(r) + UInt32(r'a') - UInt32(r'A')))
         } else {
-            sb.append(r)
+            buffer.append(r)
         }
     }
-    sb.toString()
+    buffer.toString()
 }
 
 func isAsciiWhitespace(r: Rune): Bool {

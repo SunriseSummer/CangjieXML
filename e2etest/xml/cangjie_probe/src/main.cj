@@ -6,23 +6,23 @@ import std.sort.*
 
 /**
  * e2e probe 主入口：读取 fixtures 目录、按 `--mode` 以对应流水线在仓颉侧处理每个
- * `.xml`、生成与 Python 端一致的指纹 JSON。
+ * `.xml`、生成与 Python 端一致的指纹 JSON
  *
  * ## 模式
  *
- * - `parse`（默认）：读文件 → `loadXmlFromFile` → 指纹。覆盖 Parser + IO。
- * - `roundtrip-pretty`：读 → parse → 以默认（pretty）选项 write → 再 parse → 指纹。
+ * - `parse`（默认）：读文件 → `loadXmlFromFile` → 指纹。覆盖 Parser + IO
+ * - `roundtrip-pretty`：读 → parse → 以默认（pretty）选项 write → 再 parse → 指纹
  *   覆盖 Writer 默认排版 + 与 Parser 的往返一致性。写出的缩进 / 换行不应改变
- *   指纹，因为 `normalizeWhitespace` 会吞掉"仅空白"的 direct text。
- * - `roundtrip-compact`：读 → parse → 以 compact 选项 write → 再 parse → 指纹。
- *   额外覆盖 compact 模式下空元素 / 文本 inline 的写出路径。
+ *   指纹，因为 `normalizeWhitespace` 会吞掉"仅空白"的 direct text
+ * - `roundtrip-compact`：读 → parse → 以 compact 选项 write → 再 parse → 指纹
+ *   额外覆盖 compact 模式下空元素 / 文本 inline 的写出路径
  * - `builder`：不读 fixture 文件——而是用 `XmlDocumentBuilder` 在仓颉侧**构造**
- *   与 `01_bookstore.xml` 等价的文档 → write → 再 parse → 指纹。
- *   与 Python 对 `01_bookstore.xml` 的指纹严格一致才能通过。覆盖 Builder + DOM。
+ *   与 `01_bookstore.xml` 等价的文档 → write → 再 parse → 指纹
+ *   与 Python 对 `01_bookstore.xml` 的指纹严格一致才能通过。覆盖 Builder + DOM
  *
  * - `bytes`：把每个 fixture 读为字节 → `parseXmlBytes` → 走 `writeXmlToBytes` 再
  *   `parseXmlBytes` → 指纹。覆盖 `io.parseXmlBytes` + `io.writeXmlToBytes` 的
- *   字节级往返路径（与 `parse` 模式互补——后者走 `loadXmlFromFile`）。
+ *   字节级往返路径（与 `parse` 模式互补——后者走 `loadXmlFromFile`）
  *
  * 用法：`cangjie_probe <mode> <fixtures_dir> <out_path>`
  */
@@ -52,7 +52,7 @@ main(args: Array<String>): Int64 {
     0
 }
 
-/** 按文件名字典序列出 fixtures 目录里的所有 `.xml`。 */
+/** 按文件名字典序列出 fixtures 目录里的所有 `.xml` */
 func listXmlFiles(dir: String): ArrayList<String> {
     let infos = Directory.readFrom(Path(dir))
     let names = ArrayList<String>()
@@ -66,7 +66,7 @@ func listXmlFiles(dir: String): ArrayList<String> {
     names
 }
 
-/** 遍历所有 fixture，按指定模式生成合并 JSON 对象。 */
+/** 遍历所有 fixture，按指定模式生成合并 JSON 对象 */
 func renderAllFixtures(dir: String, mode: ProbeMode): String {
     let files = listXmlFiles(dir)
     let json = StringBuilder()

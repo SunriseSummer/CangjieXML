@@ -8,7 +8,7 @@ import fastxml.io.*
 import fastxml.parser.*
 import fastxml.writer.*
 
-/** Probe 的五种运行模式——影响 `loadForFingerprint` 走哪条库路径。 */
+/** Probe 的五种运行模式——影响 `loadForFingerprint` 走哪条库路径 */
 enum ProbeMode {
     | ModeParse
     | ModeRoundTripPretty
@@ -19,7 +19,7 @@ enum ProbeMode {
 
 /**
  * 把单个 fixture 的指纹写进 `out`。JSON 形状与 `python_probe/probe.py` 完全一致
- * ——两端任何字段顺序 / 键名 / 文本规范化规则的偏差都会被 diff 立刻炸出。
+ * ——两端任何字段顺序 / 键名 / 文本规范化规则的偏差都会被 diff 立刻炸出
  */
 func writeFileFingerprint(out: StringBuilder, dir: String, name: String, mode: ProbeMode): Unit {
     let path = "${dir}/${name}"
@@ -33,7 +33,7 @@ func writeFileFingerprint(out: StringBuilder, dir: String, name: String, mode: P
 
     // `declaration_present` 永远按原始字节判定；roundtrip 写出的 XML 即便丢了
     // declaration（compact + writeDeclaration=true 保留；pretty 默认也保留），
-    // 也不应改变"原文件指纹"的该字段——否则 diff 反而会误报。
+    // 也不应改变"原文件指纹"的该字段——否则 diff 反而会误报
     let declPresent = hasXmlDeclaration(path)
     let rootName = match (doc.rootElement) {
         case Some(r) => r.name
@@ -43,38 +43,38 @@ func writeFileFingerprint(out: StringBuilder, dir: String, name: String, mode: P
     emitFingerprint(out, name, declPresent, rootName, elements)
 }
 
-/** 根据模式选择库路径：直接 parse / parse→write→parse 的往返。 */
+/** 根据模式选择库路径：直接 parse / parse→write→parse 的往返 */
 func loadDocForMode(path: String, mode: ProbeMode): XmlDocument {
     match (mode) {
         case ModeParse => loadXmlFromFile(path)
         case ModeRoundTripPretty => roundTrip(loadXmlFromFile(path), XmlWriteOptions.default_())
         case ModeRoundTripCompact => roundTrip(loadXmlFromFile(path), XmlWriteOptions.compactPreset())
         case ModeBytesRoundTrip =>
-            // 走 bytes 专用 API：parseXmlBytes → writeXmlToBytes → parseXmlBytes。
+            // 走 bytes 专用 API：parseXmlBytes → writeXmlToBytes → parseXmlBytes
             // 和 `roundtrip-*` 的区别在于两端都用字节 API——覆盖 io 包里从
-            // `Array<Byte>` 进出的路径（HTTP / DB / 嵌入资源场景）。
+            // `Array<Byte>` 进出的路径（HTTP / DB / 嵌入资源场景）
             let raw = File.readFrom(Path(path))
             let parsed = parseXmlBytes(raw)
             let serialized = writeXmlToBytes(parsed, XmlWriteOptions.compactPreset())
             parseXmlBytes(serialized)
         case ModeBuilder =>
-            // `builder` 模式不应通过本函数——由 `renderBuilderFixtures` 直接调用。
+            // `builder` 模式不应通过本函数——由 `renderBuilderFixtures` 直接调用
             throw Exception("loadDocForMode called with ModeBuilder (internal error)")
     }
 }
 
 /**
- * parse → write（以 `opts` 排版）→ parse，返回新 Document。
+ * parse → write（以 `opts` 排版）→ parse，返回新 Document
  *
  * 用 `doc.writeToString(opts)` 而非手动构造 `XmlWriter`——这条路径走的是
  * `writer.XmlWritable` 接口的跨包扩展方法，顺带作为"跨包可见性"的回归
- * 保障：如果 `writeToString` 又被写成脱离接口的扩展，e2e 立刻挂。
+ * 保障：如果 `writeToString` 又被写成脱离接口的扩展，e2e 立刻挂
  */
 func roundTrip(doc: XmlDocument, opts: XmlWriteOptions): XmlDocument {
     parseXml(doc.writeToString(opts))
 }
 
-/** 写出一条 fixture 的指纹 JSON。抽取以便 `renderBuilderFixtures` 复用。 */
+/** 写出一条 fixture 的指纹 JSON。抽取以便 `renderBuilderFixtures` 复用 */
 func emitFingerprint(
     out: StringBuilder, name: String,
     declPresent: Bool, rootName: String,
@@ -98,12 +98,12 @@ func emitFingerprint(
     out.append("  }")
 }
 
-/** 用 record 持有单个元素的指纹字段——让"收集"与"序列化"解耦。 */
+/** 用 record 持有单个元素的指纹字段——让"收集"与"序列化"解耦 */
 class ElementRecord {
     public let path: String
     public let depth: Int64
     public let name: String
-    /** 按属性名字典序排好的 (name, value) 对。 */
+    /** 按属性名字典序排好的 (name, value) 对 */
     public let attrs: ArrayList<(String, String)>
     public let text: String
     public init(
@@ -132,7 +132,7 @@ func writeElementRecord(out: StringBuilder, r: ElementRecord): Unit {
 
 /**
  * 与 Python 侧 `visit` 严格对齐：对每个元素按"同名兄弟序号"生成 `path`，
- * 并把自身记录追加到扁平列表，再递归孩子。
+ * 并把自身记录追加到扁平列表，再递归孩子
  */
 func visitElement(
     el: XmlElement, parentPath: String,
@@ -161,7 +161,7 @@ func visitElement(
     }
 }
 
-/** 读取 el 的直接文本：仅该元素下的 XmlText 子节点（含 CDATA），规范化后拼接。 */
+/** 读取 el 的直接文本：仅该元素下的 XmlText 子节点（含 CDATA），规范化后拼接 */
 func directText(el: XmlElement): String {
     let buf = StringBuilder()
     for (child in el.childNodes()) {
@@ -175,9 +175,9 @@ func directText(el: XmlElement): String {
 
 /** 与 Python 侧的 `normalize_text` 等价：内部连续空白折叠为单空格，两端 strip。
  *
- *  实现要点：按**字节**扫描，但非空白字节原样复制到输出（不经过 `Rune`）。
+ *  实现要点：按**字节**扫描，但非空白字节原样复制到输出（不经过 `Rune`）
  *  否则 `Rune(UInt32(b))` 会把每个 UTF-8 续字节当成独立码点，中文 / emoji
- *  会被拆散再重组为伪 Latin-1 字符串，导致与 Python 侧 diff 不上。
+ *  会被拆散再重组为伪 Latin-1 字符串，导致与 Python 侧 diff 不上
  */
 func normalizeWhitespace(s: String): String {
     let bytes = s.toArray()
@@ -214,7 +214,7 @@ func collectSortedAttrs(el: XmlElement): ArrayList<(String, String)> {
     pairs
 }
 
-/** 通过读取文件头 64 字节来判断是否存在 `<?xml` 声明，容忍 BOM。 */
+/** 通过读取文件头 64 字节来判断是否存在 `<?xml` 声明，容忍 BOM */
 func hasXmlDeclaration(path: String): Bool {
     let bytes = File.readFrom(Path(path))
     var start = 0
@@ -223,8 +223,8 @@ func hasXmlDeclaration(path: String): Bool {
     }
     // skip leading whitespace
     while (start < bytes.size) {
-        let b = bytes[start]
-        if (b == b' ' || b == b'\t' || b == b'\n' || b == b'\r') { start += 1 }
+        let byte = bytes[start]
+        if (byte == b' ' || byte == b'\t' || byte == b'\n' || byte == b'\r') { start += 1 }
         else { break }
     }
     let needle: Array<Byte> = [b'<', b'?', b'x', b'm', b'l']
@@ -238,7 +238,7 @@ func hasXmlDeclaration(path: String): Bool {
 /** JSON 字符串转义——只处理必须转义的 ASCII 控制字符；其它 UTF-8 字节原样复制。
  *
  *  与 `normalizeWhitespace` 同理：非特殊字节绝不走 `Rune` 构造，否则会把 UTF-8
- *  续字节当独立码点、重新编码成乱码。
+ *  续字节当独立码点、重新编码成乱码
  */
 func jsonEscape(s: String): String {
     let bytes = s.toArray()
