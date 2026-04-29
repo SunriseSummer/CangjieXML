@@ -12,10 +12,11 @@
 
 ## 命名
 
-- 局部变量使用具有语义的名字，避免 `n / i / j / b / sb / ojbk` 这类单字母名或简单缩写
+- 类型名用大驼峰，函数名和变量名等使用小驼峰，但字面含义都应准确清晰反映其实体功能
+- 变量名避免 `n / i / j / b / sb / ojbk` 这类单字母名或简单缩写，尽量用完整单词/组合表达其语义
+- 常量名全大写 + 下划线分隔，并按语义归类（如 `UTF8_*`、`BOM_*` 等前缀）
 - 用途明确时优先使用 `length / size / index / position / current / target` 等约定名
 - 索引类变量统一用 `xxxIndex`（如 `byteIndex`、`candidateIndex`、`lastWriteIndex`）
-- 常量名全大写下划线分隔，并按语义归类（`CDATA_*`、`UTF8_*`、`BOM_*` 等前缀）
 
 ## 魔鬼数字
 
