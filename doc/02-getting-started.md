@@ -25,22 +25,6 @@ my_app/
 
 ---
 
-## 构建与测试
-
-```bash
-source /opt/cangjie/envsetup.sh   # 或自行配置仓颉 SDK
-cjpm build
-cjpm test
-```
-
-`cjpm test` 会运行：
-
-- DOM / Parser / Writer / Query / Builder / Visit / IO 的单元测试；
-- `src/doc_examples/` 下的**文档示例验证测试**（见
-  [文档回归保障](./README.md#文档版本与回归保障)）。
-
----
-
 ## 第一个程序：构造并打印一棵 XML
 
 ```cangjie
@@ -100,10 +84,7 @@ main(): Int64 {
 }
 ```
 
-注意：本示例使用 `parser` 包中的顶层函数 `parseXml(...)`。受 cjc 1.0.5
-扩展可见性限制，`XmlDocument.parseString(...)` 静态方法形式仅在同包调用时
-可见，应用代码（与 `fastxml.parser` 不同包）中应使用 `parseXml(...)`。详见
-[04 — Parser](./04-parser.md#公共入口)。
+本示例使用了 `fastxml.parser` 包中的顶层函数 `parseXml(...)`。
 
 ---
 
