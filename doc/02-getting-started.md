@@ -10,7 +10,7 @@
 ## 在项目引入 fastxml
 
 在你的仓颉项目配置文件 `cjpm.toml` 中声明 fastxml 依赖，即可
-通过 `import fastxml.*` / `import fastxml.dom.*` 等方式引入。
+导入相关包，如 `import fastxml.*` / `import fastxml.dom.*`。
 可参见端到端测试项目 `e2etest/excel/cjpm.toml` 的配置方法。
 
 ---
